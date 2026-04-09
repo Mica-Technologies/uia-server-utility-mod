@@ -1,12 +1,18 @@
-[{
+[
+  {
     "modid": "${modid}",
     "name": "${modname}",
-    "description": "An example mod for Minecraft 1.12.2 with Forge",
+    "description": "Resourceful blocks and tools for the Alto Minecraft server",
     "version": "${version}",
     "mcversion": "${mcversion}",
+    "credits": "Alex H, Brandon H (Mica Technologies)",
     "logoFile": "",
     "url": "",
-    "authorList": [],
-    "credits": "",
-    "dependencies": []
-}]
+    "updateUrl": "",
+    "authorList": ["Mica Technologies"],
+    "dependencies": [],
+    "dependants": [],
+    "requiredMods": [],
+    "useDependencyInformation": "true"
+  }
+]
