@@ -78,9 +78,14 @@ local.properties
 # Linux
 *~
 
-run/
+run/*
+!run/config/
+!run/config/lwjgl3ify-early.json
 
 logs/
 
 # Mac
 .DS_Store
+
+.claude/settings.local.json
+.claude/worktrees/
