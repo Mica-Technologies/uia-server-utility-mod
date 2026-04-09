@@ -80,6 +80,7 @@ local.properties
 
 run/*
 !run/config/
+run/config/*
 !run/config/lwjgl3ify-early.json
 
 logs/
