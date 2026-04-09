@@ -1,12 +1,12 @@
 package com.micatechnologies.minecraft.sum.roamer;
 
 import com.micatechnologies.minecraft.sum.SumConstants;
-import net.minecraft.client.model.ModelBiped;
-import net.minecraft.client.renderer.entity.RenderBiped;
+import net.minecraft.client.model.ModelPlayer;
+import net.minecraft.client.renderer.entity.RenderLivingBase;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.ResourceLocation;
 
-public class RenderRoamer extends RenderBiped<EntityRoamer> {
+public class RenderRoamer extends RenderLivingBase<EntityRoamer> {
 
     private static final ResourceLocation[] TEXTURES = {
         new ResourceLocation(SumConstants.MOD_NAMESPACE, "textures/entity/roamer_1.png"),
@@ -18,7 +18,7 @@ public class RenderRoamer extends RenderBiped<EntityRoamer> {
     };
 
     public RenderRoamer(RenderManager manager) {
-        super(manager, new ModelBiped(), 0.5F);
+        super(manager, new ModelPlayer(0.0F, false), 0.5F);
     }
 
     @Override
