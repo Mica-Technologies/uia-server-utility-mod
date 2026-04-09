@@ -6,7 +6,6 @@ import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
@@ -28,38 +27,10 @@ public class Sum {
     @Mod.Instance(SumConstants.MOD_NAMESPACE)
     public static Sum instance;
 
-    private static int entityId = 0;
-
     @EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         SumConfig.init(event.getSuggestedConfigurationFile());
-        MinecraftForge.EVENT_BUS.register(this);
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
-    }
-
-    @SubscribeEvent
-    public void registerEntities(RegistryEvent.Register<EntityEntry> event) {
-        event.getRegistry().register(
-            EntityEntryBuilder.create()
-                .entity(EntityRoamer.class)
-                .id(new ResourceLocation(SumConstants.MOD_NAMESPACE, "roamer"), entityId++)
-                .name("roamer")
-                .tracker(80, 3, true)
-                .build()
-        );
-    }
-
-    @SubscribeEvent
-    public void registerItems(RegistryEvent.Register<Item> event) {
-        event.getRegistry().register(new ItemRoamerSpawnEgg());
-    }
-
-    @SubscribeEvent
-    public void registerRecipes(RegistryEvent.Register<IRecipe> event) {
-    }
-
-    @SubscribeEvent
-    public void registerBlocks(RegistryEvent.Register<Block> event) {
     }
 
     @EventHandler
@@ -72,5 +43,36 @@ public class Sum {
 
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
+    }
+
+    @Mod.EventBusSubscriber(modid = SumConstants.MOD_NAMESPACE)
+    public static class RegistrationHandler {
+
+        private static int entityId = 0;
+
+        @SubscribeEvent
+        public static void registerEntities(RegistryEvent.Register<EntityEntry> event) {
+            event.getRegistry().register(
+                EntityEntryBuilder.create()
+                    .entity(EntityRoamer.class)
+                    .id(new ResourceLocation(SumConstants.MOD_NAMESPACE, "roamer"), entityId++)
+                    .name("roamer")
+                    .tracker(80, 3, true)
+                    .build()
+            );
+        }
+
+        @SubscribeEvent
+        public static void registerItems(RegistryEvent.Register<Item> event) {
+            event.getRegistry().register(new ItemRoamerSpawnEgg());
+        }
+
+        @SubscribeEvent
+        public static void registerBlocks(RegistryEvent.Register<Block> event) {
+        }
+
+        @SubscribeEvent
+        public static void registerRecipes(RegistryEvent.Register<IRecipe> event) {
+        }
     }
 }
