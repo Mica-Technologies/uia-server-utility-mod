@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
+import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.IRecipe;
@@ -44,13 +45,13 @@ public class Sum {
                 .id(new ResourceLocation(SumConstants.MOD_NAMESPACE, "roamer"), entityId++)
                 .name("roamer")
                 .tracker(80, 3, true)
-                .egg(0x7B9971, 0x3B3024)
                 .build()
         );
     }
 
     @SubscribeEvent
     public void registerItems(RegistryEvent.Register<Item> event) {
+        event.getRegistry().register(new ItemRoamerSpawnEgg());
     }
 
     @SubscribeEvent
