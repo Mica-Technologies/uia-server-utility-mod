@@ -9,6 +9,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
+import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
@@ -24,6 +25,10 @@ public class Sum {
 
     public static final Logger LOGGER = LogManager.getLogger(SumConstants.MOD_NAMESPACE);
 
+    @SidedProxy(clientSide = "com.micatechnologies.minecraft.sum.SumClientProxy",
+                serverSide = "com.micatechnologies.minecraft.sum.SumCommonProxy")
+    public static SumProxy proxy;
+
     @Mod.Instance(SumConstants.MOD_NAMESPACE)
     public static Sum instance;
 
@@ -33,6 +38,7 @@ public class Sum {
     public void preInit(FMLPreInitializationEvent event) {
         SumConfig.init(event.getSuggestedConfigurationFile());
         MinecraftForge.EVENT_BUS.register(this);
+        proxy.preInit(event);
         SumTab.initTabElements();
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
@@ -65,6 +71,7 @@ public class Sum {
 
     @EventHandler
     public void init(FMLInitializationEvent event) {
+        proxy.init(event);
     }
 
     @EventHandler

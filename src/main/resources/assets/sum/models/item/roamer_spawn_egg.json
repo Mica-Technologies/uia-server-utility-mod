@@ -1,7 +1,6 @@
 {
   "parent": "item/generated",
   "textures": {
-    "layer0": "minecraft:items/spawn_egg",
-    "layer1": "minecraft:items/spawn_egg_overlay"
+    "layer0": "sum:items/roamer_spawn_egg"
   }
 }
