@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
@@ -38,6 +39,7 @@ public class Sum {
     public void preInit(FMLPreInitializationEvent event) {
         SumConfig.init(event.getSuggestedConfigurationFile());
         MinecraftForge.EVENT_BUS.register(this);
+        MinecraftForge.EVENT_BUS.register(new RoadRunnerHandler());
         proxy.preInit(event);
         SumTab.initTabElements();
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
