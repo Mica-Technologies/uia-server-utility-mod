@@ -3,6 +3,7 @@ package com.micatechnologies.minecraft.sum.roamer;
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.SumConstants;
+import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
@@ -23,6 +24,7 @@ public class ItemRoamerSpawnEgg extends Item {
         this.setTranslationKey(SumConstants.MOD_NAMESPACE + ".roamer_spawn_egg");
         this.setCreativeTab(SumTab.TAB);
         this.maxStackSize = 64;
+        SumRegistry.registerItem(this);
     }
 
     @Override
