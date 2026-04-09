@@ -44,16 +44,17 @@ public class Sum {
                 .id(new ResourceLocation(SumConstants.MOD_NAMESPACE, "roamer"), entityId++)
                 .name("roamer")
                 .tracker(80, 3, true)
+                .egg(0x7B9971, 0x3B3024)
                 .build()
         );
     }
 
     @SubscribeEvent
-    public void registerRecipes(RegistryEvent.Register<IRecipe> event) {
+    public void registerItems(RegistryEvent.Register<Item> event) {
     }
 
     @SubscribeEvent
-    public void registerItems(RegistryEvent.Register<Item> event) {
+    public void registerRecipes(RegistryEvent.Register<IRecipe> event) {
     }
 
     @SubscribeEvent
