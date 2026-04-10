@@ -49,10 +49,14 @@ public class EntityRoamer extends EntityCreature {
     @Override
     protected void initEntityAI() {
         this.tasks.addTask(0, new EntityAISwimming(this));
-        this.tasks.addTask(1, new EntityAIRoamerWander(this, 1.0D, 10));
-        this.tasks.addTask(2, new EntityAIRoamerGreet(this));
-        this.tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
-        this.tasks.addTask(4, new EntityAILookIdle(this));
+        // Emergency AI tasks (CSM fire alarm integration) - higher priority than wander
+        this.tasks.addTask(1, new EntityAIRoamerFireEvacuate(this, 1.2D));
+        this.tasks.addTask(1, new EntityAIRoamerStormShelter(this, 1.2D));
+        // Normal behavior
+        this.tasks.addTask(2, new EntityAIRoamerWander(this, 1.0D, 10));
+        this.tasks.addTask(3, new EntityAIRoamerGreet(this));
+        this.tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
+        this.tasks.addTask(5, new EntityAILookIdle(this));
     }
 
     @Override

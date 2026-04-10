@@ -38,5 +38,8 @@
  * For more details, see https://docs.gradle.org/8.4/userguide/java_library_plugin.html#sec:java_library_configurations_graph
  */
 dependencies {
-
+    // City Super Mod (CSM) - compile-only for soft dependency on fire alarm API.
+    // The SUM mod works without CSM present; integration classes are only classloaded when
+    // Loader.isModLoaded("csm") returns true. Rebuild CSM before SUM if the API changes.
+    compileOnly fileTree(dir: '../minecraft-city-super-mod/build/libs', include: '*-dev.jar')
 }
