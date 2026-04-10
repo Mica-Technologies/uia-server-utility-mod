@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.SharedMonsterAttributes;
+import net.minecraft.entity.ai.attributes.IAttributeInstance;
 import net.minecraft.entity.ai.EntityAILookIdle;
 import net.minecraft.entity.ai.EntityAISwimming;
 import net.minecraft.entity.ai.EntityAIWatchClosest;
@@ -40,6 +41,10 @@ public class EntityRoamer extends EntityCreature {
     private int greetCooldown = DEFAULT_GREET_COOLDOWN;
     private List<String> greetings = new ArrayList<>();
 
+    // When true, the walkable-block pathfinding restriction is bypassed so the roamer can
+    // navigate through buildings on any solid block during fire/storm emergencies.
+    private boolean emergencyMode = false;
+
     public EntityRoamer(World world) {
         super(world);
         this.setSize(0.6F, 1.8F); // Same hitbox as a player
@@ -64,6 +69,10 @@ public class EntityRoamer extends EntityCreature {
         super.applyEntityAttributes();
         this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(20.0D);
         this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.23D);
+        // Pathfinder range — default 16 is too short for emergency evacuation through buildings.
+        // A roamer inside a 15x15 building needs to path: center → door → around wall → exit,
+        // which can easily exceed 16 blocks of path length.
+        this.getEntityAttribute(SharedMonsterAttributes.FOLLOW_RANGE).setBaseValue(48.0D);
     }
 
     @Override
@@ -154,6 +163,16 @@ public class EntityRoamer extends EntityCreature {
         if (this.hasCustomName()) {
             this.setAlwaysRenderNameTag(true);
         }
+    }
+
+    // --- Emergency mode ---
+
+    public boolean isEmergencyMode() {
+        return emergencyMode;
+    }
+
+    public void setEmergencyMode(boolean emergency) {
+        this.emergencyMode = emergency;
     }
 
     // --- Property accessors ---

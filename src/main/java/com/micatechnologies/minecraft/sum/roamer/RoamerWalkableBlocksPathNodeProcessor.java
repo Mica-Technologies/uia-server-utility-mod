@@ -9,7 +9,9 @@ import net.minecraft.world.IBlockAccess;
 
 /**
  * Custom path node processor that restricts pathfinding to only blocks listed
- * in the SUM config's walkable blocks list.
+ * in the SUM config's walkable blocks list. During emergency mode (fire/storm),
+ * the restriction is bypassed so the roamer can navigate through buildings on
+ * any solid block.
  */
 public class RoamerWalkableBlocksPathNodeProcessor extends WalkNodeProcessor {
 
@@ -17,8 +19,13 @@ public class RoamerWalkableBlocksPathNodeProcessor extends WalkNodeProcessor {
     public PathNodeType getPathNodeType(IBlockAccess world, int x, int y, int z) {
         PathNodeType baseType = super.getPathNodeType(world, x, y, z);
 
-        // Only allow walkable nodes if the block below is in the allowed set
+        // Only restrict walkable nodes when NOT in emergency mode
         if (baseType == PathNodeType.WALKABLE) {
+            // If the entity is a roamer in emergency mode, allow all walkable nodes
+            if (this.entity instanceof EntityRoamer && ((EntityRoamer) this.entity).isEmergencyMode()) {
+                return baseType;
+            }
+
             BlockPos belowPos = new BlockPos(x, y - 1, z);
             IBlockState belowState = world.getBlockState(belowPos);
             String registryName = belowState.getBlock().getRegistryName().toString();
