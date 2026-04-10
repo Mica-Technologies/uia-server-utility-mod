@@ -102,4 +102,37 @@ public class SumConfig {
         }
         return roadRunnerSpeedBlocks.getOrDefault(registryName, 0.0);
     }
+
+    public static void reloadConfig() {
+        if (config != null) {
+            config.load();
+            loadConfig();
+        }
+    }
+
+    public static boolean addRoamerWalkableBlock(String registryName) {
+        if (roamerWalkableBlockSet.contains(registryName)) {
+            return false;
+        }
+        roamerWalkableBlockSet.add(registryName);
+        saveRoamerWalkableBlocks();
+        return true;
+    }
+
+    public static boolean removeRoamerWalkableBlock(String registryName) {
+        if (!roamerWalkableBlockSet.contains(registryName)) {
+            return false;
+        }
+        roamerWalkableBlockSet.remove(registryName);
+        saveRoamerWalkableBlocks();
+        return true;
+    }
+
+    private static void saveRoamerWalkableBlocks() {
+        roamerWalkableBlocks = roamerWalkableBlockSet.toArray(new String[0]);
+        config.get(CATEGORY_ROAMER, FIELD_KEY_ROAMER_WALKABLE_BLOCKS,
+            FIELD_DEFAULT_ROAMER_WALKABLE_BLOCKS, FIELD_DESCRIPTION_ROAMER_WALKABLE_BLOCKS)
+            .set(roamerWalkableBlocks);
+        config.save();
+    }
 }

@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import net.minecraft.block.Block;
@@ -82,5 +83,6 @@ public class Sum {
 
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
+        event.registerServerCommand(new CommandSum());
     }
 }
