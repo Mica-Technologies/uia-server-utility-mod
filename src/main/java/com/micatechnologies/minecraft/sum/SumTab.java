@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.ItemStack;
@@ -14,8 +15,10 @@ public class SumTab {
     };
 
     public static ItemRoamerSpawnEgg roamerSpawnEgg;
+    public static ItemRoamerConfigurator roamerConfigurator;
 
     public static void initTabElements() {
         roamerSpawnEgg = new ItemRoamerSpawnEgg();
+        roamerConfigurator = new ItemRoamerConfigurator();
     }
 }

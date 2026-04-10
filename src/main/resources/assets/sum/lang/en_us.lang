@@ -1,3 +1,4 @@
 item.sum.roamer_spawn_egg.name=Roamer Spawn Egg
+item.sum.roamer_configurator.name=Roamer Configurator
 entity.roamer.name=Roamer
 itemGroup.sum=Server Utility Mod

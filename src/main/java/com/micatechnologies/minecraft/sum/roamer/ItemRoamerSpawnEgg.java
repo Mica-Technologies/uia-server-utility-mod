@@ -50,10 +50,16 @@ public class ItemRoamerSpawnEgg extends Item {
         roamer.setLocationAndAngles(
             spawnPos.getX() + 0.5, spawnPos.getY(), spawnPos.getZ() + 0.5,
             world.rand.nextFloat() * 360.0F, 0.0F);
+        // Transfer display name from spawn egg to roamer
+        ItemStack stack = player.getHeldItem(hand);
+        if (stack.hasDisplayName()) {
+            roamer.setCustomNameTag(stack.getDisplayName());
+            roamer.setAlwaysRenderNameTag(true);
+        }
+
         if (world.spawnEntity(roamer)) {
             Sum.LOGGER.info("Roamer spawned at [{}, {}, {}]",
                 spawnPos.getX(), spawnPos.getY(), spawnPos.getZ());
-            ItemStack stack = player.getHeldItem(hand);
             if (!player.capabilities.isCreativeMode) {
                 stack.shrink(1);
             }
