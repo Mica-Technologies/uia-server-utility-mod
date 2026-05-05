@@ -36,6 +36,17 @@ public class EntityRoamer extends EntityCreature {
     private static final int DEFAULT_GREET_COOLDOWN = 1200; // 60 seconds
     private static final String[] DEFAULT_GREETINGS = {"Hello!", "Hey there!", "Welcome!"};
 
+    // AI-idle gate: when no player is within IDLE_RANGE blocks, skip the per-tick AI work
+    // (pathfinding, task evaluation, helpers). Slightly less than the entity tracker range (80)
+    // so the roamer is already AI-active by the time a player can actually see it. Re-checked
+    // every IDLE_CHECK_INTERVAL ticks; the initial timer is staggered per-instance so a herd of
+    // roamers doesn't all check on the same tick.
+    private static final int IDLE_RANGE = 64;
+    private static final int IDLE_CHECK_INTERVAL = 20; // 1 second
+
+    private int idleCheckTimer;
+    private boolean playerNearby = true;
+
     private boolean greetEnabled = true;
     private double greetRadius = DEFAULT_GREET_RADIUS;
     private int greetCooldown = DEFAULT_GREET_COOLDOWN;
@@ -49,6 +60,7 @@ public class EntityRoamer extends EntityCreature {
         super(world);
         this.setSize(0.6F, 1.8F); // Same hitbox as a player
         resetGreetingsToDefault();
+        this.idleCheckTimer = world.rand.nextInt(IDLE_CHECK_INTERVAL);
     }
 
     @Override
@@ -78,6 +90,27 @@ public class EntityRoamer extends EntityCreature {
     @Override
     protected PathNavigate createNavigator(World world) {
         return new RoamerWalkableBlocksNavigator(this, world);
+    }
+
+    @Override
+    protected void updateAITasks() {
+        if (idleCheckTimer > 0) {
+            idleCheckTimer--;
+        } else {
+            idleCheckTimer = IDLE_CHECK_INTERVAL;
+            playerNearby = world.getClosestPlayer(posX, posY, posZ, IDLE_RANGE, false) != null;
+        }
+
+        if (!playerNearby) {
+            // Stop in place when nobody can see us. AI resumes on the next tick that finds a
+            // player back in range — including any active fire/storm response.
+            if (!getNavigator().noPath()) {
+                getNavigator().clearPath();
+            }
+            return;
+        }
+
+        super.updateAITasks();
     }
 
     @Override
