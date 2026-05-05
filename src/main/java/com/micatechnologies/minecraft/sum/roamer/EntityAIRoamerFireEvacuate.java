@@ -54,10 +54,7 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     private static final int OUTDOOR_WANDER_INTERVAL_MIN = 60;  // 3 seconds
     private static final int OUTDOOR_WANDER_INTERVAL_MAX = 200; // 10 seconds
 
-    // Minimum distance between claimed rally positions so roamers don't stack on one block
-    private static final double MIN_CLAIM_DISTANCE_SQ = 1.0; // 1 block (shoulder-to-shoulder)
-
-    // Shared set of claimed rally positions
+    // Shared set of claimed rally positions — prevents two roamers from picking the same block
     private static final Set<BlockPos> claimedPositions = new HashSet<>();
 
     private final EntityRoamer roamer;
@@ -297,12 +294,7 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     }
 
     private static boolean isPositionClaimed(BlockPos candidate) {
-        for (BlockPos claimed : claimedPositions) {
-            if (claimed.distanceSq(candidate) < MIN_CLAIM_DISTANCE_SQ) {
-                return true;
-            }
-        }
-        return false;
+        return claimedPositions.contains(candidate);
     }
 
     /**

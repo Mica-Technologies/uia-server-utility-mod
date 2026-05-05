@@ -55,10 +55,6 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private static final int INDOOR_WANDER_INTERVAL_MIN = 60;  // 3 seconds
     private static final int INDOOR_WANDER_INTERVAL_MAX = 200; // 10 seconds
 
-    // Minimum distance between claimed shelter positions — just prevent same-block overlap
-    // so roamers can pack shoulder-to-shoulder in a small shelter room
-    private static final double MIN_CLAIM_DISTANCE_SQ = 1.0; // 1 block
-
     // Shared set of claimed shelter positions — prevents all roamers from picking the same spot
     private static final Set<BlockPos> claimedPositions = new HashSet<>();
 
@@ -364,12 +360,7 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     }
 
     private static boolean isPositionClaimed(BlockPos candidate) {
-        for (BlockPos claimed : claimedPositions) {
-            if (claimed.distanceSq(candidate) < MIN_CLAIM_DISTANCE_SQ) {
-                return true;
-            }
-        }
-        return false;
+        return claimedPositions.contains(candidate);
     }
 
     /**
