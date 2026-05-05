@@ -283,6 +283,10 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private List<ScoredPos> findShelterCandidates(World world, BlockPos entityPos) {
         List<ScoredPos> candidates = new ArrayList<>();
         int worstKeptScore = Integer.MIN_VALUE;
+        // Reused mutables for the cube walk — only allocate immutable copies for kept candidates.
+        BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
 
         for (int dy = -SEARCH_RADIUS_Y_DOWN; dy <= SEARCH_RADIUS_Y_UP; dy++) {
             for (int r = 0; r <= SEARCH_RADIUS_XZ; r++) {
@@ -295,30 +299,34 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
                             continue;
                         }
 
-                        BlockPos candidate = entityPos.add(dx, dy, dz);
+                        cur.setPos(entityPos.getX() + dx, entityPos.getY() + dy,
+                            entityPos.getZ() + dz);
 
-                        if (!world.isBlockLoaded(candidate)) {
+                        if (!world.isBlockLoaded(cur)) {
                             continue;
                         }
 
-                        if (!world.isAirBlock(candidate) || !world.isAirBlock(candidate.up())) {
+                        above.setPos(cur.getX(), cur.getY() + 1, cur.getZ());
+                        if (!world.isAirBlock(cur) || !world.isAirBlock(above)) {
                             continue;
                         }
 
-                        if (!world.getBlockState(candidate.down()).getMaterial().isSolid()) {
+                        below.setPos(cur.getX(), cur.getY() - 1, cur.getZ());
+                        if (!world.getBlockState(below).getMaterial().isSolid()) {
                             continue;
                         }
 
-                        if (world.canSeeSky(candidate.up())) {
+                        if (world.canSeeSky(above)) {
                             continue;
                         }
 
-                        // Skip positions already claimed by another roamer
-                        if (isPositionClaimed(candidate)) {
+                        // Skip positions already claimed by another roamer (BlockPos.equals checks
+                        // coords, not concrete class — the mutable matches the stored immutable).
+                        if (isPositionClaimed(cur)) {
                             continue;
                         }
 
-                        int yScore = (entityPos.getY() - candidate.getY()) * 10;
+                        int yScore = (entityPos.getY() - cur.getY()) * 10;
                         int distScore = -(Math.abs(dx) + Math.abs(dz));
                         int score = yScore + distScore;
 
@@ -327,11 +335,11 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
                         }
 
                         // Expensive check — only reached for promising unclaimed candidates
-                        if (isNearHazard(world, candidate)) {
+                        if (isNearHazard(world, cur)) {
                             continue;
                         }
 
-                        candidates.add(new ScoredPos(candidate, score));
+                        candidates.add(new ScoredPos(cur.toImmutable(), score));
 
                         if (score >= GOOD_ENOUGH_SCORE) {
                             candidates.sort(Comparator.comparingInt(s -> -s.score));

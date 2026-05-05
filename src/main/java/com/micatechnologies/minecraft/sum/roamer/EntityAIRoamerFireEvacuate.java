@@ -388,6 +388,10 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
     private List<BlockPos> findExitCandidates(World world, BlockPos entityPos) {
         List<BlockPos> candidates = new ArrayList<>();
+        // Reused mutables for the cube walk — only allocate immutable copies for kept candidates.
+        BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
 
         for (int r = 1; r <= SEARCH_RADIUS_XZ; r++) {
             for (int dx = -r; dx <= r; dx++) {
@@ -397,30 +401,33 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
                     }
 
                     for (int dy = -SEARCH_RADIUS_Y; dy <= SEARCH_RADIUS_Y; dy++) {
-                        BlockPos candidate = entityPos.add(dx, dy, dz);
+                        cur.setPos(entityPos.getX() + dx, entityPos.getY() + dy,
+                            entityPos.getZ() + dz);
 
-                        if (!world.isBlockLoaded(candidate)) {
+                        if (!world.isBlockLoaded(cur)) {
                             continue;
                         }
 
-                        if (!world.isAirBlock(candidate) || !world.isAirBlock(candidate.up())) {
+                        above.setPos(cur.getX(), cur.getY() + 1, cur.getZ());
+                        if (!world.isAirBlock(cur) || !world.isAirBlock(above)) {
                             continue;
                         }
 
-                        if (!world.getBlockState(candidate.down()).getMaterial().isSolid()) {
+                        below.setPos(cur.getX(), cur.getY() - 1, cur.getZ());
+                        if (!world.getBlockState(below).getMaterial().isSolid()) {
                             continue;
                         }
 
-                        if (!world.canSeeSky(candidate.up())) {
+                        if (!world.canSeeSky(above)) {
                             continue;
                         }
 
-                        if (!hasEnoughOpenSky(world, candidate, OPEN_AREA_CHECK_RADIUS,
+                        if (!hasEnoughOpenSky(world, cur, OPEN_AREA_CHECK_RADIUS,
                             MIN_OPEN_SKY_BLOCKS)) {
                             continue;
                         }
 
-                        candidates.add(candidate);
+                        candidates.add(cur.toImmutable());
                     }
                 }
             }
