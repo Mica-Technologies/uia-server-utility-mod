@@ -3,8 +3,10 @@ package com.micatechnologies.minecraft.sum.roamer;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -364,14 +366,42 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     }
 
     private boolean hasEnoughOpenSky(World world, BlockPos center, int radius, int threshold) {
+        return hasEnoughOpenSky(world, center, radius, threshold, null, OPEN_SKY_SCRATCH.get());
+    }
+
+    /**
+     * Same as the public-facing variant but with an optional {@code skyCache} that maps packed
+     * BlockPos longs to canSeeSky results. When the candidate finder evaluates several positions
+     * within a few blocks of one another, their open-area footprints overlap heavily — caching
+     * short-circuits redundant {@link World#canSeeSky} calls. Pass null when no reuse is possible.
+     */
+    private boolean hasEnoughOpenSky(World world, BlockPos center, int radius, int threshold,
+                                     Map<Long, Boolean> skyCache, BlockPos.MutableBlockPos scratch) {
         int count = 0;
         int side = radius * 2 + 1;
         int total = side * side;
         int checked = 0;
+        int cy = center.getY() + 1;
+        int cx = center.getX();
+        int cz = center.getZ();
 
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                if (world.canSeeSky(center.add(dx, 1, dz))) {
+                scratch.setPos(cx + dx, cy, cz + dz);
+                boolean visible;
+                if (skyCache == null) {
+                    visible = world.canSeeSky(scratch);
+                } else {
+                    long key = scratch.toLong();
+                    Boolean cached = skyCache.get(key);
+                    if (cached == null) {
+                        visible = world.canSeeSky(scratch);
+                        skyCache.put(key, visible);
+                    } else {
+                        visible = cached;
+                    }
+                }
+                if (visible) {
                     count++;
                     if (count >= threshold) {
                         return true;
@@ -386,12 +416,21 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         return count >= threshold;
     }
 
+    // Per-thread scratch mutable for the no-cache path so isRallyPoint and findNearbyRallyPoint
+    // (which call hasEnoughOpenSky in isolation) don't have to allocate one each.
+    private static final ThreadLocal<BlockPos.MutableBlockPos> OPEN_SKY_SCRATCH =
+        ThreadLocal.withInitial(BlockPos.MutableBlockPos::new);
+
     private List<BlockPos> findExitCandidates(World world, BlockPos entityPos) {
         List<BlockPos> candidates = new ArrayList<>();
         // Reused mutables for the cube walk — only allocate immutable copies for kept candidates.
         BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
         BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
         BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos skyScratch = new BlockPos.MutableBlockPos();
+        // Shared canSeeSky cache for the open-area check across all candidates in this search.
+        // Candidates near each other have overlapping footprints, so reuse is high.
+        Map<Long, Boolean> skyCache = new HashMap<>();
 
         for (int r = 1; r <= SEARCH_RADIUS_XZ; r++) {
             for (int dx = -r; dx <= r; dx++) {
@@ -423,7 +462,7 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
                         }
 
                         if (!hasEnoughOpenSky(world, cur, OPEN_AREA_CHECK_RADIUS,
-                            MIN_OPEN_SKY_BLOCKS)) {
+                            MIN_OPEN_SKY_BLOCKS, skyCache, skyScratch)) {
                             continue;
                         }
 
