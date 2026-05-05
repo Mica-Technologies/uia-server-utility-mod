@@ -1,7 +1,6 @@
 package com.micatechnologies.minecraft.sum.roamer;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
-import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.ai.EntityAIBase;
 import net.minecraft.entity.ai.RandomPositionGenerator;
@@ -49,10 +48,7 @@ public class EntityAIRoamerWander extends EntityAIBase {
         }
 
         BlockPos groundPos = new BlockPos(target.x, target.y - 1, target.z);
-        IBlockState groundState = entity.world.getBlockState(groundPos);
-        String registryName = groundState.getBlock().getRegistryName().toString();
-
-        if (!SumConfig.isBlockWalkableByRoamer(registryName)) {
+        if (!SumConfig.isBlockWalkableByRoamer(entity.world.getBlockState(groundPos).getBlock())) {
             return false;
         }
 

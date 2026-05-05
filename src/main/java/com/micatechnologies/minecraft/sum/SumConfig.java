@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.block.Block;
 import net.minecraftforge.common.config.Configuration;
 
 public class SumConfig {
@@ -43,6 +44,10 @@ public class SumConfig {
 
     private static String[] roamerWalkableBlocks;
     private static Set<String> roamerWalkableBlockSet;
+    // Resolved lazily on first use. Block instances aren't available at preInit, since the block
+    // registry is populated between preInit and init. The pathfinder hot path only runs after
+    // entities exist in the world (post-init), so lazy resolution is safe.
+    private static volatile Set<Block> roamerWalkableBlockResolved;
 
     private static Map<String, Double> roadRunnerSpeedBlocks;
 
@@ -60,6 +65,7 @@ public class SumConfig {
             FIELD_KEY_ROAMER_WALKABLE_BLOCKS, CATEGORY_ROAMER,
             FIELD_DEFAULT_ROAMER_WALKABLE_BLOCKS, FIELD_DESCRIPTION_ROAMER_WALKABLE_BLOCKS);
         roamerWalkableBlockSet = new HashSet<>(Arrays.asList(roamerWalkableBlocks));
+        roamerWalkableBlockResolved = null;
 
         String[] speedBlockEntries = config.getStringList(
             FIELD_KEY_ROADRUNNER_SPEED_BLOCKS, CATEGORY_ROADRUNNER,
@@ -92,6 +98,37 @@ public class SumConfig {
         return roamerWalkableBlockSet != null && roamerWalkableBlockSet.contains(registryName);
     }
 
+    /**
+     * Hot-path overload used by the roamer pathfinder and AI. Resolves the configured registry
+     * names into {@link Block} instances on first call (after registries are populated) and
+     * matches by reference identity, avoiding {@code getRegistryName().toString()} allocations
+     * on every node expansion.
+     */
+    public static boolean isBlockWalkableByRoamer(Block block) {
+        Set<Block> resolved = roamerWalkableBlockResolved;
+        if (resolved == null) {
+            resolved = resolveWalkableBlocks();
+            roamerWalkableBlockResolved = resolved;
+        }
+        return resolved.contains(block);
+    }
+
+    private static synchronized Set<Block> resolveWalkableBlocks() {
+        if (roamerWalkableBlockResolved != null) {
+            return roamerWalkableBlockResolved;
+        }
+        Set<Block> set = new HashSet<>();
+        if (roamerWalkableBlockSet != null) {
+            for (String name : roamerWalkableBlockSet) {
+                Block b = Block.getBlockFromName(name);
+                if (b != null) {
+                    set.add(b);
+                }
+            }
+        }
+        return set;
+    }
+
     public static Map<String, Double> getRoadRunnerSpeedBlocks() {
         return roadRunnerSpeedBlocks;
     }
@@ -115,6 +152,7 @@ public class SumConfig {
             return false;
         }
         roamerWalkableBlockSet.add(registryName);
+        roamerWalkableBlockResolved = null;
         saveRoamerWalkableBlocks();
         return true;
     }
@@ -124,6 +162,7 @@ public class SumConfig {
             return false;
         }
         roamerWalkableBlockSet.remove(registryName);
+        roamerWalkableBlockResolved = null;
         saveRoamerWalkableBlocks();
         return true;
     }

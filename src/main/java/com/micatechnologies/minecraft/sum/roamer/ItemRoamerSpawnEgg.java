@@ -37,8 +37,8 @@ public class ItemRoamerSpawnEgg extends Item {
 
         // Check if the clicked block is a walkable block for roamers
         IBlockState clickedState = world.getBlockState(pos);
-        String registryName = clickedState.getBlock().getRegistryName().toString();
-        if (!SumConfig.isBlockWalkableByRoamer(registryName)) {
+        if (!SumConfig.isBlockWalkableByRoamer(clickedState.getBlock())) {
+            String registryName = clickedState.getBlock().getRegistryName().toString();
             player.sendMessage(new TextComponentString(
                 TextFormatting.RED + "Roamers can only be placed on walkable blocks! "
                 + TextFormatting.GRAY + "(" + registryName + " is not in the walkable blocks list)"));

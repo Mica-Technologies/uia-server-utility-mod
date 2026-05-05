@@ -6,6 +6,8 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.block.Block;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.ai.EntityAIBase;
 import net.minecraft.entity.ai.RandomPositionGenerator;
 import net.minecraft.util.math.BlockPos;
@@ -252,10 +254,8 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         BlockPos targetPos = new BlockPos(target);
         // Only wander to outdoor positions on walkable blocks
         if (roamer.world.canSeeSky(targetPos.up())) {
-            BlockPos groundPos = targetPos.down();
-            String groundName = roamer.world.getBlockState(groundPos).getBlock()
-                .getRegistryName().toString();
-            if (SumConfig.isBlockWalkableByRoamer(groundName)) {
+            Block groundBlock = roamer.world.getBlockState(targetPos.down()).getBlock();
+            if (SumConfig.isBlockWalkableByRoamer(groundBlock)) {
                 roamer.getNavigator().tryMoveToXYZ(target.x, target.y, target.z, 0.6D);
             }
         }
@@ -330,12 +330,11 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
                     if (!world.isAirBlock(candidate) || !world.isAirBlock(candidate.up())) {
                         continue;
                     }
-                    if (!world.getBlockState(candidate.down()).getMaterial().isSolid()) {
+                    IBlockState belowState = world.getBlockState(candidate.down());
+                    if (!belowState.getMaterial().isSolid()) {
                         continue;
                     }
-                    String groundName = world.getBlockState(candidate.down()).getBlock()
-                        .getRegistryName().toString();
-                    if (!SumConfig.isBlockWalkableByRoamer(groundName)) {
+                    if (!SumConfig.isBlockWalkableByRoamer(belowState.getBlock())) {
                         continue;
                     }
                     if (!isRallyPoint(world, candidate)) {
