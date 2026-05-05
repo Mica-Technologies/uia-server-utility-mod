@@ -2,7 +2,6 @@ package com.micatechnologies.minecraft.sum.roamer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import net.minecraft.util.math.BlockPos;
 
@@ -16,31 +15,31 @@ import net.minecraft.util.math.BlockPos;
  * distance. This ensures roamers prefer exits they can reach without finding stairs, falling
  * back to other-floor exits only if same-level ones aren't reachable.
  * <p>
- * Entries expire after {@link #EXPIRY_TICKS} to avoid stale data after alarms stop.
- * Cleanup is lazy — performed during lookups, not on a timer.
+ * Entries persist until world unload — building geometry doesn't change with time, and a stale
+ * entry that fails pathfinding falls through to a fresh search with no harm done.
  */
 public class RoamerExitCache {
 
-    private static final int EXPIRY_TICKS = 6000; // 5 minutes
-    private static final double MAX_DISTANCE_SQ = 50.0 * 50.0; // 50-block search radius
+    // Search radius for nearby cached exits. Buildings on the Alto pack can be large; 100 blocks
+    // covers most multi-building compounds while still rejecting unrelated exits across town.
+    private static final double MAX_DISTANCE_SQ = 100.0 * 100.0;
 
     // Exits within this Y difference from the roamer are considered "same level"
     private static final int SAME_LEVEL_TOLERANCE = 2;
 
-    private static final List<CachedExit> exits = new ArrayList<>();
+    private static final List<BlockPos> exits = new ArrayList<>();
 
     /**
      * Records a known exit position. Called when a roamer transitions from indoors to outdoors.
+     * Duplicate exits within 2 blocks of an existing entry are suppressed.
      */
-    public static void recordExit(BlockPos pos, long worldTime) {
-        // Don't duplicate exits that are very close to existing ones
-        for (CachedExit existing : exits) {
-            if (existing.pos.distanceSq(pos) < 4.0) { // within 2 blocks
-                existing.timestamp = worldTime; // refresh the timestamp
+    public static void recordExit(BlockPos pos) {
+        for (BlockPos existing : exits) {
+            if (existing.distanceSq(pos) < 4.0) {
                 return;
             }
         }
-        exits.add(new CachedExit(pos, worldTime));
+        exits.add(pos);
     }
 
     /**
@@ -52,38 +51,28 @@ public class RoamerExitCache {
      *       navigation</li>
      * </ol>
      * The caller should try each in order with the pathfinder and use the first reachable one.
-     * Lazily cleans up expired entries during the search.
      */
-    public static List<BlockPos> findExitsByPriority(BlockPos from, long worldTime) {
+    public static List<BlockPos> findExitsByPriority(BlockPos from) {
         List<BlockPos> sameLevel = new ArrayList<>();
         List<BlockPos> otherLevel = new ArrayList<>();
 
-        Iterator<CachedExit> it = exits.iterator();
-        while (it.hasNext()) {
-            CachedExit exit = it.next();
-            if (worldTime - exit.timestamp > EXPIRY_TICKS) {
-                it.remove();
-                continue;
-            }
-            double distSq = from.distanceSq(exit.pos);
+        for (BlockPos exit : exits) {
+            double distSq = from.distanceSq(exit);
             if (distSq > MAX_DISTANCE_SQ) {
                 continue;
             }
 
-            int yDiff = Math.abs(from.getY() - exit.pos.getY());
+            int yDiff = Math.abs(from.getY() - exit.getY());
             if (yDiff <= SAME_LEVEL_TOLERANCE) {
-                sameLevel.add(exit.pos);
+                sameLevel.add(exit);
             } else {
-                otherLevel.add(exit.pos);
+                otherLevel.add(exit);
             }
         }
 
-        // Sort same-level by horizontal distance (ignore Y for ranking)
         sameLevel.sort(Comparator.comparingDouble(pos -> horizontalDistSq(from, pos)));
-        // Sort other-level by full 3D distance
         otherLevel.sort(Comparator.comparingDouble(from::distanceSq));
 
-        // Combine: same-level first, then other-level
         List<BlockPos> result = new ArrayList<>(sameLevel.size() + otherLevel.size());
         result.addAll(sameLevel);
         result.addAll(otherLevel);
@@ -101,15 +90,5 @@ public class RoamerExitCache {
         double dx = a.getX() - b.getX();
         double dz = a.getZ() - b.getZ();
         return dx * dx + dz * dz;
-    }
-
-    private static class CachedExit {
-        final BlockPos pos;
-        long timestamp;
-
-        CachedExit(BlockPos pos, long timestamp) {
-            this.pos = pos;
-            this.timestamp = timestamp;
-        }
     }
 }

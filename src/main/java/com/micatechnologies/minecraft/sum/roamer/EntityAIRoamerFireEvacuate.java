@@ -113,8 +113,7 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
         // Check the shared exit cache first — a nearby roamer may have already found the way out.
         // Exits are sorted: same-level first (no stairs needed), then other levels by distance.
-        List<BlockPos> cachedExits = RoamerExitCache.findExitsByPriority(entityPos,
-            world.getTotalWorldTime());
+        List<BlockPos> cachedExits = RoamerExitCache.findExitsByPriority(entityPos);
         for (BlockPos cachedExit : cachedExits) {
             if (roamer.getNavigator().getPathToXYZ(
                     cachedExit.getX() + 0.5, cachedExit.getY(), cachedExit.getZ() + 0.5) != null) {
@@ -203,7 +202,7 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         if (!reachedOutdoors && roamer.world.canSeeSky(roamer.getPosition().up())) {
             reachedOutdoors = true;
             roamer.setEmergencyMode(false);
-            RoamerExitCache.recordExit(roamer.getPosition(), roamer.world.getTotalWorldTime());
+            RoamerExitCache.recordExit(roamer.getPosition());
 
             // Find a rally point well clear of the building (walkable blocks only now)
             rallyPoint = findNearbyRallyPoint(roamer.world, roamer.getPosition());
