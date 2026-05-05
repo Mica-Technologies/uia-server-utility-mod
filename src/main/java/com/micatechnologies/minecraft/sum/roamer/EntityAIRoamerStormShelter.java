@@ -3,7 +3,6 @@ package com.micatechnologies.minecraft.sum.roamer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.block.Block;
@@ -57,6 +56,10 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     // practice, and capping further bounds worst-case cost per search.
     private static final int MAX_CANDIDATES = 4;
     private static final int GOOD_ENOUGH_SCORE = 100;
+    // Cooperative-search budget: cells processed per tick. Worst-case search visits
+    // SEARCH_RADIUS_XZ^2 * (SEARCH_RADIUS_Y_DOWN + SEARCH_RADIUS_Y_UP + 1) cells, spread over
+    // ceil(total / CELLS_PER_TICK) ticks instead of one tick spike.
+    private static final int CELLS_PER_TICK = 1000;
 
     // Shelter-in-place indoor wander settings
     private static final int INDOOR_WANDER_RANGE = 5;
@@ -76,6 +79,10 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private int continueCheckTimer;
     private boolean sheltered; // true once the roamer reaches a safe interior position
     private int indoorWanderTimer;
+    // Cooperative-search state. Non-null while the cube scan is running across ticks.
+    private StormCubeSearchState search;
+    private boolean searching;       // mirror flag — true while the search is still progressing
+    private boolean searchFailed;    // set when the cube exhausts with no reachable shelter
 
     public EntityAIRoamerStormShelter(EntityRoamer roamer, double speed) {
         this.roamer = roamer;
@@ -109,23 +116,52 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
             sheltered = true;
             shelterTarget = entityPos;
             RoamerShelterCache.recordShelter(entityPos);
+            searching = false;
+            searchFailed = false;
             return true;
         }
 
         roamer.setEmergencyMode(true);
-        shelterTarget = findReachableShelter(world, entityPos);
-        if (shelterTarget == null) {
-            roamer.setEmergencyMode(false);
-        } else {
-            claimPosition(shelterTarget);
+
+        // Try cached shelters first (cheap, single-shot). Across storm waves the building's
+        // shelter zone is the same, and once claims have been released the cached positions
+        // are usually re-usable directly.
+        for (BlockPos cached : RoamerShelterCache.findNearest(entityPos)) {
+            if (isPositionClaimed(cached)) {
+                continue;
+            }
+            if (!isShelterPosition(world, cached)) {
+                continue;
+            }
+            if (roamer.getNavigator().getPathToXYZ(
+                    cached.getX() + 0.5, cached.getY(), cached.getZ() + 0.5) != null) {
+                shelterTarget = cached;
+                claimPosition(shelterTarget);
+                searching = false;
+                searchFailed = false;
+                return true;
+            }
         }
-        return shelterTarget != null;
+
+        // No cached shelter worked — kick off a cooperative cube scan; updateTask drives it.
+        shelterTarget = null;
+        searching = true;
+        searchFailed = false;
+        search = new StormCubeSearchState();
+        return true;
     }
 
     @Override
     public boolean shouldContinueExecuting() {
         if (!csmLoaded) {
             return false;
+        }
+
+        if (searchFailed) {
+            return false;
+        }
+        if (searching) {
+            return true; // cooperative search still running — keep the slot
         }
 
         // Throttle expensive checks
@@ -170,6 +206,8 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
             roamer.setEmergencyMode(false);
             indoorWanderTimer = INDOOR_WANDER_INTERVAL_MIN
                 + roamer.getRNG().nextInt(INDOOR_WANDER_INTERVAL_MAX - INDOOR_WANDER_INTERVAL_MIN);
+        } else if (searching) {
+            // No path target yet — cube scan runs across ticks in updateTask.
         } else {
             roamer.getNavigator().tryMoveToXYZ(shelterTarget.getX() + 0.5, shelterTarget.getY(),
                 shelterTarget.getZ() + 0.5, speed);
@@ -178,6 +216,11 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
 
     @Override
     public void updateTask() {
+        if (searching) {
+            stepStormShelterSearch();
+            return;
+        }
+
         if (sheltered) {
             // Shelter-in-place: wander slowly within the interior
             indoorWanderTimer--;
@@ -207,6 +250,9 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         }
         shelterTarget = null;
         sheltered = false;
+        searching = false;
+        searchFailed = false;
+        search = null;
         checkTimer = CHECK_INTERVAL_TICKS;
         roamer.setEmergencyMode(false);
     }
@@ -276,110 +322,160 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
 
     // --- Shelter search ---
 
-    private BlockPos findReachableShelter(World world, BlockPos entityPos) {
-        // Try cached shelters first. Across storm waves the building's shelter zone is the same,
-        // and once claims have been released the cached positions are usually re-usable directly.
-        for (BlockPos cached : RoamerShelterCache.findNearest(entityPos)) {
-            if (isPositionClaimed(cached)) {
-                continue;
-            }
-            if (!isShelterPosition(world, cached)) {
-                continue;
-            }
-            if (roamer.getNavigator().getPathToXYZ(
-                    cached.getX() + 0.5, cached.getY(), cached.getZ() + 0.5) != null) {
-                return cached;
-            }
+    /**
+     * Drives one tick of the cooperative cube scan. Processes up to {@link #CELLS_PER_TICK}
+     * cells per call; when the cube exhausts (or a candidate scoring {@link #GOOD_ENOUGH_SCORE}
+     * or higher is found) the collected candidates are tested in score order via
+     * {@code getPathToXYZ}, and the first reachable one transitions the task to its moving
+     * phase. If none are reachable {@code searchFailed} ends the task on the next tick.
+     */
+    private void stepStormShelterSearch() {
+        World world = roamer.world;
+        BlockPos entityPos = roamer.getPosition();
+
+        // Bail if the storm stopped before the search completed.
+        if (!CsmIntegration.isStormAlarmActiveNear(world, entityPos)) {
+            searching = false;
+            searchFailed = true;
+            roamer.setEmergencyMode(false);
+            return;
         }
-        // Fall through to the full cube scan
-        List<ScoredPos> candidates = findShelterCandidates(world, entityPos);
-        for (ScoredPos sp : candidates) {
-            if (roamer.getNavigator().getPathToXYZ(
-                    sp.pos.getX() + 0.5, sp.pos.getY(), sp.pos.getZ() + 0.5) != null) {
-                return sp.pos;
-            }
-        }
-        return null;
-    }
 
-    private List<ScoredPos> findShelterCandidates(World world, BlockPos entityPos) {
-        List<ScoredPos> candidates = new ArrayList<>();
-        int worstKeptScore = Integer.MIN_VALUE;
-        // Reused mutables for the cube walk — only allocate immutable copies for kept candidates.
-        BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
+        // Stage 1: cube walk, capped by cube exhaustion or a good-enough candidate.
+        if (!search.cubeExhausted && !search.foundGoodEnough) {
+            int processed = 0;
+            while (processed < CELLS_PER_TICK
+                && !search.cubeExhausted && !search.foundGoodEnough) {
+                if (!search.advance()) {
+                    search.cubeExhausted = true;
+                    break;
+                }
 
-        for (int dy = -SEARCH_RADIUS_Y_DOWN; dy <= SEARCH_RADIUS_Y_UP; dy++) {
-            for (int r = 0; r <= SEARCH_RADIUS_XZ; r++) {
-                int startDx = (r == 0) ? 0 : -r;
-                int endDx = r;
+                int cx = entityPos.getX() + search.dx;
+                int cy = entityPos.getY() + search.dy;
+                int cz = entityPos.getZ() + search.dz;
+                search.cur.setPos(cx, cy, cz);
+                processed++;
 
-                for (int dx = startDx; dx <= endDx; dx++) {
-                    for (int dz = -r; dz <= r; dz++) {
-                        if (r > 0 && Math.abs(dx) != r && Math.abs(dz) != r) {
-                            continue;
-                        }
+                if (!world.isBlockLoaded(search.cur)) continue;
 
-                        cur.setPos(entityPos.getX() + dx, entityPos.getY() + dy,
-                            entityPos.getZ() + dz);
+                search.above.setPos(cx, cy + 1, cz);
+                if (!world.isAirBlock(search.cur) || !world.isAirBlock(search.above)) continue;
 
-                        if (!world.isBlockLoaded(cur)) {
-                            continue;
-                        }
+                search.below.setPos(cx, cy - 1, cz);
+                if (!world.getBlockState(search.below).getMaterial().isSolid()) continue;
 
-                        above.setPos(cur.getX(), cur.getY() + 1, cur.getZ());
-                        if (!world.isAirBlock(cur) || !world.isAirBlock(above)) {
-                            continue;
-                        }
+                if (world.canSeeSky(search.above)) continue;
 
-                        below.setPos(cur.getX(), cur.getY() - 1, cur.getZ());
-                        if (!world.getBlockState(below).getMaterial().isSolid()) {
-                            continue;
-                        }
+                if (isPositionClaimed(search.cur)) continue;
 
-                        if (world.canSeeSky(above)) {
-                            continue;
-                        }
+                int yScore = (entityPos.getY() - cy) * 10;
+                int distScore = -(Math.abs(search.dx) + Math.abs(search.dz));
+                int score = yScore + distScore;
 
-                        // Skip positions already claimed by another roamer (BlockPos.equals checks
-                        // coords, not concrete class — the mutable matches the stored immutable).
-                        if (isPositionClaimed(cur)) {
-                            continue;
-                        }
+                if (search.candidates.size() >= MAX_CANDIDATES
+                        && score <= search.worstKeptScore) {
+                    continue;
+                }
 
-                        int yScore = (entityPos.getY() - cur.getY()) * 10;
-                        int distScore = -(Math.abs(dx) + Math.abs(dz));
-                        int score = yScore + distScore;
+                if (isNearHazard(world, search.cur)) continue;
 
-                        if (candidates.size() >= MAX_CANDIDATES && score <= worstKeptScore) {
-                            continue;
-                        }
+                search.candidates.add(new ScoredPos(search.cur.toImmutable(), score));
 
-                        // Expensive check — only reached for promising unclaimed candidates
-                        if (isNearHazard(world, cur)) {
-                            continue;
-                        }
+                if (score >= GOOD_ENOUGH_SCORE) {
+                    search.foundGoodEnough = true;
+                    break;
+                }
 
-                        candidates.add(new ScoredPos(cur.toImmutable(), score));
-
-                        if (score >= GOOD_ENOUGH_SCORE) {
-                            candidates.sort(Comparator.comparingInt(s -> -s.score));
-                            return candidates;
-                        }
-
-                        if (candidates.size() > MAX_CANDIDATES) {
-                            candidates.sort(Comparator.comparingInt(s -> -s.score));
-                            candidates.subList(MAX_CANDIDATES, candidates.size()).clear();
-                            worstKeptScore = candidates.get(candidates.size() - 1).score;
-                        }
-                    }
+                if (search.candidates.size() > MAX_CANDIDATES) {
+                    search.candidates.sort(Comparator.comparingInt(s -> -s.score));
+                    search.candidates.subList(MAX_CANDIDATES, search.candidates.size()).clear();
+                    search.worstKeptScore = search.candidates.get(
+                        search.candidates.size() - 1).score;
                 }
             }
         }
 
-        candidates.sort(Comparator.comparingInt(s -> -s.score));
-        return candidates;
+        // Yield until next tick if more cube to scan.
+        if (!search.cubeExhausted && !search.foundGoodEnough) {
+            return;
+        }
+
+        // Stage 2: try paths in score order, take the first reachable.
+        search.candidates.sort(Comparator.comparingInt(s -> -s.score));
+        for (ScoredPos sp : search.candidates) {
+            if (roamer.getNavigator().getPathToXYZ(
+                    sp.pos.getX() + 0.5, sp.pos.getY(), sp.pos.getZ() + 0.5) == null) {
+                continue;
+            }
+            shelterTarget = sp.pos;
+            claimPosition(shelterTarget);
+            searching = false;
+            search = null;
+            roamer.getNavigator().tryMoveToXYZ(sp.pos.getX() + 0.5, sp.pos.getY(),
+                sp.pos.getZ() + 0.5, speed);
+            repathTimer = 0;
+            return;
+        }
+
+        // Nothing reachable — let shouldContinueExecuting end the task next tick.
+        searching = false;
+        searchFailed = true;
+        search = null;
+        roamer.setEmergencyMode(false);
+    }
+
+    /**
+     * Iterator state for a cooperative ringed cube walk. Outer loop is dy (Y plane), middle is
+     * the ring radius, inner two are dx/dz on the ring perimeter. Mirrors the nested-loop order
+     * of the previous synchronous {@code findShelterCandidates} but with loop variables
+     * externalised so the search can yield mid-walk and resume on the next tick.
+     */
+    private static class StormCubeSearchState {
+        int dy = -SEARCH_RADIUS_Y_DOWN;
+        int r = 0;
+        int dx = 0;
+        int dz = 0;
+        boolean firstAdvance = true;
+        boolean cubeExhausted = false;
+        boolean foundGoodEnough = false;
+        int worstKeptScore = Integer.MIN_VALUE;
+        final List<ScoredPos> candidates = new ArrayList<>();
+        final BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
+        final BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
+        final BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
+
+        boolean advance() {
+            if (firstAdvance) {
+                firstAdvance = false;
+                return true; // initial state at (dy=-Y_DOWN, r=0, dx=0, dz=0) is valid
+            }
+            do {
+                dz++;
+                if (dz > r) {
+                    dz = -r;
+                    dx++;
+                    if (dx > r) {
+                        r++;
+                        if (r > SEARCH_RADIUS_XZ) {
+                            // Move to next dy plane
+                            r = 0;
+                            dx = 0;
+                            dz = 0;
+                            dy++;
+                            if (dy > SEARCH_RADIUS_Y_UP) {
+                                return false;
+                            }
+                            return true;
+                        }
+                        dx = -r;
+                        dz = -r;
+                    }
+                }
+                // Skip interior cells of the ring (only walk the perimeter)
+            } while (r > 0 && Math.abs(dx) != r && Math.abs(dz) != r);
+            return true;
+        }
     }
 
     // --- Position claiming ---
