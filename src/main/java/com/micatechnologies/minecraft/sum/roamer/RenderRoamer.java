@@ -18,7 +18,24 @@ public class RenderRoamer extends RenderLivingBase<EntityRoamer> {
     };
 
     public RenderRoamer(RenderManager manager) {
-        super(manager, new ModelPlayer(0.0F, false), 0.5F);
+        super(manager, buildModel(), 0.5F);
+    }
+
+    /**
+     * Builds the player model with all decorative overlay layers disabled. The default
+     * {@link ModelPlayer} renders five "wear" parts (jacket, sleeves, pant legs) plus a hat
+     * overlay on top of the base biped, which roughly doubles the cube count per draw call.
+     * Roamer textures don't use the overlay UV regions, so disabling them is a free FPS win.
+     */
+    private static ModelPlayer buildModel() {
+        ModelPlayer model = new ModelPlayer(0.0F, false);
+        model.bipedBodyWear.showModel = false;
+        model.bipedLeftArmwear.showModel = false;
+        model.bipedRightArmwear.showModel = false;
+        model.bipedLeftLegwear.showModel = false;
+        model.bipedRightLegwear.showModel = false;
+        model.bipedHeadwear.showModel = false;
+        return model;
     }
 
     @Override
