@@ -108,6 +108,7 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         if (isShelterPosition(world, entityPos)) {
             sheltered = true;
             shelterTarget = entityPos;
+            RoamerShelterCache.recordShelter(entityPos);
             return true;
         }
 
@@ -144,6 +145,7 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         if (!sheltered && isShelterPosition(roamer.world, roamer.getPosition())) {
             sheltered = true;
             roamer.setEmergencyMode(false);
+            RoamerShelterCache.recordShelter(roamer.getPosition());
             indoorWanderTimer = INDOOR_WANDER_INTERVAL_MIN
                 + roamer.getRNG().nextInt(INDOOR_WANDER_INTERVAL_MAX - INDOOR_WANDER_INTERVAL_MIN);
         }
@@ -275,6 +277,21 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     // --- Shelter search ---
 
     private BlockPos findReachableShelter(World world, BlockPos entityPos) {
+        // Try cached shelters first. Across storm waves the building's shelter zone is the same,
+        // and once claims have been released the cached positions are usually re-usable directly.
+        for (BlockPos cached : RoamerShelterCache.findNearest(entityPos)) {
+            if (isPositionClaimed(cached)) {
+                continue;
+            }
+            if (!isShelterPosition(world, cached)) {
+                continue;
+            }
+            if (roamer.getNavigator().getPathToXYZ(
+                    cached.getX() + 0.5, cached.getY(), cached.getZ() + 0.5) != null) {
+                return cached;
+            }
+        }
+        // Fall through to the full cube scan
         List<ScoredPos> candidates = findShelterCandidates(world, entityPos);
         for (ScoredPos sp : candidates) {
             if (roamer.getNavigator().getPathToXYZ(
