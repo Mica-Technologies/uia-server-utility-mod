@@ -41,6 +41,9 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     // Note: the AI task system only calls shouldExecute() every 3 ticks, so the effective
     // real-time interval is CHECK_INTERVAL_TICKS * 3. Keep this low for emergencies.
     private static final int CHECK_INTERVAL_TICKS = 5; // ~0.75 seconds effective
+    // First-check stagger applied at construction so a freshly-loaded chunk full of roamers
+    // doesn't run their initial alarm probe on the same tick. Steady-state cadence is unaffected.
+    private static final int INITIAL_STAGGER_TICKS = 60;
     private static final int SEARCH_RADIUS_XZ = 30;
     private static final int SEARCH_RADIUS_Y = 10;
     private static final int MIN_OPEN_SKY_BLOCKS = 60;
@@ -74,7 +77,7 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         this.roamer = roamer;
         this.speed = speed;
         this.csmLoaded = Loader.isModLoaded("csm");
-        this.checkTimer = roamer.getRNG().nextInt(CHECK_INTERVAL_TICKS);
+        this.checkTimer = roamer.getRNG().nextInt(INITIAL_STAGGER_TICKS);
         this.setMutexBits(1);
     }
 
