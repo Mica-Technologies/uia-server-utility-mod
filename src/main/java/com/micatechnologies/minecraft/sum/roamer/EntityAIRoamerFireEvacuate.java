@@ -48,11 +48,16 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     private static final int INITIAL_STAGGER_TICKS = 60;
     private static final int SEARCH_RADIUS_XZ = 30;
     private static final int SEARCH_RADIUS_Y = 10;
-    private static final int MIN_OPEN_SKY_BLOCKS = 60;
-    private static final int OPEN_AREA_CHECK_RADIUS = 5;
+    // Open-area footprint: a 7x7 ring (49 cells) with at least ~50% sky-visible is enough to
+    // distinguish "outside in a clearing" from "outside in a doorway". Smaller than before so
+    // fewer canSeeSky calls per candidate.
+    private static final int OPEN_AREA_CHECK_RADIUS = 3;
+    private static final int MIN_OPEN_SKY_BLOCKS = 25;
     private static final int REPATH_INTERVAL_TICKS = 60;
     private static final int CONTINUE_CHECK_INTERVAL = 20;
-    private static final int MAX_CANDIDATES = 5;
+    // Lowered: streamed evaluation finds a usable exit on the first or second candidate in
+    // practice, and capping further bounds worst-case cost per search.
+    private static final int MAX_CANDIDATES = 3;
 
     // Rally-phase outdoor wander settings
     private static final int OUTDOOR_WANDER_RANGE = 6;

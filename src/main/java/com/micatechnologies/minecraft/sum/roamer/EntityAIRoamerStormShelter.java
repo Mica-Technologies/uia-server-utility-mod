@@ -47,10 +47,15 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private static final int SEARCH_RADIUS_XZ = 25;
     private static final int SEARCH_RADIUS_Y_DOWN = 20;
     private static final int SEARCH_RADIUS_Y_UP = 5;
-    private static final int HAZARD_CHECK_DISTANCE = 3;
+    // Lowered from 3 to 2: a window or door 3 blocks past a wall is on the other side of the
+    // building and not really a hazard for the position being evaluated. Cuts the hazard scan
+    // from 7*4*7=196 to 5*4*5=100 block-state lookups per kept candidate.
+    private static final int HAZARD_CHECK_DISTANCE = 2;
     private static final int REPATH_INTERVAL_TICKS = 60;
     private static final int CONTINUE_CHECK_INTERVAL = 20;
-    private static final int MAX_CANDIDATES = 8;
+    // Lowered: scoring + early-exit picks a viable shelter from the first few candidates in
+    // practice, and capping further bounds worst-case cost per search.
+    private static final int MAX_CANDIDATES = 4;
     private static final int GOOD_ENOUGH_SCORE = 100;
 
     // Shelter-in-place indoor wander settings
