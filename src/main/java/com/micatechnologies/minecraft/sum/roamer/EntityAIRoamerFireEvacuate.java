@@ -58,6 +58,11 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     // Lowered: streamed evaluation finds a usable exit on the first or second candidate in
     // practice, and capping further bounds worst-case cost per search.
     private static final int MAX_CANDIDATES = 3;
+    // Cooperative-search budget. The cube walk yields after this many cells so the per-tick
+    // spike stays bounded when many roamers begin searching simultaneously. Worst-case search
+    // (no exits within SEARCH_RADIUS_XZ) takes ~SEARCH_RADIUS_XZ * SEARCH_RADIUS_XZ * (2 *
+    // SEARCH_RADIUS_Y + 1) / CELLS_PER_TICK ticks.
+    private static final int CELLS_PER_TICK = 1000;
 
     // Rally-phase outdoor wander settings
     private static final int OUTDOOR_WANDER_RANGE = 6;
@@ -79,6 +84,10 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     private boolean reachedOutdoors;
     private boolean atRallyPoint;
     private int outdoorWanderTimer;
+    // Cooperative-search state. Non-null while the cube scan is running across ticks.
+    private CubeSearchState search;
+    private boolean searching;       // mirror flag — true while the search is still progressing
+    private boolean searchFailed;    // set when the cube exhausts with no reachable exit
 
     public EntityAIRoamerFireEvacuate(EntityRoamer roamer, double speed) {
         this.roamer = roamer;
@@ -112,6 +121,8 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
             atRallyPoint = true;
             reachedOutdoors = true;
             exitTarget = entityPos;
+            searching = false;
+            searchFailed = false;
             return true;
         }
 
@@ -125,22 +136,31 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
             if (roamer.getNavigator().getPathToXYZ(
                     cachedExit.getX() + 0.5, cachedExit.getY(), cachedExit.getZ() + 0.5) != null) {
                 exitTarget = cachedExit;
+                searching = false;
+                searchFailed = false;
                 return true;
             }
         }
 
-        // No cached exit worked — run the full search
-        exitTarget = findReachableExit(world, entityPos);
-        if (exitTarget == null) {
-            roamer.setEmergencyMode(false);
-        }
-        return exitTarget != null;
+        // No cached exit worked — kick off a cooperative cube scan; updateTask drives it.
+        exitTarget = null;
+        searching = true;
+        searchFailed = false;
+        search = new CubeSearchState();
+        return true;
     }
 
     @Override
     public boolean shouldContinueExecuting() {
         if (!csmLoaded) {
             return false;
+        }
+
+        if (searchFailed) {
+            return false;
+        }
+        if (searching) {
+            return true; // cooperative search still running — keep the slot
         }
 
         // Throttle the expensive checks
@@ -184,6 +204,9 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
             roamer.setEmergencyMode(false);
             outdoorWanderTimer = OUTDOOR_WANDER_INTERVAL_MIN
                 + roamer.getRNG().nextInt(OUTDOOR_WANDER_INTERVAL_MAX - OUTDOOR_WANDER_INTERVAL_MIN);
+        } else if (searching) {
+            // No path target yet — the cube scan runs across ticks in updateTask.
+            reachedOutdoors = false;
         } else {
             reachedOutdoors = false;
             roamer.getNavigator().tryMoveToXYZ(exitTarget.getX() + 0.5, exitTarget.getY(),
@@ -193,6 +216,11 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
     @Override
     public void updateTask() {
+        if (searching) {
+            stepFireExitSearch();
+            return;
+        }
+
         if (atRallyPoint) {
             // Rally phase: wander outdoors on walkable blocks
             outdoorWanderTimer--;
@@ -244,6 +272,9 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         rallyPoint = null;
         reachedOutdoors = false;
         atRallyPoint = false;
+        searching = false;
+        searchFailed = false;
+        search = null;
         checkTimer = CHECK_INTERVAL_TICKS;
         roamer.setEmergencyMode(false);
     }
@@ -286,24 +317,160 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
     // --- Exit search ---
 
-    private BlockPos findReachableExit(World world, BlockPos entityPos) {
-        List<BlockPos> candidates = findExitCandidates(world, entityPos);
-        for (BlockPos candidate : candidates) {
-            // Skip positions already claimed by another roamer
+    private static boolean isPositionClaimed(BlockPos candidate) {
+        return claimedPositions.contains(candidate);
+    }
+
+    /**
+     * Drives one tick of the cooperative cube scan. Processes up to {@link #CELLS_PER_TICK} cells
+     * per call; when the cube exhausts (or {@link #MAX_CANDIDATES} candidates are collected) the
+     * collected positions are tested in distance order via {@code getPathToXYZ}, and the first
+     * reachable one transitions the task to its moving phase. If none are reachable the task
+     * sets {@code searchFailed} and {@link #shouldContinueExecuting} ends it on the next tick.
+     */
+    private void stepFireExitSearch() {
+        World world = roamer.world;
+        BlockPos entityPos = roamer.getPosition();
+
+        // Bail if the alarm stopped before the search completed.
+        if (!CsmIntegration.isFireAlarmActiveNear(world, entityPos)) {
+            searching = false;
+            searchFailed = true;
+            roamer.setEmergencyMode(false);
+            return;
+        }
+
+        // Stage 1: cube walk, capped at MAX_CANDIDATES collected.
+        if (!search.cubeExhausted && search.candidates.size() < MAX_CANDIDATES) {
+            int processed = 0;
+            while (processed < CELLS_PER_TICK
+                && search.candidates.size() < MAX_CANDIDATES) {
+                if (!search.advance()) {
+                    search.cubeExhausted = true;
+                    break;
+                }
+
+                int cx = entityPos.getX() + search.dx;
+                int cy = entityPos.getY() + search.dy;
+                int cz = entityPos.getZ() + search.dz;
+                search.cur.setPos(cx, cy, cz);
+
+                if (!world.isBlockLoaded(search.cur)) {
+                    processed++;
+                    continue;
+                }
+
+                search.above.setPos(cx, cy + 1, cz);
+                if (!world.isAirBlock(search.cur) || !world.isAirBlock(search.above)) {
+                    processed++;
+                    continue;
+                }
+
+                search.below.setPos(cx, cy - 1, cz);
+                if (!world.getBlockState(search.below).getMaterial().isSolid()) {
+                    processed++;
+                    continue;
+                }
+
+                if (!world.canSeeSky(search.above)) {
+                    processed++;
+                    continue;
+                }
+
+                if (!hasEnoughOpenSky(world, search.cur, OPEN_AREA_CHECK_RADIUS,
+                        MIN_OPEN_SKY_BLOCKS, search.skyCache, search.skyScratch)) {
+                    processed++;
+                    continue;
+                }
+
+                search.candidates.add(search.cur.toImmutable());
+                processed++;
+            }
+        }
+
+        // Yield until next tick if more cube to scan.
+        if (!search.cubeExhausted && search.candidates.size() < MAX_CANDIDATES) {
+            return;
+        }
+
+        // Stage 2: try paths in distance order, take the first reachable.
+        search.candidates.sort(Comparator.comparingDouble(entityPos::distanceSq));
+        for (BlockPos candidate : search.candidates) {
             if (isPositionClaimed(candidate)) {
                 continue;
             }
             if (roamer.getNavigator().getPathToXYZ(
-                    candidate.getX() + 0.5, candidate.getY(), candidate.getZ() + 0.5) != null) {
-                claimPosition(candidate);
-                return candidate;
+                    candidate.getX() + 0.5, candidate.getY(), candidate.getZ() + 0.5) == null) {
+                continue;
             }
+            claimPosition(candidate);
+            exitTarget = candidate;
+            searching = false;
+            search = null;
+            roamer.getNavigator().tryMoveToXYZ(candidate.getX() + 0.5, candidate.getY(),
+                candidate.getZ() + 0.5, speed);
+            repathTimer = 0;
+            return;
         }
-        return null;
+
+        // Nothing reachable — let shouldContinueExecuting end the task next tick.
+        searching = false;
+        searchFailed = true;
+        search = null;
+        roamer.setEmergencyMode(false);
     }
 
-    private static boolean isPositionClaimed(BlockPos candidate) {
-        return claimedPositions.contains(candidate);
+    /**
+     * Iterator state for a cooperative ringed cube walk. Mirrors the nested-loop structure of
+     * the previous synchronous {@code findExitCandidates} but with the loop variables externalised
+     * so the search can yield mid-walk and resume on the next tick.
+     */
+    private static class CubeSearchState {
+        int r = 1;
+        int dx = -1;
+        int dz = -1;
+        int dy = -SEARCH_RADIUS_Y;
+        boolean firstAdvance = true;
+        boolean cubeExhausted = false;
+        final List<BlockPos> candidates = new ArrayList<>();
+        final BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
+        final BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
+        final BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
+        final BlockPos.MutableBlockPos skyScratch = new BlockPos.MutableBlockPos();
+        final Map<Long, Boolean> skyCache = new HashMap<>();
+
+        /**
+         * Advance to the next cell in the cube walk. Returns true if {@code (r, dx, dz, dy)} now
+         * point at a valid cell to evaluate; false if the entire cube has been visited.
+         */
+        boolean advance() {
+            if (firstAdvance) {
+                firstAdvance = false;
+                return true; // initial state already on a valid perimeter cell
+            }
+            dy++;
+            if (dy <= SEARCH_RADIUS_Y) {
+                return true;
+            }
+            // dy overflow — step (dx, dz) to the next perimeter cell of this ring
+            dy = -SEARCH_RADIUS_Y;
+            do {
+                dz++;
+                if (dz > r) {
+                    dz = -r;
+                    dx++;
+                    if (dx > r) {
+                        r++;
+                        if (r > SEARCH_RADIUS_XZ) {
+                            return false;
+                        }
+                        dx = -r;
+                        dz = -r;
+                    }
+                }
+            } while (Math.abs(dx) != r && Math.abs(dz) != r);
+            return true;
+        }
     }
 
     /**
@@ -426,65 +593,4 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     private static final ThreadLocal<BlockPos.MutableBlockPos> OPEN_SKY_SCRATCH =
         ThreadLocal.withInitial(BlockPos.MutableBlockPos::new);
 
-    private List<BlockPos> findExitCandidates(World world, BlockPos entityPos) {
-        List<BlockPos> candidates = new ArrayList<>();
-        // Reused mutables for the cube walk — only allocate immutable copies for kept candidates.
-        BlockPos.MutableBlockPos cur = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
-        BlockPos.MutableBlockPos skyScratch = new BlockPos.MutableBlockPos();
-        // Shared canSeeSky cache for the open-area check across all candidates in this search.
-        // Candidates near each other have overlapping footprints, so reuse is high.
-        Map<Long, Boolean> skyCache = new HashMap<>();
-
-        for (int r = 1; r <= SEARCH_RADIUS_XZ; r++) {
-            for (int dx = -r; dx <= r; dx++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    if (Math.abs(dx) != r && Math.abs(dz) != r) {
-                        continue;
-                    }
-
-                    for (int dy = -SEARCH_RADIUS_Y; dy <= SEARCH_RADIUS_Y; dy++) {
-                        cur.setPos(entityPos.getX() + dx, entityPos.getY() + dy,
-                            entityPos.getZ() + dz);
-
-                        if (!world.isBlockLoaded(cur)) {
-                            continue;
-                        }
-
-                        above.setPos(cur.getX(), cur.getY() + 1, cur.getZ());
-                        if (!world.isAirBlock(cur) || !world.isAirBlock(above)) {
-                            continue;
-                        }
-
-                        below.setPos(cur.getX(), cur.getY() - 1, cur.getZ());
-                        if (!world.getBlockState(below).getMaterial().isSolid()) {
-                            continue;
-                        }
-
-                        if (!world.canSeeSky(above)) {
-                            continue;
-                        }
-
-                        if (!hasEnoughOpenSky(world, cur, OPEN_AREA_CHECK_RADIUS,
-                            MIN_OPEN_SKY_BLOCKS, skyCache, skyScratch)) {
-                            continue;
-                        }
-
-                        candidates.add(cur.toImmutable());
-                    }
-                }
-            }
-
-            if (candidates.size() >= MAX_CANDIDATES) {
-                break;
-            }
-        }
-
-        candidates.sort(Comparator.comparingDouble(entityPos::distanceSq));
-        if (candidates.size() > MAX_CANDIDATES) {
-            candidates.subList(MAX_CANDIDATES, candidates.size()).clear();
-        }
-        return candidates;
-    }
 }
