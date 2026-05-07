@@ -9,6 +9,7 @@ key.sum.favorites.jump=Jump to Favorites Tab
 tile.sum.atm_kiosk.name=ATM Kiosk
 tile.sum.atm_wall.name=Wall ATM
 tile.sum.atm_drive_thru.name=Drive-Thru ATM
+tile.sum.bank_counter.name=Bank Counter
 sum.atm.title=ATM
 sum.atm.close=Close
 sum.atm.balance.heading=Account Balance
