@@ -3,6 +3,8 @@ package com.micatechnologies.minecraft.sum;
 import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
+import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
+import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import net.minecraft.block.Block;
@@ -42,8 +44,10 @@ public class Sum {
     @EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         SumConfig.init(event.getSuggestedConfigurationFile());
+        CapabilitySumMoney.register();
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new RoadRunnerHandler());
+        MinecraftForge.EVENT_BUS.register(new SumMoneyEvents());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();

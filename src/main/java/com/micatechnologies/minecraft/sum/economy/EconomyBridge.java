@@ -8,20 +8,25 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.fml.common.Loader;
 
 /**
- * Reflection-only soft bridge to the EconomyInc mod's per-player balance capability. SUM never
- * compiles against EconomyInc; if EconomyInc is absent at runtime, every method here is a no-op
- * and {@link #isAvailable()} returns false so callers can show a graceful fallback.
+ * Unified facade for SUM's balance operations. Internally routes between two backends:
  *
- * <p>Signatures locked from EconomyInc 1.6.2 (as bundled in the Alto pack):
+ * <ol>
+ *   <li><b>EconomyInc</b> (preferred when loaded) - reflection-only access to the mod's
+ *       {@code IMoney} capability.</li>
+ *   <li><b>SUM</b> (fallback when EconomyInc is absent) - SUM's own {@link ISumMoney}
+ *       capability attached to every player.</li>
+ * </ol>
+ *
+ * <p>Callers always go through {@link #getBalance}, {@link #adjustBalance}, and
+ * {@link #isAvailable}; they never need to know which backend is active.
+ *
+ * <p>EconomyInc 1.6.2 signatures locked via javap on the production jar:
  * <ul>
- *   <li>{@code fr.fifou.economy.capability.IMoney#getMoney()} returns {@code double}</li>
- *   <li>{@code fr.fifou.economy.capability.IMoney#setMoney(double)}</li>
- *   <li>{@code fr.fifou.economy.capability.IMoney#sync(EntityPlayer)} pushes server changes
- *       back to the client GUI</li>
- *   <li>{@code fr.fifou.economy.capability.CapabilityLoading#getMoneyHandler(Entity)} is a public
- *       static helper that wraps the {@code hasCapability}/{@code getCapability} dance using
- *       {@code EnumFacing.DOWN}; we call it instead of binding the {@code @CapabilityInject} field
- *       directly.</li>
+ *   <li>{@code IMoney.getMoney()} returns {@code double}</li>
+ *   <li>{@code IMoney.setMoney(double)}</li>
+ *   <li>{@code IMoney.sync(EntityPlayer)} pushes server changes to the client</li>
+ *   <li>{@code CapabilityLoading.getMoneyHandler(Entity)} static helper wraps the
+ *       capability dance with {@code EnumFacing.DOWN}.</li>
  * </ul>
  */
 public final class EconomyBridge {
@@ -53,17 +58,17 @@ public final class EconomyBridge {
                 get = imoney.getMethod("getMoney");
                 set = imoney.getMethod("setMoney", double.class);
                 sync = imoney.getMethod("sync", playerClass);
-                Sum.LOGGER.info("[economy] EconomyInc bridge bound (IMoney + CapabilityLoading.getMoneyHandler).");
+                Sum.LOGGER.info("[economy] EconomyInc bridge bound; SUM money capability will stay inert.");
             } catch (Throwable t) {
                 Sum.LOGGER.warn("[economy] EconomyInc is loaded but the bridge could not bind; "
-                    + "balance reads/writes will be no-ops.", t);
+                    + "falling back to SUM's own money capability.", t);
                 getHandler = null;
                 get = null;
                 set = null;
                 sync = null;
             }
         } else {
-            Sum.LOGGER.info("[economy] EconomyInc is not loaded; SUM bank features will be inert.");
+            Sum.LOGGER.info("[economy] EconomyInc is not loaded; SUM's own money capability will own the balance.");
         }
         MOD_PRESENT = present;
         GET_MONEY_HANDLER = getHandler;
@@ -74,14 +79,27 @@ public final class EconomyBridge {
 
     private EconomyBridge() {}
 
-    public static boolean isAvailable() {
+    /** True if the EconomyInc reflection bridge bound successfully and the mod is loaded. */
+    public static boolean isEconomyIncBackend() {
         return MOD_PRESENT && GET_MONEY_HANDLER != null
             && GET_MONEY != null && SET_MONEY != null;
     }
 
+    /** True if SUM's own money capability has been registered. Becomes true after
+     *  {@code Sum.preInit} completes. */
+    public static boolean isSumBackend() {
+        return CapabilitySumMoney.CAPABILITY != null;
+    }
+
+    /** True if any backend can answer balance queries. Used by features that need to
+     *  decide whether to show "Economy mod required" or proceed with the operation. */
+    public static boolean isAvailable() {
+        return isEconomyIncBackend() || isSumBackend();
+    }
+
     @Nullable
-    private static Object resolveHandler(EntityPlayer player) {
-        if (!isAvailable() || player == null) {
+    private static Object resolveEconomyIncHandler(EntityPlayer player) {
+        if (!isEconomyIncBackend() || player == null) {
             return null;
         }
         try {
@@ -93,44 +111,65 @@ public final class EconomyBridge {
     }
 
     /**
-     * @return the player's current balance in dollars, or {@link Double#NaN} if EconomyInc isn't
-     *     bound to this player (mod absent, capability missing, reflection failed).
+     * @return the player's current balance in dollars, or {@link Double#NaN} if no backend can
+     *     answer (mod absent and SUM capability missing, or both reflection paths failed).
      */
     public static double getBalance(EntityPlayer player) {
-        Object handler = resolveHandler(player);
-        if (handler == null) return Double.NaN;
-        try {
-            Object value = GET_MONEY.invoke(handler);
-            return value instanceof Number ? ((Number) value).doubleValue() : Double.NaN;
-        } catch (Throwable t) {
-            Sum.LOGGER.warn("[economy] getBalance failed for {}", player.getName(), t);
+        if (player == null) return Double.NaN;
+        if (isEconomyIncBackend()) {
+            Object handler = resolveEconomyIncHandler(player);
+            if (handler != null) {
+                try {
+                    Object value = GET_MONEY.invoke(handler);
+                    return value instanceof Number ? ((Number) value).doubleValue() : Double.NaN;
+                } catch (Throwable t) {
+                    Sum.LOGGER.warn("[economy] EconomyInc getBalance failed for {}", player.getName(), t);
+                }
+            }
             return Double.NaN;
         }
+        if (isSumBackend()) {
+            ISumMoney money = player.getCapability(CapabilitySumMoney.CAPABILITY, null);
+            if (money != null) {
+                return money.getBalance();
+            }
+        }
+        return Double.NaN;
     }
 
     /**
      * Adjusts the player's balance by {@code delta}. Refuses to overdraft (returns false).
-     * Calls {@code IMoney.sync(EntityPlayer)} on success so the client-side balance display
-     * stays in sync with the server.
+     * Triggers a balance sync to the player's client on success so the in-game GUIs see the
+     * new value on the next frame.
      *
-     * @return true on success; false if EconomyInc isn't bound, the player has no money handler,
-     *     or the resulting balance would be negative.
+     * @return true on success; false if no backend is available or the result would go negative.
      */
     public static boolean adjustBalance(EntityPlayer player, double delta) {
-        Object handler = resolveHandler(player);
-        if (handler == null) return false;
-        try {
-            double current = ((Number) GET_MONEY.invoke(handler)).doubleValue();
-            double next = current + delta;
-            if (next < 0.0) return false;
-            SET_MONEY.invoke(handler, next);
-            if (player instanceof EntityPlayerMP && SYNC != null) {
-                SYNC.invoke(handler, player);
+        if (player == null) return false;
+        if (isEconomyIncBackend()) {
+            Object handler = resolveEconomyIncHandler(player);
+            if (handler == null) return false;
+            try {
+                double current = ((Number) GET_MONEY.invoke(handler)).doubleValue();
+                double next = current + delta;
+                if (next < 0.0) return false;
+                SET_MONEY.invoke(handler, next);
+                if (player instanceof EntityPlayerMP && SYNC != null) {
+                    SYNC.invoke(handler, player);
+                }
+                return true;
+            } catch (Throwable t) {
+                Sum.LOGGER.warn("[economy] EconomyInc adjustBalance failed for {}", player.getName(), t);
+                return false;
             }
-            return true;
-        } catch (Throwable t) {
-            Sum.LOGGER.warn("[economy] adjustBalance failed for {}", player.getName(), t);
-            return false;
         }
+        if (isSumBackend()) {
+            ISumMoney money = player.getCapability(CapabilitySumMoney.CAPABILITY, null);
+            if (money != null && money.adjust(delta)) {
+                money.sync(player);
+                return true;
+            }
+        }
+        return false;
     }
 }
