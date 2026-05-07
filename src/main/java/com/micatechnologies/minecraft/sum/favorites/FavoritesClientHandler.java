@@ -23,6 +23,7 @@ import net.minecraftforge.client.event.GuiContainerEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.InputEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -82,15 +83,45 @@ public class FavoritesClientHandler {
     }
 
     private void handleJump(GuiContainerCreative gui, GuiScreenEvent.KeyboardInputEvent.Pre event) {
-        if (CreativeTabFavorites.INSTANCE == null || SET_CURRENT_CREATIVE_TAB == null) {
-            return;
+        if (selectFavoritesTab(gui)) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
+     * Switches the given creative GUI to the favorites tab via the private vanilla method
+     * resolved reflectively at class load. Also serves as the "refresh after a store mutation"
+     * path, since setCurrentCreativeTab clears ContainerCreative.itemList and repopulates it
+     * from CreativeTabFavorites.displayAllRelevantItems in one step.
+     */
+    private boolean selectFavoritesTab(GuiContainerCreative gui) {
+        if (SET_CURRENT_CREATIVE_TAB == null || CreativeTabFavorites.INSTANCE == null) {
+            return false;
         }
         try {
             SET_CURRENT_CREATIVE_TAB.invoke(gui, CreativeTabFavorites.INSTANCE);
-            event.setCanceled(true);
+            return true;
         } catch (Exception e) {
-            Sum.LOGGER.error("Failed to invoke setCurrentCreativeTab", e);
+            Sum.LOGGER.error("Failed to switch to favorites tab", e);
+            return false;
         }
+    }
+
+    @SubscribeEvent
+    public void onKeyInputOutsideGui(InputEvent.KeyInputEvent event) {
+        if (!JUMP.isPressed()) {
+            return;
+        }
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.player == null || mc.currentScreen != null) {
+            return;
+        }
+        if (mc.playerController == null || !mc.playerController.isInCreativeMode()) {
+            return;
+        }
+        GuiContainerCreative gui = new GuiContainerCreative(mc.player);
+        mc.displayGuiScreen(gui);
+        selectFavoritesTab(gui);
     }
 
     @SubscribeEvent(receiveCanceled = true)
@@ -131,21 +162,10 @@ public class FavoritesClientHandler {
             FavoritesStore.save();
             // ContainerCreative.itemList is a snapshot from when the tab was selected, so the
             // visible slot stacks don't update on their own when the underlying store changes.
-            // Re-running setCurrentCreativeTab clears that snapshot and repopulates it from
-            // CreativeTabFavorites.displayAllRelevantItems, which now reads the new order.
-            refreshFavoritesTab(gui);
+            // selectFavoritesTab() (which re-runs setCurrentCreativeTab) clears that snapshot
+            // and repopulates it from CreativeTabFavorites.displayAllRelevantItems.
+            selectFavoritesTab(gui);
             event.setCanceled(true);
-        }
-    }
-
-    private void refreshFavoritesTab(GuiContainerCreative gui) {
-        if (SET_CURRENT_CREATIVE_TAB == null || CreativeTabFavorites.INSTANCE == null) {
-            return;
-        }
-        try {
-            SET_CURRENT_CREATIVE_TAB.invoke(gui, CreativeTabFavorites.INSTANCE);
-        } catch (Exception e) {
-            Sum.LOGGER.error("Failed to refresh favorites tab after reorder", e);
         }
     }
 
@@ -172,7 +192,7 @@ public class FavoritesClientHandler {
         // shows up immediately (e.g. toggling on a hotbar slot from inside the favorites tab).
         if (CreativeTabFavorites.INSTANCE != null
             && gui.getSelectedTabIndex() == CreativeTabFavorites.INSTANCE.getIndex()) {
-            refreshFavoritesTab(gui);
+            selectFavoritesTab(gui);
         }
         event.setCanceled(true);
     }
