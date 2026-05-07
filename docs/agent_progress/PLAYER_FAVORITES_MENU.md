@@ -16,7 +16,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 >
 > Phases #1–#5 (the MVP) shipped in commits `9c70b8c`, `b8fa3ff`, `e40d378`, `dd2d1ba`, `0a25c14`. Code compiles cleanly and the full `./gradlew build` is green, but **none of it has been verified in-game**. Before doing more work: ask Alex how playtest went and whether they hit any of the watch-outs in the Risks section (tooltip-vs-overlay layering, JEI search-field focus eating B presses, search-tab false-negatives on toggle, reflection failure on `setCurrentCreativeTab` in obfuscated build).
 >
-> All design questions were resolved on 2026-05-07 (see "Resolved design decisions"); don't re-litigate them unless Alex brings them up. Locked-in: toggle keybind = `B`, jump-to-favorites keybind = `Ctrl+B`, NBT excluded from identity in v1, storage is per-installation at `<minecraft>/config/sum/favorites.json`, soft warn at 200 favorites with no hard cap.
+> All design questions were resolved on 2026-05-07 (see "Resolved design decisions"); don't re-litigate them unless Alex brings them up. Locked-in: toggle keybind = `B`, jump-to-favorites keybind = `Z` (originally `Ctrl+B`, but Alex's setup binds Ctrl+B to a narrator toggle — see "Open follow-ups"), NBT excluded from identity in v1, storage is per-installation at `<minecraft>/config/sum/favorites.json`, soft warn at 200 favorites with no hard cap.
 >
 > Phases #6–#8 (reorder, /sum favorites command, polish) are deferred. Don't start them without explicit confirmation. The feature is **client-only** (creative inventory is a client-side construct), **creative-only by virtue of GuiContainerCreative not opening in survival**, and **persisted to a JSON file in the Minecraft config directory** so favorites survive across worlds and reinstalls of the mod pack.
 
@@ -279,7 +279,7 @@ Mostly a thin wrapper around `FavoritesStore` methods. Slot it into `CommandSum.
 These were the open questions at draft time. All resolved with Alex on 2026-05-07.
 
 1. **Toggle keybind default = `B`.** Unbound by default in vanilla 1.12.2 inventory context. Doesn't conflict with `Q` (drop), `E` (close), `1–9` (hotbar), `LMB`/`RMB`, `MMB` (clone).
-2. **Jump-to-favorites keybind default = `Ctrl+B`.** Mirrors the toggle. Forge 1.12.2's `KeyBinding` doesn't natively support modifiers in the rebind UI, so the `Ctrl` part is enforced in code via `GuiScreen.isCtrlKeyDown()` rather than the controls menu. Config flag will let users disable the modifier requirement if it conflicts in their setup.
+2. **Jump-to-favorites keybind default = `Z`.** Originally `Ctrl+B` to mirror the toggle, but Alex's setup binds Ctrl+B to a narrator/accessibility toggle (vanilla 1.12.2 doesn't natively define this — likely OS-level or a third-party mod). Switched to `Z`, single key, no modifier — sidesteps the Forge 1.12.2 modifier-key clunkiness too.
 3. **NBT excluded from identity in v1.** Identity key is `(registry name, meta)`. Custom-NBT items (named/enchanted tools) all collapse to the same favorite. A future phase can add an opt-in NBT-aware mode behind a config flag.
 4. **Tab placement: best-effort early construction.** Built in `SumClientProxy.preInit` so it lands among the first non-vanilla tabs. The `Ctrl+B` jump key sidesteps "where did my tab go" entirely.
 5. **Storage = per-installation.** Single JSON at `<minecraft>/config/sum/favorites.json`. Same favorites across every world. Per-world or per-character variants are not on the roadmap.
@@ -287,6 +287,11 @@ These were the open questions at draft time. All resolved with Alex on 2026-05-0
 7. **`/sum favorites import` mechanism: deferred.** Phase #7 will pick the import format (clipboard vs path-on-disk) at implementation time. Not on the MVP path.
 
 ---
+
+## Open follow-ups (post-MVP playtest, 2026-05-07)
+
+- **`B` toggle silently did nothing on first playtest.** Diagnostic INFO logging added to `FavoritesClientHandler.onKeyboardInput` (and to every bail branch in `handleToggle`) so the next playtest reveals whether the event is reaching us, which key code arrives, and which condition bails. Also added `receiveCanceled = true` so we still fire if another mod (e.g. Inventory Tweaks, JEI) is cancelling `KeyboardInputEvent.Pre` for its own handler. Strip the logs once we know what's happening.
+- **`Ctrl+B` jump conflicted with a narrator-toggle binding** in Alex's setup (not from vanilla 1.12.2 — likely OS-level or a mod). Jump key changed to plain `Z`, no modifier. Toggle is unchanged at `B`.
 
 ## Risks and watch-outs
 

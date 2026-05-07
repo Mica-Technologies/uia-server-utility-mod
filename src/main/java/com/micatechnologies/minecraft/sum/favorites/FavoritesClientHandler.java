@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainerCreative;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
@@ -32,7 +31,7 @@ public class FavoritesClientHandler {
         "key.sum.favorites.toggle", Keyboard.KEY_B, CATEGORY);
 
     public static final KeyBinding JUMP = new KeyBinding(
-        "key.sum.favorites.jump", Keyboard.KEY_B, CATEGORY);
+        "key.sum.favorites.jump", Keyboard.KEY_Z, CATEGORY);
 
     private static final ResourceLocation STAR_TEX =
         new ResourceLocation("sum", "textures/gui/favorite_star.png");
@@ -58,7 +57,7 @@ public class FavoritesClientHandler {
         ClientRegistry.registerKeyBinding(JUMP);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(receiveCanceled = true)
     public void onKeyboardInput(GuiScreenEvent.KeyboardInputEvent.Pre event) {
         if (!(event.getGui() instanceof GuiContainerCreative)) {
             return;
@@ -72,14 +71,19 @@ public class FavoritesClientHandler {
         }
 
         GuiContainerCreative gui = (GuiContainerCreative) event.getGui();
-        boolean ctrl = GuiScreen.isCtrlKeyDown();
 
-        // Jump takes priority when Ctrl is held to mirror the keybind doc (Ctrl+B).
-        if (ctrl && eventKey == JUMP.getKeyCode()) {
+        if (eventKey == TOGGLE.getKeyCode() || eventKey == JUMP.getKeyCode()) {
+            Sum.LOGGER.info(
+                "[favorites] keypress eventKey={} toggleKey={} jumpKey={} tab={} canceled={}",
+                eventKey, TOGGLE.getKeyCode(), JUMP.getKeyCode(),
+                gui.getSelectedTabIndex(), event.isCanceled());
+        }
+
+        if (eventKey == JUMP.getKeyCode()) {
             handleJump(gui, event);
             return;
         }
-        if (!ctrl && eventKey == TOGGLE.getKeyCode()) {
+        if (eventKey == TOGGLE.getKeyCode()) {
             handleToggle(gui, event);
         }
     }
@@ -99,22 +103,27 @@ public class FavoritesClientHandler {
     private void handleToggle(GuiContainerCreative gui, GuiScreenEvent.KeyboardInputEvent.Pre event) {
         // Defer to the search field's own input handling when the search tab is active.
         if (gui.getSelectedTabIndex() == CreativeTabs.SEARCH.getIndex()) {
+            Sum.LOGGER.info("[favorites] toggle bailed: on SEARCH tab");
             return;
         }
         Slot slot = gui.getSlotUnderMouse();
         if (slot == null) {
+            Sum.LOGGER.info("[favorites] toggle bailed: no slot under mouse");
             return;
         }
         ItemStack stack = slot.getStack();
         if (stack.isEmpty()) {
+            Sum.LOGGER.info("[favorites] toggle bailed: slot {} empty", slot.slotNumber);
             return;
         }
         FavoriteKey key = FavoriteKey.of(stack);
         if (key == null) {
+            Sum.LOGGER.info("[favorites] toggle bailed: stack has no registry name");
             return;
         }
         boolean nowPresent = FavoritesStore.toggle(key);
         FavoritesStore.save();
+        Sum.LOGGER.info("[favorites] toggled {} -> {}", key, nowPresent ? "added" : "removed");
         playFeedback(nowPresent);
         event.setCanceled(true);
     }
