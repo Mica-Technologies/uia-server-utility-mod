@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum.command;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
+import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
@@ -13,8 +14,10 @@ import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
@@ -31,7 +34,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites>";
+        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ>";
     }
 
     @Override
@@ -40,7 +43,7 @@ public class CommandSum extends CommandBase {
     }
 
     @Override
-    public void execute(MinecraftServer server, ICommandSender sender, String[] args) {
+    public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
         if (args.length == 0) {
             sendMessage(sender, TextFormatting.RED, getUsage(sender));
             return;
@@ -61,6 +64,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "favorites":
                 handleFavorites(sender, args);
+                break;
+            case "econ":
+                handleEcon(server, sender, args);
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown subcommand. Usage: " + getUsage(sender));
@@ -211,6 +217,129 @@ public class CommandSum extends CommandBase {
             "Favorites file: " + (file != null ? file.getAbsolutePath() : "(not configured)"));
     }
 
+    // --- /sum econ subcommands (EconomyInc smoke-test surface) ---
+
+    private void handleEcon(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+        if (args.length < 2) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum econ <balance|add|set> [args...]");
+            return;
+        }
+        if (!EconomyBridge.isAvailable()) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "EconomyInc bridge unavailable (mod not loaded or reflection bind failed). "
+                    + "See server log for details.");
+            return;
+        }
+        switch (args[1].toLowerCase()) {
+            case "balance":
+                handleEconBalance(server, sender, args);
+                break;
+            case "add":
+                handleEconAdd(server, sender, args);
+                break;
+            case "set":
+                handleEconSet(server, sender, args);
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED,
+                    "Unknown econ subcommand. Usage: /sum econ <balance|add|set> [args...]");
+                break;
+        }
+    }
+
+    private void handleEconBalance(MinecraftServer server, ICommandSender sender, String[] args)
+        throws CommandException {
+        EntityPlayerMP target = (args.length >= 3)
+            ? getPlayer(server, sender, args[2])
+            : asPlayer(sender);
+        if (target == null) {
+            return;
+        }
+        double balance = EconomyBridge.getBalance(target);
+        if (Double.isNaN(balance)) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                target.getName() + " has no IMoney capability (offline or capability not attached).");
+            return;
+        }
+        sendMessage(sender, TextFormatting.GREEN,
+            target.getName() + "'s balance: $" + formatMoney(balance));
+    }
+
+    private void handleEconAdd(MinecraftServer server, ICommandSender sender, String[] args)
+        throws CommandException {
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum econ add <amount> [player]");
+            return;
+        }
+        double delta = parseMoneyArg(sender, args[2]);
+        if (Double.isNaN(delta)) {
+            return;
+        }
+        EntityPlayerMP target = (args.length >= 4) ? getPlayer(server, sender, args[3]) : asPlayer(sender);
+        if (target == null) {
+            return;
+        }
+        if (EconomyBridge.adjustBalance(target, delta)) {
+            sendMessage(sender, TextFormatting.GREEN,
+                "Adjusted " + target.getName() + "'s balance by $" + formatMoney(delta)
+                    + " (now $" + formatMoney(EconomyBridge.getBalance(target)) + ").");
+        } else {
+            sendMessage(sender, TextFormatting.RED,
+                "Adjustment failed (capability missing or would overdraft).");
+        }
+    }
+
+    private void handleEconSet(MinecraftServer server, ICommandSender sender, String[] args)
+        throws CommandException {
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum econ set <amount> [player]");
+            return;
+        }
+        double amount = parseMoneyArg(sender, args[2]);
+        if (Double.isNaN(amount) || amount < 0.0) {
+            sendMessage(sender, TextFormatting.RED, "Amount must be a non-negative number.");
+            return;
+        }
+        EntityPlayerMP target = (args.length >= 4) ? getPlayer(server, sender, args[3]) : asPlayer(sender);
+        if (target == null) {
+            return;
+        }
+        double current = EconomyBridge.getBalance(target);
+        if (Double.isNaN(current)) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                target.getName() + " has no IMoney capability.");
+            return;
+        }
+        if (EconomyBridge.adjustBalance(target, amount - current)) {
+            sendMessage(sender, TextFormatting.GREEN,
+                "Set " + target.getName() + "'s balance to $" + formatMoney(amount) + ".");
+        } else {
+            sendMessage(sender, TextFormatting.RED, "Set failed (capability missing).");
+        }
+    }
+
+    @Nullable
+    private EntityPlayerMP asPlayer(ICommandSender sender) {
+        if (sender instanceof EntityPlayerMP) {
+            return (EntityPlayerMP) sender;
+        }
+        sendMessage(sender, TextFormatting.RED, "This subcommand requires a player target when run from console.");
+        return null;
+    }
+
+    private double parseMoneyArg(ICommandSender sender, String arg) {
+        try {
+            return Double.parseDouble(arg);
+        } catch (NumberFormatException e) {
+            sendMessage(sender, TextFormatting.RED, "'" + arg + "' is not a number.");
+            return Double.NaN;
+        }
+    }
+
+    private static String formatMoney(double amount) {
+        return String.format(java.util.Locale.ROOT, "%.2f", amount);
+    }
+
     // --- /sum roamer subcommands ---
 
     private void handleRoamer(ICommandSender sender, String[] args) {
@@ -327,7 +456,7 @@ public class CommandSum extends CommandBase {
                                           @Nullable BlockPos targetPos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args,
-                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites");
+                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ");
         }
         if (args.length == 2 && "rmroamerblock".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, SumConfig.getRoamerWalkableBlocks());
@@ -338,6 +467,14 @@ public class CommandSum extends CommandBase {
         if (args.length == 2 && "favorites".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args,
                 "list", "clear", "export", "importfile", "file");
+        }
+        if (args.length == 2 && "econ".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, "balance", "add", "set");
+        }
+        if (args.length >= 3 && "econ".equalsIgnoreCase(args[0])
+            && ("balance".equalsIgnoreCase(args[1]) && args.length == 3
+                || ("add".equalsIgnoreCase(args[1]) || "set".equalsIgnoreCase(args[1])) && args.length == 4)) {
+            return getListOfStringsMatchingLastWord(args, server.getOnlinePlayerNames());
         }
         if (args.length == 3 && "roamer".equalsIgnoreCase(args[0]) && "greet".equalsIgnoreCase(args[1])) {
             return getListOfStringsMatchingLastWord(args, "add", "list", "clear");
