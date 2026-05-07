@@ -1,0 +1,8 @@
+{
+  "parent": "block/orientable",
+  "textures": {
+    "front": "sum:blocks/atm_kiosk_front",
+    "side":  "sum:blocks/atm_kiosk_side",
+    "top":   "sum:blocks/atm_kiosk_top"
+  }
+}
