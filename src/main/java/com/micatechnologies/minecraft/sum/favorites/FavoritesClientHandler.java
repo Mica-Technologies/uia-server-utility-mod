@@ -20,6 +20,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.lwjgl.input.Keyboard;
 
@@ -53,6 +54,16 @@ public class FavoritesClientHandler {
         Sum.LOGGER.info("[favorites] FavoritesClientHandler instance constructed");
     }
 
+    private boolean tickEventSeen = false;
+
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (!tickEventSeen) {
+            tickEventSeen = true;
+            Sum.LOGGER.info("[favorites] ClientTickEvent reached handler (event bus dispatch is working)");
+        }
+    }
+
     private Map<ResourceLocation, Set<Integer>> favoritesByItem = Collections.emptyMap();
     private int favoritesCacheVersion = -1;
 
@@ -63,13 +74,24 @@ public class FavoritesClientHandler {
 
     @SubscribeEvent(receiveCanceled = true)
     public void onKeyboardInput(GuiScreenEvent.KeyboardInputEvent.Pre event) {
+        int eventKey = Keyboard.getEventKey();
+        boolean keyDown = Keyboard.getEventKeyState();
+
+        // Unconditional diagnostic: log every B/Z event (down or up) reaching this handler,
+        // regardless of which GUI is open. Helps disambiguate "event not delivered" from
+        // "event delivered but bailed because GUI wasn't GuiContainerCreative".
+        if (eventKey == Keyboard.KEY_B || eventKey == Keyboard.KEY_Z) {
+            String guiName = event.getGui() != null ? event.getGui().getClass().getName() : "null";
+            Sum.LOGGER.info("[favorites] keyboard event reached handler: key={} state={} gui={} canceled={}",
+                eventKey, keyDown, guiName, event.isCanceled());
+        }
+
         if (!(event.getGui() instanceof GuiContainerCreative)) {
             return;
         }
-        if (!Keyboard.getEventKeyState()) {
+        if (!keyDown) {
             return;
         }
-        int eventKey = Keyboard.getEventKey();
         if (eventKey == 0) {
             return;
         }
