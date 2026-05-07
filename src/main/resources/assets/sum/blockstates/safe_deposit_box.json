@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:safe_deposit_box" },
+    "facing=east":  { "model": "sum:safe_deposit_box", "y": 90 },
+    "facing=south": { "model": "sum:safe_deposit_box", "y": 180 },
+    "facing=west":  { "model": "sum:safe_deposit_box", "y": 270 }
+  }
+}

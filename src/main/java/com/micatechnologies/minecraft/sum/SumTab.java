@@ -4,6 +4,7 @@ import com.micatechnologies.minecraft.sum.atm.BlockAtmDriveThru;
 import com.micatechnologies.minecraft.sum.atm.BlockAtmKiosk;
 import com.micatechnologies.minecraft.sum.atm.BlockAtmWall;
 import com.micatechnologies.minecraft.sum.bank.BlockBankCounter;
+import com.micatechnologies.minecraft.sum.bank.BlockSafeDepositBox;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
 import net.minecraft.creativetab.CreativeTabs;
@@ -24,6 +25,7 @@ public class SumTab {
     public static BlockAtmWall atmWall;
     public static BlockAtmDriveThru atmDriveThru;
     public static BlockBankCounter bankCounter;
+    public static BlockSafeDepositBox safeDepositBox;
 
     public static void initTabElements() {
         roamerSpawnEgg = new ItemRoamerSpawnEgg();
@@ -32,5 +34,6 @@ public class SumTab {
         atmWall = new BlockAtmWall();
         atmDriveThru = new BlockAtmDriveThru();
         bankCounter = new BlockBankCounter();
+        safeDepositBox = new BlockSafeDepositBox();
     }
 }

@@ -1,0 +1,22 @@
+{
+  "ambientocclusion": true,
+  "textures": {
+    "front":    "sum:blocks/safe_deposit_box_front",
+    "side":     "sum:blocks/safe_deposit_box_side",
+    "particle": "sum:blocks/safe_deposit_box_front"
+  },
+  "elements": [
+    {
+      "from": [3, 0, 0],
+      "to":   [13, 16, 5],
+      "faces": {
+        "north": { "uv": [3, 0, 13, 16], "texture": "#front" },
+        "south": { "uv": [3, 0, 13, 16], "texture": "#side"  },
+        "east":  { "uv": [0, 0, 5, 16],  "texture": "#side"  },
+        "west":  { "uv": [0, 0, 5, 16],  "texture": "#side"  },
+        "up":    { "uv": [3, 0, 13, 5],  "texture": "#side"  },
+        "down":  { "uv": [3, 0, 13, 5],  "texture": "#side"  }
+      }
+    }
+  ]
+}
