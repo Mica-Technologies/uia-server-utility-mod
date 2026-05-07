@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
+import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
@@ -45,6 +46,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new RoadRunnerHandler());
         proxy.preInit(event);
         SumTab.initTabElements();
+        SumNetwork.init();
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 
