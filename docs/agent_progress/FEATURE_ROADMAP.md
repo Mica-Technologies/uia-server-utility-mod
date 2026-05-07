@@ -476,13 +476,140 @@ C1 + C3 alone give SUM a self-sufficient money system, which is the highest-valu
 
 ### Open questions specific to Section C
 
-These need Alex's calls before any C-phase starts.
+Resolved 2026-05-07 via the AskUserQuestion interface:
 
-1. **Approach 1, 2, 3, or 4?** The recommendation is Approach 4 → 2. Approach 3 (full replacement) is only worth it if there's a triggering event.
-2. **If we do C1, what happens to in-world EconomyInc bills/blocks?** Coexistence is the easy answer; full migration is the hard one. Defer until C9.
-3. **Do we ship our own credit card item (C4) or is the debit-card-as-physical-thing not on-theme for SUM?** Real banks don't issue physical balance objects — phones do. Could swap for a "phone item" that opens the ATM GUI.
-4. **Plots system: in scope or out?** Strongly recommend out for now. Plots is a land-claim mod and SUM is a city-utility mod; they're adjacent but distinct. If desired, that's its own roadmap (Section D).
-5. **Vault-cracker minigame: in scope or out?** Strongly recommend out. PvP burglary doesn't fit SUM's theme.
+1. ✅ **Approach choice.** Approach 3 (full replacement), shipped iteratively. C1 (the SUM money capability) lands first as the foundation; everything else extends it.
+2. ✅ **In-world EconomyInc items/blocks during transition.** Coexistence first; migration tooling is C9 once the rest of Section C is in place.
+3. ✅ **Credit card UX.** Both phone (modern, recommended) and debit card (classic). C4 ships both as separate items.
+4. ✅ **Plots system.** Out of Section C — moved to Section D as its own research/spec.
+5. ✅ **Vault-cracker minigame.** Out of scope. PvP burglary doesn't fit SUM's theme. Skip the cracker tool, gear/microchip/mechanism crafting components, GuiCracking, and BlockVaultCracked entirely.
+
+---
+
+## Section D — Plots system (research / future spec)
+
+Status: **research only — not on the active roadmap.** Documented while EconomyInc's plots internals were fresh in case SUM wants to absorb it later. The land-claim concept is genuinely useful (it solves "how do I sell players a piece of map?" on roleplay servers), but it's a distinct domain from the bank/utility work in Sections A–C and big enough to warrant its own dedicated effort.
+
+### What EconomyInc's plots system actually is
+
+Admin-defined buyable land regions. **Not** a free-form chunk-claim system like FTBChunks or GriefPrevention — admins explicitly create plots with bounding boxes and prices, then players run a command to buy one.
+
+Decompiled data model from EconomyInc 1.6.2:
+
+```java
+// fr.fifou.economy.world.saveddata.PlotsData
+public class PlotsData {
+    public String name;        // human-readable plot ID, used in /plots buy <name>
+    public String owner;       // player username (not UUID — fragile under name changes)
+    public int xPosFirst;      // bbox corner 1 X
+    public int zPosFirst;      // bbox corner 1 Z
+    public int xPosSecond;     // bbox corner 2 X
+    public int zPosSecond;     // bbox corner 2 Z
+    public int yPos;           // a single Y? not a vertical bbox — surprising
+    public double price;       // dollar cost via IMoney
+    public boolean bought;     // ownership flag
+}
+```
+
+Persistence:
+
+- `PlotsWorldSavedData extends WorldSavedData` — holds the master `List<PlotsData>` per dimension, written into `world/data/plots.dat`.
+- `ChunksWorldSavedData` + `PlotsChunkData` — secondary chunk-keyed index for fast "what plot does this chunk belong to" lookups during PvP/build-permission checks.
+
+Commands:
+
+- `/plots` — `CommandPlots` likely lists plots, shows info, admin-creates (verify by decompiling at impl time).
+- `/plots buy <name>` — `CommandPlotsBuy` deducts price via IMoney and flips `bought=true`, sets `owner` to the buying player.
+
+Interactions with the rest of the mod:
+
+- `VillageHandlerShop` + `VillageComponentShop` — village shops that procedurally generate inside village structures may register as plots automatically. **Need to verify.** If true, SUM's plot system has to play nice with vanilla village generation.
+- IMoney — buy operations deduct from the player's balance.
+
+### Limitations of the EconomyInc design (reasons SUM should not just copy it)
+
+- **Username, not UUID, for owner.** A player who changes their Mojang username loses their plot. Modern mods key by UUID and resolve the display name at GUI time.
+- **Single Y coordinate.** A plot is `(x1,z1)..(x2,z2)` at one specific Y level — not a true 3D box. Surface-only feature; no "claim the cave under my house."
+- **Boolean `bought` flag, no states.** No "for sale", "for rent", "expired", "disputed" states. No rental.
+- **No permissions model.** Plot owner controls it absolutely. No "let my friend build here too" without giving them ownership.
+- **No protection enforcement (apparently).** The plot data is stored but I don't see a `BlockEvent.BreakEvent` handler in EconomyInc's event classes. Plots may be purely informational, with admins relying on vanilla op permissions for actual protection. **Verify by decompiling EventClassCommon at impl time.**
+- **No selection ergonomics.** Admins create plots by typing exact coordinates; no wand/click-corners flow.
+
+### Proposed SUM-native design
+
+A SUM `Plot` is a 3D bbox owned by zero or one players, with a permissions list and a status:
+
+```java
+public class SumPlot {
+    UUID plotId;                       // stable internal ID
+    String displayName;                // shown in /sum plots list
+    UUID ownerUuid;                    // null = unowned/admin-listed
+    BlockPos cornerA, cornerB;         // 3D bbox; cornerA.y/cornerB.y allow vertical claims
+    int dimensionId;
+    double price;                      // 0 if not for sale
+    Status status;                     // FOR_SALE, OWNED, RESERVED, EXPIRED
+    Set<UUID> trustedBuilders;         // players allowed to build despite not owning
+    long createdAt;                    // epoch ms
+    long lastActivity;                 // for expiry policies (e.g. unused for 90 days → EXPIRED)
+}
+enum Status { FOR_SALE, OWNED, RESERVED, EXPIRED }
+```
+
+Persistence:
+
+- `SumPlotsWorldSavedData extends WorldSavedData` — per-dimension master list, written to `world/data/sum_plots.dat`.
+- `SumPlotsChunkIndex` — chunk-keyed lookup table, eagerly built from the master list at world load and kept in sync on plot create/delete. Used by the protection event handler.
+
+Commands (`/sum plots <subcommand>`):
+
+- `/sum plots list [near]` — list plots; `near` filters to ones inside ~64 blocks.
+- `/sum plots info <id>` — name, owner, bbox, status, price, trusted list.
+- `/sum plots create <name> <price>` — admin only. Uses the player's wand selection (see below) for the bbox.
+- `/sum plots delete <id>` — admin only.
+- `/sum plots buy <id>` — anyone with sufficient balance.
+- `/sum plots sell <id>` — owner sets back to FOR_SALE at a chosen price.
+- `/sum plots trust <id> <player>` / `/sum plots untrust <id> <player>` — owner manages builders.
+- `/sum plots transfer <id> <player>` — owner transfers ownership outright.
+
+User-facing items:
+
+- **Plot wand (`sum:plot_wand`)** — admin tool. Left-click corner A, right-click corner B, then `/sum plots create` reads the selection. Mirrors the WorldEdit wand convention familiar to most server admins.
+
+Protection enforcement:
+
+- `BlockEvent.BreakEvent` and `BlockEvent.PlaceEvent` listener. If the affected block is inside a plot the actor doesn't own/isn't trusted on, cancel the event and send a chat warning. Op-level players bypass.
+- `PlayerInteractEvent` listener for chest/door access — same rule, configurable.
+- `LivingDestroyBlockEvent` for mob breakage of plot blocks (creepers, withers) — cancel if plot has the "no mob damage" flag.
+
+GUI:
+
+- `/sum plots gui` opens a browser showing FOR_SALE plots with map-style location preview, sortable by price/distance.
+
+### Implementation phases (sketch)
+
+| Phase | Goal | Effort | Depends on |
+|---|---|---|---|
+| D1 | Data model: `SumPlot`, `SumPlotsWorldSavedData`, NBT round-trip. No commands or protection yet. | M | C1 (for currency) |
+| D2 | `/sum plots create/delete/list/info` admin commands + plot wand item. | M | D1 |
+| D3 | `/sum plots buy/sell` + currency deduction via `EconomyBridge`. | S | D1, D2 |
+| D4 | Protection: BreakEvent/PlaceEvent/InteractEvent listeners + chunk index. | M | D1 |
+| D5 | `/sum plots trust/untrust/transfer` permissions + non-owner trusted-builder support. | S | D4 |
+| D6 | Plot browser GUI (`/sum plots gui`). | M | D3 |
+| D7 | Optional rental flow + auto-balance-deduction. | M | D5 |
+| D8 | (Optional) EconomyInc plots migration command. | S | D1 |
+
+**Total effort for D1–D6** (everything except rental and EconomyInc migration): ~5 days. **D7 + D8** add ~1 day each.
+
+### Open questions for Section D
+
+These can stay open until D-phase work begins.
+
+1. **Per-dimension or world-global plots?** Vanilla `WorldSavedData` is per-dimension by default; cross-dimension plots would need a separate global manager. Recommend per-dimension.
+2. **Y-axis claims: full-column, custom-3D, or surface-only?** Custom 3D is the most flexible but the chunk-index becomes 3D too (more complex). Recommend full-column claims by default with an admin override for custom 3D.
+3. **Protection scope: blocks only, or also entities (mobs, item frames, paintings)?** Vanilla griefing is mostly blocks; entity protection is a small additional handler. Recommend including it.
+4. **Plot creation: admin-only, or can players self-stake claims (with a limit)?** EconomyInc is admin-only, FTBChunks lets players claim. Recommend admin-only for v1 with a config flag for opening it up later.
+5. **Plot pricing: flat dollar or per-block (e.g. $1 per block^2)?** Per-block scales fairly with claim size but is harder to think about. Recommend flat dollar by default with an admin-config-controlled per-block-floor formula.
+6. **Should D ship before or after the rest of Section C?** Section C is the bank/economy work; Section D is the land-claim work. Doing C first means plots have a working `EconomyBridge.adjustBalance` to deduct from, so the order is C → D. Don't interleave.
 
 ---
 
