@@ -5,3 +5,4 @@ itemGroup.sum=Server Utility Mod
 itemGroup.sum_favorites=SUM: Favorites
 key.sum.category=Server Utility Mod
 key.sum.favorites.toggle=Toggle Favorite (in creative menu)
+key.sum.favorites.jump=Jump to Favorites Tab (hold Ctrl)

@@ -1,5 +1,7 @@
 package com.micatechnologies.minecraft.sum.favorites;
 
+import com.micatechnologies.minecraft.sum.Sum;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -7,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainerCreative;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
@@ -18,6 +21,7 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.lwjgl.input.Keyboard;
 
 public class FavoritesClientHandler {
@@ -27,14 +31,31 @@ public class FavoritesClientHandler {
     public static final KeyBinding TOGGLE = new KeyBinding(
         "key.sum.favorites.toggle", Keyboard.KEY_B, CATEGORY);
 
+    public static final KeyBinding JUMP = new KeyBinding(
+        "key.sum.favorites.jump", Keyboard.KEY_B, CATEGORY);
+
     private static final ResourceLocation STAR_TEX =
         new ResourceLocation("sum", "textures/gui/favorite_star.png");
+
+    private static final Method SET_CURRENT_CREATIVE_TAB = resolveSetTabMethod();
+
+    private static Method resolveSetTabMethod() {
+        try {
+            return ReflectionHelper.findMethod(GuiContainerCreative.class,
+                "setCurrentCreativeTab", "func_147050_b", CreativeTabs.class);
+        } catch (Exception e) {
+            Sum.LOGGER.error("Could not resolve GuiContainerCreative#setCurrentCreativeTab; "
+                + "Ctrl+B jump-to-favorites will be disabled.", e);
+            return null;
+        }
+    }
 
     private Map<ResourceLocation, Set<Integer>> favoritesByItem = Collections.emptyMap();
     private int favoritesCacheVersion = -1;
 
     public static void registerKeybinds() {
         ClientRegistry.registerKeyBinding(TOGGLE);
+        ClientRegistry.registerKeyBinding(JUMP);
     }
 
     @SubscribeEvent
@@ -51,9 +72,27 @@ public class FavoritesClientHandler {
         }
 
         GuiContainerCreative gui = (GuiContainerCreative) event.getGui();
+        boolean ctrl = GuiScreen.isCtrlKeyDown();
 
-        if (eventKey == TOGGLE.getKeyCode()) {
+        // Jump takes priority when Ctrl is held to mirror the keybind doc (Ctrl+B).
+        if (ctrl && eventKey == JUMP.getKeyCode()) {
+            handleJump(gui, event);
+            return;
+        }
+        if (!ctrl && eventKey == TOGGLE.getKeyCode()) {
             handleToggle(gui, event);
+        }
+    }
+
+    private void handleJump(GuiContainerCreative gui, GuiScreenEvent.KeyboardInputEvent.Pre event) {
+        if (CreativeTabFavorites.INSTANCE == null || SET_CURRENT_CREATIVE_TAB == null) {
+            return;
+        }
+        try {
+            SET_CURRENT_CREATIVE_TAB.invoke(gui, CreativeTabFavorites.INSTANCE);
+            event.setCanceled(true);
+        } catch (Exception e) {
+            Sum.LOGGER.error("Failed to invoke setCurrentCreativeTab", e);
         }
     }
 
