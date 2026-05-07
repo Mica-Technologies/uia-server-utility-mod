@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:atm_wall" },
+    "facing=east":  { "model": "sum:atm_wall", "y": 90 },
+    "facing=south": { "model": "sum:atm_wall", "y": 180 },
+    "facing=west":  { "model": "sum:atm_wall", "y": 270 }
+  }
+}
