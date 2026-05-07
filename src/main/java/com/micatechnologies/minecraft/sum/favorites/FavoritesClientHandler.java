@@ -19,6 +19,7 @@ import net.minecraft.init.SoundEvents;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.client.event.GuiContainerEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -186,11 +187,11 @@ public class FavoritesClientHandler {
     }
 
     @SubscribeEvent
-    public void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {
+    public void onDrawForeground(GuiContainerEvent.DrawForeground event) {
         if (!SumConfig.isFavoritesStarOverlayEnabled()) {
             return;
         }
-        if (!(event.getGui() instanceof GuiContainerCreative)) {
+        if (!(event.getGuiContainer() instanceof GuiContainerCreative)) {
             return;
         }
         refreshCacheIfStale();
@@ -198,7 +199,7 @@ public class FavoritesClientHandler {
             return;
         }
 
-        GuiContainerCreative gui = (GuiContainerCreative) event.getGui();
+        GuiContainerCreative gui = (GuiContainerCreative) event.getGuiContainer();
         Minecraft mc = Minecraft.getMinecraft();
         mc.getTextureManager().bindTexture(STAR_TEX);
 
@@ -208,18 +209,21 @@ public class FavoritesClientHandler {
         GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA,
             GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        GlStateManager.translate(0.0F, 0.0F, 300.0F);
+        // Z=250 places the star above item icons (drawn at Z=200) but below tooltips
+        // (drawn at Z=300), so hovering an item shows the tooltip on top of nearby stars
+        // rather than the stars clipping over the tooltip text.
+        GlStateManager.translate(0.0F, 0.0F, 250.0F);
 
-        int guiLeft = gui.getGuiLeft();
-        int guiTop = gui.getGuiTop();
-
+        // DrawForeground fires inside GuiContainer.drawScreen with a translate(guiLeft,
+        // guiTop, 0) already applied to the modelview, so slot.xPos / slot.yPos are
+        // already in screen-correct local coordinates.
         for (Slot slot : gui.inventorySlots.inventorySlots) {
             ItemStack stack = slot.getStack();
             if (stack.isEmpty() || !isFavoritedStack(stack)) {
                 continue;
             }
-            int x = guiLeft + slot.xPos + 9;
-            int y = guiTop + slot.yPos - 1;
+            int x = slot.xPos + 9;
+            int y = slot.yPos - 1;
             Gui.drawScaledCustomSizeModalRect(x, y, 0, 0, 16, 16, 8, 8, 16.0F, 16.0F);
         }
 
