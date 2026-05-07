@@ -1,6 +1,6 @@
 # Roamer NPC performance optimization
 
-Status as of commit `80ebbd3` (the last commit on this plan as written). Twelve commits land on `main`, all green on `gradlew build`. Alex tested mid-stream after the first three commits and confirmed roamers were faster and behaviorally identical; the remaining nine commits are unverified in-game.
+Status: thirteen commits land on `main`, all green on `gradlew build`. Alex tested mid-stream after the first three commits and confirmed roamers were faster and behaviorally identical; the remaining ten commits (the cooperative search, search-cost cache/constants, ModelPlayer overlay disable, and the texture-atlas + persona expansion) are unverified in-game.
 
 ---
 
@@ -10,13 +10,11 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 
 > I'm continuing the roamer NPC performance optimization pass for the SUM mod.
 >
-> Read `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` first — it has the full plan, what's been done, what's left, the original review findings, and the testing checklist.
+> Read `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` first — it has the full plan, what's been done, the original review findings, and the testing checklist.
 >
-> The last 12 commits on `main` (from `ad108ca` "Switch roamer walkable-block lookup to Block reference" through `80ebbd3` "Disable ModelPlayer overlay layers on the roamer renderer") implement phases #1, #2, #3, #5, and all of #4 (steps A–H), plus the FPS-side hat/wear-layer disable. Alex validated the first three commits in-game and confirmed performance improved with no behavioral regressions. The remaining nine commits compile and pass the test suite but are unverified in-game.
+> Every item in the original review is now landed on `main` through the texture-atlas + persona expansion (FPS #2). Alex validated the first three commits in-game; the remaining ten compile and pass the test suite but are unverified in-game.
 >
-> The only deferred item from the original review is the texture-atlas / UV-remap work for batch coherency (~3–4 hours, complex, modest-FPS payoff). Don't start it without explicit confirmation — current cost is ~1 ms/frame in typical scenes.
->
-> Before doing more work: ask Alex what they observed in testing the latest commits, and whether they want to (a) tune any constants based on what they saw, (b) start on the texture atlas, or (c) call this performance pass complete and move on.
+> Before doing more work: ask Alex what they observed in testing the latest commits, and whether they want to (a) tune any constants based on what they saw (see "Tunable constants summary" at the bottom), (b) author additional roamer personas (edit `tools/roamer_atlas/generate.py` and bump `RenderRoamer.VARIANT_COUNT`), or (c) call this performance pass complete and move on to a different feature.
 
 ---
 
@@ -37,7 +35,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | #4-A+B fire | Cooperative cross-tick fire search | ✅ done, unverified | `7797af2` |
 | #4-A+B storm | Cooperative cross-tick storm search | ✅ done, unverified | `4d6791d` |
 | FPS #1 | Disable ModelPlayer overlay layers | ✅ done, unverified | `80ebbd3` |
-| FPS #2 | Texture atlas / UV remap | ⏸️ deferred — explicit confirmation required | — |
+| FPS #2 | Texture atlas + 16 persona variants | ✅ done, unverified | (this commit) |
 
 ---
 
@@ -114,16 +112,20 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 - **What**: `ModelPlayer` renders five "wear" parts (jacket, both sleeves, both pant legs) plus the hat overlay on top of the base biped, doubling the cube count per draw call. Roamer textures don't use the overlay UV regions, so all six layers are pure cost. Helper `buildModel()` flips `showModel = false` on each one. Roughly halves per-roamer render work with no visual change.
 - **Watch**: if a custom roamer skin *does* use a hat or jacket UV region, those will now be invisible. Easy to flip back per-layer if needed.
 
+### FPS #2 — Texture atlas + persona variants
+
+- **Files**: new `ModelRoamer.java`, rewritten `RenderRoamer.java`, new generated `assets/sum/textures/entity/roamer_atlas.png`, new `tools/roamer_atlas/generate.py`, the six base templates moved from assets to `tools/roamer_atlas/templates/`.
+- **What**: All roamers now sample a single shared atlas (64 wide × `VARIANT_COUNT * 64` tall, vertically stacked). At construction the renderer builds one `ModelRoamer` per variant; each variant rebuilds the rendered biped parts after `super(0.0F, false)` with V offsets shifted by `variantIndex * 64` and the model's logical `textureHeight` raised to the full atlas height so UV normalization stays correct. `doRender` swaps `mainModel` based on `entity.getUniqueID().getLeastSignificantBits() % VARIANT_COUNT`, then delegates to super. `getEntityTexture` returns the single atlas.
+- **Why it's cheap**: with one texture for all variants, MC 1.12.2's `TextureManager.bindTexture` short-circuits redundant binds via its `lastBoundTexture` field — a chunkful of roamers now causes one real `glBindTexture` per render pass instead of up to 6.
+- **Persona expansion**: `VARIANT_COUNT = 16` (up from 6). The first six entries in `tools/roamer_atlas/generate.py`'s `PERSONAS` list reproduce the original templates unchanged; the next ten are generated by exact-color recoloring of shirt/pants/hair regions to fit a "city" theme (office, casual, construction hi-vis, nightlife, tourist, park ranger, academic, elder, tech, artist). UUID hashing for previously-spawned roamers is unchanged for indices 0–5, so existing entities keep their original look.
+- **Adding more variants**: edit `PERSONAS` in `generate.py`, re-run the script, and bump `RenderRoamer.VARIANT_COUNT` to match. The atlas height implies the count, so a mismatch will sample the wrong V slice.
+- **Watch**: variant-to-variant UV shifts are integer pixel-aligned (multiples of 64) so there's no risk of bleed between slices, but if a future template happens to share the source-color of *another* template's region, the recolor swap won't isolate it cleanly. Keep templates using flat solid fills per region (no gradients/shading on shirts/pants/hair) so the exact-match recolor stays accurate.
+
 ---
 
 ## What's left
 
-### Texture atlas / UV remap (deferred — only if explicitly confirmed)
-
-- **Original concern**: Six roamer texture variants → up to 6 GL state changes per render pass when all variants are visible.
-- **Realistic cost in MC 1.12.2**: each `glBindTexture` is ~5–50 μs, so 6 binds = ~30–300 μs/frame = well under 1 ms. With wear-layers gone, this is no longer a meaningful render cost in typical scenes.
-- **What "doing it" looks like**: combine the six `roamer_N.png` textures into one atlas image, build the model with per-instance UV offsets so each variant samples a different region. This requires custom `ModelRenderer` cube setup since `ModelPlayer` bakes UVs into its cubes at construction. Estimated 3–4 hours and a real risk of visual bugs on first try.
-- **Recommendation**: don't do this preemptively. Profile in-game with many roamers visible. If GL state-change time shows up as a hotspot, revisit. Otherwise leave it.
+Nothing in the original review. The texture atlas (FPS #2) was the last deferred item and is now done. See the FPS #2 phase entry below.
 
 ---
 
