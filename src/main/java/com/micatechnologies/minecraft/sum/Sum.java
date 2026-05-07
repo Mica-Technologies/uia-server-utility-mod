@@ -2,6 +2,7 @@ package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
+import com.micatechnologies.minecraft.sum.command.CommandBalance;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
@@ -93,5 +94,6 @@ public class Sum {
     @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandSum());
+        event.registerServerCommand(new CommandBalance());
     }
 }
