@@ -1,6 +1,8 @@
 # Player favorites menu (creative-mode favorites tab)
 
-Status: **planning only — no code written.** This document captures the feasibility analysis, the proposed design, and a phased implementation plan for adding a "Favorites" tab to the creative inventory GUI. The Alto pack runs ~13 pages of creative tabs, so a personal favorites tab — especially for tools/weapons — is meant to short-circuit hunting through pagination every time the player wants the same handful of stacks.
+Status: **MVP code complete on 2026-05-07; in-game testing pending.** Commits `9c70b8c` through `0a25c14` ship phases #1–#5. The full build is green (`./gradlew build`); no in-world verification yet. Phases #6–#8 are deferred until Alex has tried the MVP in the Alto pack.
+
+This document captures the feasibility analysis, the design, and the phased implementation plan for adding a "Favorites" tab to the creative inventory GUI. The Alto pack runs ~13 pages of creative tabs, so a personal favorites tab — especially for tools/weapons — short-circuits hunting through pagination every time the player wants the same handful of stacks.
 
 ---
 
@@ -12,11 +14,11 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 >
 > Read `docs/agent_progress/PLAYER_FAVORITES_MENU.md` first — it has the full plan, feasibility notes, phases, what's been done vs. what's left, open design questions, and the testing checklist.
 >
-> Before doing more work: check the "Status snapshot" table for the next unchecked phase. All design questions were resolved on 2026-05-07 (see "Resolved design decisions"); don't re-litigate them unless Alex brings them up.
+> Phases #1–#5 (the MVP) shipped in commits `9c70b8c`, `b8fa3ff`, `e40d378`, `dd2d1ba`, `0a25c14`. Code compiles cleanly and the full `./gradlew build` is green, but **none of it has been verified in-game**. Before doing more work: ask Alex how playtest went and whether they hit any of the watch-outs in the Risks section (tooltip-vs-overlay layering, JEI search-field focus eating B presses, search-tab false-negatives on toggle, reflection failure on `setCurrentCreativeTab` in obfuscated build).
 >
-> Locked-in decisions: toggle keybind = `B`, jump-to-favorites keybind = `Ctrl+B`, NBT excluded from identity in v1, storage is per-installation at `<minecraft>/config/sum/favorites.json`, soft warn at 200 favorites with no hard cap. MVP scope = phases #1–#5; phases #6–#8 are deferred until after in-game testing.
+> All design questions were resolved on 2026-05-07 (see "Resolved design decisions"); don't re-litigate them unless Alex brings them up. Locked-in: toggle keybind = `B`, jump-to-favorites keybind = `Ctrl+B`, NBT excluded from identity in v1, storage is per-installation at `<minecraft>/config/sum/favorites.json`, soft warn at 200 favorites with no hard cap.
 >
-> The feature is **client-only** (creative inventory is a client-side construct), **creative-only by virtue of GuiContainerCreative not opening in survival**, and **persisted to a JSON file in the Minecraft config directory** so favorites survive across worlds and reinstalls of the mod pack.
+> Phases #6–#8 (reorder, /sum favorites command, polish) are deferred. Don't start them without explicit confirmation. The feature is **client-only** (creative inventory is a client-side construct), **creative-only by virtue of GuiContainerCreative not opening in survival**, and **persisted to a JSON file in the Minecraft config directory** so favorites survive across worlds and reinstalls of the mod pack.
 
 ---
 
@@ -25,16 +27,16 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | Phase | Goal | Status | Commit |
 |---|---|---|---|
 | #0 | Feasibility spike (this doc) | ✅ done | — |
-| #1 | `FavoritesStore` — in-memory list + JSON persistence | ☐ not started | — |
-| #2 | `CreativeTabFavorites` — custom tab populated from the store | ☐ not started | — |
-| #3 | Toggle keybind (`B` default) — add/remove favorite while hovering an item | ☐ not started | — |
-| #4 | Star overlay icon on favorited slots inside any creative tab | ☐ not started | — |
-| #5 | "Jump to favorites" keybind (`Ctrl+B` default) — switch tab without paginating | ☐ not started | — |
-| #6 | Reorder support (drag within the favorites tab, or numeric command) | ☐ not started | — |
-| #7 | `/sum favorites` admin/debug subcommand (list, clear, import/export) | ☐ not started | — |
-| #8 | Polish: tab icon, language strings, config knobs, JEI/NEI compat smoke test | ☐ not started | — |
+| #1 | `FavoritesStore` — in-memory list + JSON persistence | ✅ done, unverified in-game | `9c70b8c` |
+| #2 | `CreativeTabFavorites` — custom tab populated from the store | ✅ done, unverified in-game | `b8fa3ff` |
+| #3 | Toggle keybind (`B` default) — add/remove favorite while hovering an item | ✅ done, unverified in-game | `e40d378` |
+| #4 | Star overlay icon on favorited slots inside any creative tab | ✅ done, unverified in-game | `dd2d1ba` |
+| #5 | "Jump to favorites" keybind (`Ctrl+B` default) — switch tab without paginating | ✅ done, unverified in-game | `0a25c14` |
+| #6 | Reorder support (drag within the favorites tab, or numeric command) | ⏸️ deferred — explicit confirmation required | — |
+| #7 | `/sum favorites` admin/debug subcommand (list, clear, import/export) | ⏸️ deferred — explicit confirmation required | — |
+| #8 | Polish: tab icon, language strings, config knobs, JEI/NEI compat smoke test | ⏸️ deferred — explicit confirmation required | — |
 
-Phases #1–#5 are the **MVP**. Phases #6–#8 are nice-to-have and can ship later or be cut if effort runs over.
+Phases #1–#5 are the **MVP** and have all landed; the full `./gradlew build` is green. Phases #6–#8 are nice-to-have — pause for in-game testing first, then revisit.
 
 ---
 
