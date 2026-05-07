@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum.favorites;
 
 import com.micatechnologies.minecraft.sum.Sum;
+import com.micatechnologies.minecraft.sum.SumConfig;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
@@ -122,6 +123,9 @@ public class FavoritesClientHandler {
 
     @SubscribeEvent
     public void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {
+        if (!SumConfig.isFavoritesStarOverlayEnabled()) {
+            return;
+        }
         if (!(event.getGui() instanceof GuiContainerCreative)) {
             return;
         }

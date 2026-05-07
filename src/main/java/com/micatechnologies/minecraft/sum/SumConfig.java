@@ -30,6 +30,15 @@ public class SumConfig {
         "minecraft:concrete"
     };
 
+    private static final String CATEGORY_FAVORITES = "favorites";
+
+    private static final String FIELD_KEY_FAVORITES_STAR_OVERLAY = "enableStarOverlay";
+    private static final String FIELD_DESCRIPTION_FAVORITES_STAR_OVERLAY =
+        "Whether to render a small gold star in the upper-right of every creative-inventory slot "
+            + "whose item is in your favorites list. Set to false to disable the overlay without "
+            + "removing favorites themselves.";
+    private static final boolean FIELD_DEFAULT_FAVORITES_STAR_OVERLAY = true;
+
     private static final String CATEGORY_ROADRUNNER = "roadrunner";
 
     private static final String FIELD_KEY_ROADRUNNER_SPEED_BLOCKS = "speedBlocks";
@@ -50,6 +59,8 @@ public class SumConfig {
     private static volatile Set<Block> roamerWalkableBlockResolved;
 
     private static Map<String, Double> roadRunnerSpeedBlocks;
+
+    private static boolean favoritesStarOverlay;
 
     private static Configuration config;
 
@@ -85,9 +96,17 @@ public class SumConfig {
             }
         }
 
+        favoritesStarOverlay = config.getBoolean(
+            FIELD_KEY_FAVORITES_STAR_OVERLAY, CATEGORY_FAVORITES,
+            FIELD_DEFAULT_FAVORITES_STAR_OVERLAY, FIELD_DESCRIPTION_FAVORITES_STAR_OVERLAY);
+
         if (config.hasChanged()) {
             config.save();
         }
+    }
+
+    public static boolean isFavoritesStarOverlayEnabled() {
+        return favoritesStarOverlay;
     }
 
     public static Set<String> getRoamerWalkableBlocks() {

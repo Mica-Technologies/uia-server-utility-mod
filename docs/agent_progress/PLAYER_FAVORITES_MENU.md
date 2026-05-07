@@ -32,9 +32,9 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | #3 | Toggle keybind (`B` default) — add/remove favorite while hovering an item | ✅ done, unverified in-game | `e40d378` |
 | #4 | Star overlay icon on favorited slots inside any creative tab | ✅ done, unverified in-game | `dd2d1ba` |
 | #5 | "Jump to favorites" keybind (`Ctrl+B` default) — switch tab without paginating | ✅ done, unverified in-game | `0a25c14` |
-| #6 | Reorder support (drag within the favorites tab, or numeric command) | ⏸️ deferred — explicit confirmation required | — |
-| #7 | `/sum favorites` admin/debug subcommand (list, clear, import/export) | ⏸️ deferred — explicit confirmation required | — |
-| #8 | Polish: tab icon, language strings, config knobs, JEI/NEI compat smoke test | ⏸️ deferred — explicit confirmation required | — |
+| #6 | Reorder support (Shift+Scroll on a favorited slot in the favorites tab) | ☐ not started — next up | — |
+| #7 | `/sum favorites` admin/debug subcommand (list, clear, import/export) | ☐ not started | — |
+| #8 | Polish: config knob, language strings, JEI/NEI compat plan | ✅ done, unverified in-game | (this commit) |
 
 Phases #1–#5 are the **MVP** and have all landed; the full `./gradlew build` is green. Phases #6–#8 are nice-to-have — pause for in-game testing first, then revisit.
 
