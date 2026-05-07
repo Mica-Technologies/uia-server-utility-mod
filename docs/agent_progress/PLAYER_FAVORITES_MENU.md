@@ -1,6 +1,6 @@
 # Player favorites menu (creative-mode favorites tab)
 
-Status: **MVP code complete on 2026-05-07; in-game testing pending.** Commits `9c70b8c` through `0a25c14` ship phases #1–#5. The full build is green (`./gradlew build`); no in-world verification yet. Phases #6–#8 are deferred until Alex has tried the MVP in the Alto pack.
+Status: **All eight phases shipped and playtest-verified on 2026-05-07.** Plus four post-MVP refinements: visual refresh after reorder, visual refresh after toggle from inside the favorites tab, star overlay drawn before the tooltip layer (no more clipping over hover text), and `Z` works in the world to open creative directly to the favorites tab. The full `./gradlew build` is green.
 
 This document captures the feasibility analysis, the design, and the phased implementation plan for adding a "Favorites" tab to the creative inventory GUI. The Alto pack runs ~13 pages of creative tabs, so a personal favorites tab — especially for tools/weapons — short-circuits hunting through pagination every time the player wants the same handful of stacks.
 
@@ -14,7 +14,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 >
 > Read `docs/agent_progress/PLAYER_FAVORITES_MENU.md` first — it has the full plan, feasibility notes, phases, what's been done vs. what's left, open design questions, and the testing checklist.
 >
-> Phases #1–#5 (the MVP) shipped in commits `9c70b8c`, `b8fa3ff`, `e40d378`, `dd2d1ba`, `0a25c14`. Code compiles cleanly and the full `./gradlew build` is green, but **none of it has been verified in-game**. Before doing more work: ask Alex how playtest went and whether they hit any of the watch-outs in the Risks section (tooltip-vs-overlay layering, JEI search-field focus eating B presses, search-tab false-negatives on toggle, reflection failure on `setCurrentCreativeTab` in obfuscated build).
+> All eight phases plus follow-up polish are shipped and playtest-verified by Alex. The feature is functionally complete. Don't add more without an explicit ask.
 >
 > All design questions were resolved on 2026-05-07 (see "Resolved design decisions"); don't re-litigate them unless Alex brings them up. Locked-in: toggle keybind = `B`, jump-to-favorites keybind = `Z` (originally `Ctrl+B`, but Alex's setup binds Ctrl+B to a narrator toggle — see "Open follow-ups"), NBT excluded from identity in v1, storage is per-installation at `<minecraft>/config/sum/favorites.json`, soft warn at 200 favorites with no hard cap.
 >
@@ -27,14 +27,18 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | Phase | Goal | Status | Commit |
 |---|---|---|---|
 | #0 | Feasibility spike (this doc) | ✅ done | — |
-| #1 | `FavoritesStore` — in-memory list + JSON persistence | ✅ done, unverified in-game | `9c70b8c` |
-| #2 | `CreativeTabFavorites` — custom tab populated from the store | ✅ done, unverified in-game | `b8fa3ff` |
-| #3 | Toggle keybind (`B` default) — add/remove favorite while hovering an item | ✅ done, unverified in-game | `e40d378` |
-| #4 | Star overlay icon on favorited slots inside any creative tab | ✅ done, unverified in-game | `dd2d1ba` |
-| #5 | "Jump to favorites" keybind (`Ctrl+B` default) — switch tab without paginating | ✅ done, unverified in-game | `0a25c14` |
-| #6 | Reorder support (Shift+Scroll on a favorited slot in the favorites tab) | ✅ done, unverified in-game | (this commit) |
-| #7 | `/sum favorites` admin/debug subcommand (list, clear, export, importfile, file) | ✅ done, unverified in-game | (this commit) |
-| #8 | Polish: config knob, language strings, JEI/NEI compat plan | ✅ done, unverified in-game | (this commit) |
+| #1 | `FavoritesStore` — in-memory list + JSON persistence | ✅ done, verified | `9c70b8c` |
+| #2 | `CreativeTabFavorites` — custom tab populated from the store | ✅ done, verified | `b8fa3ff` |
+| #3 | Toggle keybind (`B`) — add/remove favorite while hovering an item | ✅ done, verified | `e40d378` |
+| #4 | Star overlay icon on favorited slots inside any creative tab | ✅ done, verified | `dd2d1ba` |
+| #5 | "Jump to favorites" keybind (`Z`) — switch tab without paginating | ✅ done, verified | `0a25c14` |
+| #6 | Reorder support (Shift+Scroll on a favorited slot in the favorites tab) | ✅ done, verified | `bbc0ea7` |
+| #7 | `/sum favorites` admin/debug subcommand (list, clear, export, importfile, file) | ✅ done, verified | `9aca238` |
+| #8 | Polish: config knob, language strings, JEI/NEI compat plan | ✅ done, verified | `a85e41a` |
+| post-MVP | Reorder visual refresh — `ContainerCreative.itemList` snapshot was stale | ✅ done, verified | `238309a` |
+| post-MVP | Toggle visual refresh when on favorites tab — same snapshot issue | ✅ done, verified | `d3d7458` |
+| post-MVP | Star overlay rendered via `GuiContainerEvent.DrawForeground` so tooltips draw on top | ✅ done, verified | `7d16151` |
+| post-MVP | `Z` opens creative directly to favorites when no GUI is open | ✅ done, verified | `d0ed8df` |
 
 Phases #1–#5 are the **MVP** and have all landed; the full `./gradlew build` is green. Phases #6–#8 are nice-to-have — pause for in-game testing first, then revisit.
 
