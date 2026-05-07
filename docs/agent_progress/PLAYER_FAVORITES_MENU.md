@@ -32,7 +32,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | #3 | Toggle keybind (`B` default) — add/remove favorite while hovering an item | ✅ done, unverified in-game | `e40d378` |
 | #4 | Star overlay icon on favorited slots inside any creative tab | ✅ done, unverified in-game | `dd2d1ba` |
 | #5 | "Jump to favorites" keybind (`Ctrl+B` default) — switch tab without paginating | ✅ done, unverified in-game | `0a25c14` |
-| #6 | Reorder support (Shift+Scroll on a favorited slot in the favorites tab) | ☐ not started — next up | — |
+| #6 | Reorder support (Shift+Scroll on a favorited slot in the favorites tab) | ✅ done, unverified in-game | (this commit) |
 | #7 | `/sum favorites` admin/debug subcommand (list, clear, import/export) | ☐ not started | — |
 | #8 | Polish: config knob, language strings, JEI/NEI compat plan | ✅ done, unverified in-game | (this commit) |
 

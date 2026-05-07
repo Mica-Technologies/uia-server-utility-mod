@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainerCreative;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.settings.KeyBinding;
@@ -23,6 +24,7 @@ import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 public class FavoritesClientHandler {
 
@@ -87,6 +89,46 @@ public class FavoritesClientHandler {
             event.setCanceled(true);
         } catch (Exception e) {
             Sum.LOGGER.error("Failed to invoke setCurrentCreativeTab", e);
+        }
+    }
+
+    @SubscribeEvent
+    public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
+        if (!(event.getGui() instanceof GuiContainerCreative)) {
+            return;
+        }
+        int dWheel = Mouse.getEventDWheel();
+        if (dWheel == 0) {
+            return;
+        }
+        if (!GuiScreen.isShiftKeyDown()) {
+            return;
+        }
+        GuiContainerCreative gui = (GuiContainerCreative) event.getGui();
+        if (CreativeTabFavorites.INSTANCE == null
+            || gui.getSelectedTabIndex() != CreativeTabFavorites.INSTANCE.getIndex()) {
+            return;
+        }
+        Slot slot = gui.getSlotUnderMouse();
+        if (slot == null) {
+            return;
+        }
+        ItemStack stack = slot.getStack();
+        if (stack.isEmpty()) {
+            return;
+        }
+        FavoriteKey key = FavoriteKey.of(stack);
+        if (key == null) {
+            return;
+        }
+        int index = FavoritesStore.indexOf(key);
+        if (index < 0) {
+            return;
+        }
+        int target = dWheel > 0 ? index - 1 : index + 1;
+        if (FavoritesStore.swap(index, target)) {
+            FavoritesStore.save();
+            event.setCanceled(true);
         }
     }
 

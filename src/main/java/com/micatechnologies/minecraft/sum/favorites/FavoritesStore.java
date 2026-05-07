@@ -182,6 +182,26 @@ public final class FavoritesStore {
         }
     }
 
+    public static int indexOf(FavoriteKey key) {
+        synchronized (LOCK) {
+            return key == null ? -1 : ITEMS.indexOf(key);
+        }
+    }
+
+    public static boolean swap(int a, int b) {
+        synchronized (LOCK) {
+            int n = ITEMS.size();
+            if (a < 0 || b < 0 || a >= n || b >= n || a == b) {
+                return false;
+            }
+            FavoriteKey tmp = ITEMS.get(a);
+            ITEMS.set(a, ITEMS.get(b));
+            ITEMS.set(b, tmp);
+            version++;
+            return true;
+        }
+    }
+
     public static boolean contains(FavoriteKey key) {
         synchronized (LOCK) {
             return key != null && ITEM_SET.contains(key);
