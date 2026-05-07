@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **planning only — no code written.** This document is a forward-looking catalog of features SUM could add next, organized so each one ships independently. Top priority by user request is a bank/ATM kit; the remainder are sketched to give Alex options when picking what to build after that.
+Status: **A1 (ATM block kit) shipped over 5 commits on 2026-05-07.** A2 (bank lobby kit) and A3 (bank teller NPC) remain. Section B items are sketches for after Section A.
 
 ---
 
@@ -8,29 +8,28 @@ Status: **planning only — no code written.** This document is a forward-lookin
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. Working directory is `E:\gitRepos\uia-server-utility-mod`. The mod targets Minecraft 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build` (set `JAVA_HOME` from `~/.jdks/azul-17.0.18`).
+> I'm continuing the SUM mod's feature roadmap. A1 (ATM block kit) shipped on 2026-05-07 over 5 commits (`1e25e0a` through `604abea`). **Next priority is Phase A2 (bank-lobby kit)** — bank counter blocks, animated vault door, per-player safe-deposit-box block, velvet rope. A3 (bank teller NPC) follows. Section B is on hold until Alex green-lights it.
+>
+> Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
 > **Read first, in this order:**
 >
-> 1. `docs/agent_progress/FEATURE_ROADMAP.md` — this doc. Has the full plan, EconomyInc integration approach, every phase, open questions, recommended order.
-> 2. `docs/agent_progress/PLAYER_FAVORITES_MENU.md` — recently-shipped feature; look at it for the format conventions, the per-phase commit cadence, and how SUM's `SumClientProxy`/`SumConfig`/`CommandSum`/lang files get extended for a new feature.
-> 3. `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` — older but useful for the Roamer-related parts (phase A3 bank teller, MX postal worker, ST storm-shelter sign).
-> 4. `CLAUDE.md` — build commands, JDK location, project conventions.
-> 5. `MEMORY.md` (in `~/.claude/projects/E--gitRepos-uia-server-utility-mod/memory/`) — Alex's standing preferences (no `git push`, omit Co-Authored-By only if asked, JDK at `~/.jdks/azul-17.0.18`, etc.).
+> 1. `docs/agent_progress/FEATURE_ROADMAP.md` — this doc. Section A's phase A1 is shipped; A2/A3 are still in spec form. EconomyInc reflection signatures are locked at the top of the integration section.
+> 2. `docs/agent_progress/PLAYER_FAVORITES_MENU.md` — for commit-cadence and wiring conventions (lang strings, `SumClientProxy`, `CommandSum`).
+> 3. `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` — useful for A3 (bank teller via Roamer role tag).
+> 4. `CLAUDE.md` and the project memory under `~/.claude/projects/E--gitRepos-uia-server-utility-mod/memory/`.
 >
-> **Top priority is Section A** of the roadmap, starting with phase **A1** (realistic ATM block kit). A2 (bank lobby) and A3 (bank teller NPC) follow naturally; each ships on its own. Section B (mailbox, sleep-vote, trash can, business cards, job board, storm-shelter signage) is a queue of ideas for after Section A — do not start any of them without explicit confirmation.
+> **Reuse, don't rebuild.** A1 left these reusable pieces in `com.micatechnologies.minecraft.sum.atm`:
 >
-> **Before writing any code, do the EconomyInc spike** described in the "EconomyInc integration approach" section. The recommended path is reflection-only via a single `EconomyBridge` helper class. Concrete artifacts to inspect before locking the reflection signatures:
+> - `EconomyBridge` (in `.economy` package): `isAvailable()`, `getBalance(player)`, `adjustBalance(player, delta)`. Balance is `double`. Call this from any A2/A3 code that needs to read/write money.
+> - `Bills`: lookup of EconomyInc bill items by denomination — useful if A2 vault door wants to verify a payment.
+> - `BlockAtmBase`: shared rotation/activation/registration template for horizontal-facing blocks. The bank counter and safe deposit box can extend it (or a similar `BlockSumBase`) to avoid retyping the same boilerplate.
+> - `SumGuiHandler` (GUI dispatcher) and `SumNetwork` (SimpleNetworkWrapper, channel `sum`). Add new GUI IDs to `SumGuiHandler` and new packets to `SumNetwork.init()` — do not create a second wrapper.
+> - `SumTab.initTabElements()` is where new blocks/items are constructed in `preInit`.
 >
-> - JAR location: `C:\Users\ahawk\AppData\Roaming\.minecraft\mods\economy-inc.jar` (also referenced in the Alto modpack manifest at `E:\gitRepos\minecraft-launcher-modpacks\alto\manifest.json`).
-> - Mod ID: `economy` (from the mod's `mcmod.info`).
-> - Capability interface: `fr.fifou.economy.capability.IMoney` — get the actual method names by decompiling that class. Likely `getMoney()` returning int, `setMoney(int)`, but verify.
-> - Capability holder: `fr.fifou.economy.capability.CapabilityLoading` — has the `@CapabilityInject Capability<IMoney>` static field.
-> - Main mod class: `fr.fifou.economy.ModEconomy`.
+> **A2 open questions to resolve before coding** (per "Open questions" below): vault door passcode UI is in-GUI text field by default; safe deposit box is 3×3 by default. If Alex hasn't said otherwise, take the defaults.
 >
-> **Before resolving phases A1–A3 with code, run the open questions past Alex.** The two that materially shape the implementation are (1) ATM GUI ownership — wrap EconomyInc's existing GUI or build our own; default is build our own — and (2) soft-link mechanism — reflection-only `EconomyBridge` (default) or compile-time `compileOnly` dep on EconomyInc.
->
-> **Watch out for:** Alex maintains a separate Weather 2 Remastered fork at `E:\gitRepos\LDW2` for weather/snow features that pair with this pack — *not* this repo. There may be uncommitted WIP in this repo's working tree from prior sessions (roamer atlas work under `tools/roamer_atlas/`, `ModelRoamer.java`, etc.) — preserve it and don't bundle it into your commits. Always `git restore --staged` anything that wasn't yours before committing.
+> **Watch out for:** Alex maintains a separate Weather 2 Remastered fork at `E:\gitRepos\LDW2` for weather/snow features — *not* this repo. The repo working tree is clean as of `604abea`; if you find unfamiliar uncommitted WIP, preserve it and don't bundle it into your commits.
 
 ---
 
@@ -38,7 +37,11 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 
 | Phase | Goal | Effort | Status | Commit |
 |---|---|---|---|---|
-| A1 | Realistic ATM block kit (street kiosk, wall-mounted, drive-thru) | M | ☐ not started — top priority | — |
+| A1.1 | EconomyBridge (reflection) + `/sum econ` smoke command | S | ✅ shipped | `1e25e0a` |
+| A1.2 | Kiosk ATM block + balance-only GUI shell | M | ✅ shipped | `2439414` |
+| A1.3 | ATM withdraw + deposit (bills + network packets) | M | ✅ shipped | `5e0148e` |
+| A1.4 | Wall-mounted ATM variant | S | ✅ shipped | `81eb4f1` |
+| A1.5 | Drive-thru ATM variant | S | ✅ shipped | `604abea` |
 | A2 | Bank-lobby kit (counter blocks, vault door, safe deposit box, velvet rope) | M-L | ☐ not started | — |
 | A3 | Bank teller NPC (Roamer subclass with bank-themed greetings) | S | ☐ not started | — |
 | MX | Mailbox + postal system | M | ☐ not started | — |
@@ -52,18 +55,16 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 ---
 
-## First-day pre-flight checklist (for the next session)
+## First-day pre-flight checklist (historical — A1 only)
 
-Before touching code, verify each of these. Most should be quick `gh`/`Bash`/`Read` confirmations.
+Kept as a reference for future EconomyInc-touching work. All items checked by 2026-05-07 during A1.
 
-- [ ] `git log --oneline -10` shows recent SUM history; HEAD is on `main` and clean (or you've inspected and noted any uncommitted WIP).
-- [ ] `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build` succeeds on the current HEAD before any of your changes.
-- [ ] `unzip -l C:/Users/ahawk/AppData/Roaming/.minecraft/mods/economy-inc.jar | grep capability` confirms the `fr/fifou/economy/capability/IMoney.class` and `CapabilityLoading.class` are present at the expected paths.
-- [ ] You've decompiled `IMoney` and `CapabilityLoading` (use the deobf source jar if available — earlier session located the fernflower-cache source at `C:/Users/ahawk/.gradle/caches/retro_futura_gradle/fernflower-cache/*.jar` for vanilla classes; for EconomyInc classes you'll need to decompile the production jar or pull source from the GitHub repo). Confirmed method names and field names for `IMoney`'s balance getter/setter.
-- [ ] Confirmed the `@CapabilityInject` location for `Capability<IMoney>` in `CapabilityLoading`. Locked the field name into the `EconomyBridge` reflection.
-- [ ] You've tested in dev (`runClient`) that `Loader.isModLoaded("economy")` returns true when EconomyInc is present and false when it's not.
-
-If any of those fail, fix before proceeding — don't build features on top of a shaky integration.
+- [x] `git log --oneline -10` shows recent SUM history; HEAD is on `main` and clean.
+- [x] `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build` succeeds on the current HEAD.
+- [x] `economy-inc.jar` contains `fr/fifou/economy/capability/IMoney.class` and `CapabilityLoading.class`.
+- [x] `IMoney` and `CapabilityLoading` decompiled via `javap` — signatures locked into `EconomyBridge` (see "Verified EconomyInc signatures" above).
+- [x] `CapabilityLoading.CAPABILITY_MONEY` field name and the `getMoneyHandler(Entity)` static helper confirmed.
+- [ ] **Pending playtest:** confirm in-game that `Loader.isModLoaded("economy")` returns true when EconomyInc is present and that `/sum econ balance` reports the balance EconomyInc shows via `/balance`. The smoke command is the easiest way to verify the bridge end-to-end.
 
 ---
 
@@ -80,9 +81,26 @@ This shapes which features are worth building. Highlights from the pack manifest
 
 ## EconomyInc integration approach
 
-Three SUM phases (A1, A2 partly, A3 partly) need to read/write a player's balance. Two ways to wire this up:
+Three SUM phases (A1, A2 partly, A3 partly) need to read/write a player's balance. Two ways to wire this up. **A1 shipped with Option 1 (reflection-only).** The bridge lives at `com.micatechnologies.minecraft.sum.economy.EconomyBridge`; A2 and A3 should reuse it without modification.
 
-### Option 1 — Reflection-only soft dependency (recommended)
+### Verified EconomyInc signatures (locked from javap on `economy-inc.jar` 1.6.2)
+
+The bridge that shipped is in `EconomyBridge.java`; these are the actual signatures it binds to. Where this section originally guessed, the verified value is in **bold**:
+
+- `fr.fifou.economy.capability.IMoney`
+  - `double getMoney()` — returns **`double`** (originally guessed `int`; balance is fractional dollars, e.g. $12.50)
+  - `void setMoney(double)`
+  - `void sync(EntityPlayer)` — must be called after `setMoney` from server-side mutations so the client GUI sees the new value (originally not noted in the guess)
+  - Other methods exposed: `getLinked`/`setLinked`, `getName`/`setName`, `getOnlineUUID`/`setOnlineUUID` — the bridge ignores these
+- `fr.fifou.economy.capability.CapabilityLoading`
+  - Static field name: **`CAPABILITY_MONEY`** of type `Capability<IMoney>` (originally guessed `MONEY_CAPABILITY` — wrong)
+  - Static helper: **`public static IMoney getMoneyHandler(Entity entity)`** — wraps `entity.hasCapability(CAPABILITY_MONEY, EnumFacing.DOWN)` + `entity.getCapability(...)` and returns null if absent. The bridge calls this directly instead of binding the `@CapabilityInject` field, which avoids one Capability<?> wildcard reflection step.
+- Bill items (used by ATM withdraw/deposit, see `Bills.java`):
+  - `economy:item_oneb`, `item_fiveb`, `item_tenb`, `item_twentyb`
+  - `economy:item_fiftybe` (note typo: trailing 'e'), `economy:item_hundreedb` (note typo: doubled 'e'), `economy:item_twohundreedb`, `economy:item_fivehundreedb`
+  - These are the *physical* money items. The IMoney capability is the *account balance*. ATM withdraw converts balance → bills; deposit converts bills → balance.
+
+### Option 1 — Reflection-only soft dependency (what shipped)
 
 - No build-graph change. EconomyInc stays a runtime-only dependency of the *modpack*, not of SUM.
 - All access goes through a single `EconomyBridge` helper class. Recommended skeleton (drop into `com.micatechnologies.minecraft.sum.economy`):
@@ -199,7 +217,22 @@ A spike in phase A1 should decompile `IMoney` and `CapabilityLoading` once and l
 
 This is the headline work. Three phases that build on each other but each can ship on its own.
 
-### Phase A1 — Realistic ATM block kit
+### Phase A1 — Realistic ATM block kit ✅ SHIPPED 2026-05-07
+
+Shipped over 5 commits (`1e25e0a` → `604abea`). What landed:
+
+- `EconomyBridge` (reflection-only) + `/sum econ <balance|add|set> [player]` smoke command for verifying the bridge in dev.
+- Three ATM blocks: `sum:atm_kiosk`, `sum:atm_wall`, `sum:atm_drive_thru`. All inherit `BlockAtmBase`; only bounding boxes and front textures differ.
+- `GuiSumAtm` (custom, not a wrap of EconomyInc's GUI) with $1/$5/$10/$20/$50/$100 withdraw buttons + "Deposit All Bills" + balance display. Uses `SumNetwork` + `AtmPacketTransaction` for client→server transactions; server-side handler converts balance ↔ bill items via `Bills` and `EconomyBridge`.
+- Three placeholder pixel-art textures (kiosk_front, kiosk_side, kiosk_top + a distinct drive_thru_front), generated by `tools/atm_textures/generate.py`. Polish-quality textures are a future pass.
+
+**What was deferred from the original spec:**
+
+- *True multi-block kiosk and drive-thru* (1×2 / 1×3 footprints): all three variants ship as 1×1 blocks. Implementing door-style upper/lower placement is its own follow-up if servers want the taller silhouette.
+- *Transfer tab* in the GUI: only Withdraw and Deposit shipped. Adding a per-player `/sum econ pay <player> <amount>` is the cheaper way to cover transfer for now.
+- *Block-position validation in the transaction packet*: the server doesn't currently re-check the player is near an ATM when handling withdraw/deposit packets. Low risk on a friendly server; harden if needed.
+
+**Original spec follows for reference:**
 
 **Goal:** SUM ships three visually distinct ATM block variants that look like real ATMs, integrate with EconomyInc's balance, and feel like first-class city street furniture rather than the placeholder cube of vanilla Forge mods.
 
@@ -347,11 +380,11 @@ These are listed so we have a queue of ideas after the bank kit lands. Each is a
 
 ## Open questions
 
-These should be resolved before phase A1 starts. The first two materially shape the implementation.
+A1 questions are resolved (see ✅). A2/A3 questions still open at the time of writing.
 
-1. **ATM GUI: wrap EconomyInc's, or build our own?** Wrapping is faster (zero new GUI code) but ties us to EconomyInc's specific UX (notably: their GUI requires the `Creditcard` item to be present, which may feel like dead weight on a SUM-branded ATM). Building our own is more code but lets the *withdraw/deposit/transfer* flow work without holding a credit card. → **Default unless told otherwise: build our own.**
-2. **Soft dependency: reflection or compile-time?** Both work; reflection avoids build coupling but is verbose. → **Default unless told otherwise: reflection-only via `EconomyBridge`.**
-3. **ATM block textures: hand-drawn, AI-generated, or "good enough" pixel art?** Affects time budget more than design. → **Default: I do "good enough" pixel art for the dev pass; Alex polishes/swaps later if desired.**
+1. ✅ **ATM GUI: wrap EconomyInc's, or build our own?** Resolved 2026-05-07: built our own (`GuiSumAtm`). No credit-card requirement; cleaner UX.
+2. ✅ **Soft dependency: reflection or compile-time?** Resolved 2026-05-07: reflection-only via `EconomyBridge`.
+3. ✅ **ATM block textures: hand-drawn, AI-generated, or "good enough" pixel art?** Resolved 2026-05-07: pixel art via `tools/atm_textures/generate.py`. Alex can polish/swap any time without touching the block models.
 4. **Vault door passcode UI: chat-driven form or in-GUI text field?** GUI is more polished but more code. → **Default: in-GUI text field.**
 5. **Safe deposit box size: 3×3 (single chest equivalent) or 5×3 (large chest equivalent)?** → **Default: 3×3, configurable.**
 6. **Bank teller dialogue: hand-written list or pull from a config file?** → **Default: config file, with sensible built-in defaults.**
@@ -386,8 +419,8 @@ Phase-specific checklists go into the phase's own plan doc once that phase begin
 
 Order, by my read of value-vs-effort and how the pieces interlock:
 
-1. **A1 — Realistic ATM block kit.** Highest user-articulated priority. Self-contained. Forces the `EconomyBridge` infrastructure into existence so A2/A3 can reuse it. ✅ Start here.
-2. **A2 — Bank lobby kit.** Once ATMs work, the bank counter + vault door + safe deposit box make a complete "bank room" buildable. Safe deposit box is the most genuinely useful block in this whole roadmap.
+1. ✅ **A1 — Realistic ATM block kit.** Shipped 2026-05-07.
+2. **A2 — Bank lobby kit.** ← **Next.** Once ATMs work, the bank counter + vault door + safe deposit box make a complete "bank room" buildable. Safe deposit box is the most genuinely useful block in this whole roadmap.
 3. **A3 — Bank teller NPC.** Polish on top of A2. Quick to build because of existing Roamer infrastructure.
 4. **MX — Mailbox.** First Section-B item to consider; it's a genuine gap and fits the "city utility" theme.
 5. **SV — Sleep voting.** Tiny win; ship whenever.
@@ -396,4 +429,4 @@ Order, by my read of value-vs-effort and how the pieces interlock:
 8. **JB — Job board.** Biggest item; defer until there's clear demand.
 9. **ST — Storm-shelter signage.** Tiny; bundle with the next Roamer touch-up.
 
-Total budget for everything end-to-end: ~5–7 days of focused work. Phases A1+A2+A3 alone are ~2 days.
+Total budget for everything end-to-end: ~5–7 days of focused work. Phases A2+A3 are ~1.5 days remaining for Section A.
