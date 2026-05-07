@@ -378,6 +378,114 @@ These are listed so we have a queue of ideas after the bank kit lands. Each is a
 
 ---
 
+## Section C — Replacing EconomyInc with SUM-native equivalents (research)
+
+Status: **research only — no code, no commitment.** The question is whether SUM should grow to *replace* EconomyInc rather than depend on it via the reflection bridge that A1 shipped. This section catalogs what EconomyInc actually does, what each piece would cost SUM to replicate, the migration story, and three concrete approaches with a recommendation.
+
+### Why consider this at all
+
+The A1 reflection bridge works, but it locks SUM to a mod that hasn't seen a release since November 2020 and contains at least one literal "Will be fix in another version of the mod. Quite bugged for the moment." string in its `ItemCreditcard` bytecode. Reasons SUM might want to own the economy outright:
+
+- **Stability.** EconomyInc's CurseForge artifact could move or disappear; the reflection bridge degrades gracefully but the bank/ATM features become inert if it's removed. If SUM owns the data model, the features stand on their own.
+- **Coherent UX.** A2's safe deposit box, A3's bank teller, MX's mailbox postage, JB's job-board payouts all want to read/write balance. Today every one of them goes through `EconomyBridge`; it works, but every feature inherits EconomyInc's quirks (fractional `double` balances, the credit-card-required-for-card-GUI, the buggy ItemCreditcard).
+- **Pack reduction.** The Alto modpack already tracks ~80 mods; if SUM can absorb EconomyInc cleanly, that's one fewer artifact to chase.
+
+Reasons not to do it:
+
+- **Real cost.** Even excluding the plots system and the vault-cracking minigame, replicating just money + bills + credit card + bill-changer + a player-shop block is ~2 weeks of focused work plus an in-game economy-balance pass.
+- **EconomyInc already works.** Despite the rough edges, the mod has been in production servers for years. Reimplementing it from scratch trades known bugs for unknown ones.
+- **Migration is the hard part.** Existing servers have player balances stored in EconomyInc's `IMoney` capability NBT, plot ownership in `PlotsWorldSavedData`, and bill items scattered through inventories. Any SUM replacement has to either coexist or migrate every piece.
+
+### What EconomyInc actually ships (full inventory)
+
+Decompiled from `economy-inc.jar` 1.6.2. Each row notes whether SUM already replicates it, whether it's worth replicating, and a rough effort estimate.
+
+| EconomyInc piece | What it does | SUM today | Replication cost |
+|---|---|---|---|
+| `IMoney` capability + `ProviderMoney` + `StorageMoney` + `DefaultMoneyHandler` | Per-player `double` balance, NBT-serialized, attached at entity construction. Standard Forge capability pattern. | reads via `EconomyBridge` | **M** — ~250 LOC for capability interface, default impl, provider, storage, and per-player attach event. Standard pattern, well-trodden. |
+| 8 bill items (`item_oneb`..`item_fivehundreedb`) | Physical money, denominations $1..$500. Author misspelled `item_fiftybe` and `item_hundreedb` and they're frozen that way for save-compat. | reads via `Bills` | **S** — ~200 LOC + 8 textures. Trivially repetitive; one base class. SUM names them properly (`sum:bill_1`..`sum:bill_500`). |
+| 8 packet items | Bundled bills (e.g. `item_packet_hundreedb` = a stack of $100 bills as one item slot, presumably for inventory compactness). | not used | **S** — ~150 LOC + 8 textures. Pairs with the changer block; if we skip the changer, packets aren't needed. |
+| `ItemCreditcard` | NBT-keyed by `OwnerUUID`, requires "wireless technology" component, opens a card GUI on right-click. **Author marks it as "Quite bugged for the moment."** | not used | **S** — ~150 LOC + texture. SUM should ship a clean reimplementation if we go down this path; the EconomyInc one isn't a good model. Skip the wireless-tech component. |
+| `BlockAtm` + `GuiItemATM` | Cube ATM block, right-click opens a buttons-only GUI requiring credit card | ✅ **shipped** (A1: kiosk/wall/drive-thru + GuiSumAtm without card requirement) | **DONE** |
+| `BlockChanger` + TE + `GuiChanger` | Convert bills ↔ packets (and presumably balance ↔ bills/packets). | not used | **M** — ~300 LOC: BlockContainer + TE + Container + GUI + 1 texture. Pairs with packets. |
+| `BlockSeller` + TE + `GuiSeller` + `GuiSellerBuy` | Player-owned vending machine. TE stores owner, ownerName, item, amount, cost, funds_total, admin flag, "created" two-phase setup. | not used | **L** — ~600 LOC: most complex single block in the mod. Two GUIs (set-up + buy), per-block save state, ownership/permissions, withdraw of accumulated funds. |
+| `BlockBills` + `ModelBills` + TESR | Decorative block that visually shows physical bills inserted. | not used | **S** — ~250 LOC + TESR + texture. Pure flavor; skip unless we want decorative cash. |
+| 3 vault blocks (`BlockVault`, `BlockVault2by2`, `BlockVaultCracked`) + TEs + TESRs + 4 GUIs | Personal storage with passcode, 1×1 and 2×2×2 sizes, "cracked" intermediate state, settings GUIs. | covered by A2 vault door + safe deposit box (different design, similar use case) | **L if literal-equivalent, M if just A2's design** — A2 already plans a passcode vault door + per-UUID safe deposit box. The 2×2×2 multi-block vault is a separate effort. |
+| `ItemVaultCracker` + crafting components (`ItemGear`, `ItemGearsMecanism`, `ItemMicroChip`) + `GuiCracking` | Mini-game for breaking into someone else's vault. | not used | **M** — ~300 LOC. **Skip.** Player-vs-player burglary mechanics aren't in SUM's "server utility" theme. |
+| `EntityInformater` + `RenderInformater` + `ModelInformater` + `GuiInformaterTrade` + `ContainerInformaterTrade` | NPC trader (oddly extends `EntityMob`). Has a `safeCode` static (!) for some kind of code-protected trade. | A3 covers a Roamer-based bank teller; A3 + future "shopkeeper role" can absorb this | **S** — bank teller is already planned; shopkeeper role is an additive ~100 LOC on top. |
+| `CommandBalance` | `/balance` user-facing command | partial: `/sum econ balance` (admin permission level 2) | **XS** — un-restrict the existing command path, or add `/balance` as an alias. ~20 LOC. |
+| `CommandPlots` + `CommandPlotsBuy` + `PlotsData` + `PlotsWorldSavedData` + `PlotsChunkData` + `ChunksWorldSavedData` | Admin-defined buyable land plots. Plots have name/owner/bbox/price/bought; a chunk index speeds up containment checks. | not used | **XL** — ~1000+ LOC. Largest single feature in EconomyInc. Treat as its own roadmap section if SUM wants to absorb it. **Defer.** |
+| `VillageHandlerShop` + `VillageComponentShop` | Procedural village structures that spawn shops with Informaters inside. | not used | **M** — ~250 LOC + structure NBT. Tightly coupled to the Informater + Plots; only meaningful if we replicate those. |
+| `CustomLootTableList` | Injects bill drops into vanilla chest loot tables. | not used | **XS** — ~30 LOC + a single loot-table JSON. Free if we have bills. |
+| `MySQL` + online linking (IMoney's `linked`/`onlineUUID`) | Optional server-side cross-world balance sync via MySQL DB, gated by `ConfigFile.connectDB`. | not used | **XL or skip** — niche feature, requires a JDBC driver bundled, raises the bar of "what runs out of the box." **Skip.** |
+| `ConfigFile` knobs (preview-in-block, gold-nugget recipe, village shops on/off, etc.) | User-facing toggles. | not used | absorbed naturally as we replicate the dependent features. |
+
+**Total replication budget for the realistic scope** (money + bills + credit card + changer + seller + bank vault + bills-display + balance command + loot inject; *excluding* plots, village shops, vault-cracker, MySQL): roughly **2–3 weeks of focused work** plus an in-game balance/playtest pass.
+
+### The migration story
+
+Replacement is harmless on a fresh world. On a server with existing players and items, three things have to migrate, in this order:
+
+1. **Player balances.** EconomyInc stores `IMoney` per-player as serialized NBT in the world's `playerdata/<uuid>.dat` files. SUM's replacement ships its own `Capability<ISumMoney>` and a one-time on-login migration: at `PlayerLoggedInEvent`, if the player has a non-zero EconomyInc balance and a zero SUM balance, copy across via reflection (the `EconomyBridge` already knows how to read EconomyInc), then mark the migration complete in a NBT flag on the SUM capability. This means EconomyInc must still be installed during the migration window.
+2. **Existing bill items in inventories.** Every bill item already in the world has registry name `economy:item_oneb` etc. If we remove EconomyInc, those item slots become "unknown item" placeholders and the player loses them. Three options:
+   - **Migration item filter.** On `PlayerLoggedInEvent`, walk inventory; for each EconomyInc bill, replace with the equivalent SUM bill of the same denomination. Run for 1–2 weeks while both mods are loaded, then EconomyInc can be uninstalled cleanly.
+   - **Reflective name aliasing.** Register SUM's bills under both `sum:bill_500` *and* `economy:item_fivehundreedb` as a fallback. This is undocumented Forge territory and probably brittle.
+   - **Drop and refund.** On EconomyInc removal, sweep all players' inventories, count their bills, credit the equivalent balance to their SUM capability, log the refund. Lossless but server-side-only and a one-shot operation.
+3. **Existing in-world blocks.** EconomyInc ATMs, vaults, sellers, etc. placed in the world become "missing block" stubs if EconomyInc is removed. Server admins would need to replace them with SUM equivalents manually, OR SUM ships a one-time `/sum migrate-economy-blocks` command that scans loaded chunks and converts. **High risk** — block conversion can lose state (vault contents, seller stock/funds). On Alto, this is probably tractable since the in-world block count is small, but it's a real operational task.
+
+Plot ownership data is the lowest concern: it's stored in `PlotsWorldSavedData` which is just an NBT file under `data/`. If SUM doesn't replicate plots, the file becomes orphan but doesn't break anything; admins can delete it.
+
+### Three approaches
+
+**Approach 1 — Stay reflection-only.** SUM keeps `EconomyBridge`. Future SUM features (A2 safe deposit, A3 teller, MX mailbox postage, JB job board payments) all go through it. The Alto pack continues to ship EconomyInc. **Effort: zero (status quo).** **Risk: long-term coupling to a stale mod.**
+
+**Approach 2 — Reimplement money + bills only; coexist with EconomyInc for everything else.** SUM ships its own `Capability<ISumMoney>` + bill items. Critical: SUM has to *prefer* EconomyInc's `IMoney` when both are loaded, otherwise players end up with two parallel balances and no way to spend one on the other's blocks. Implementation: `EconomyBridge.isAvailable()` becomes the toggle — if true, `getBalance/adjustBalance` route to EconomyInc; if false, they route to SUM's own capability. SUM's vending blocks (when added) accept either currency type. **Effort: ~M (~500 LOC + bill assets).** **Risk: subtle dual-source bugs; players holding EconomyInc bills can't spend at SUM blocks unless we add the dual-currency logic.**
+
+**Approach 3 — Full replacement on a target date.** SUM ships its own everything (excluding plots and vault-cracker, which we explicitly skip). At the cutover, server admins run a `/sum migrate-economy` command, then uninstall EconomyInc from the pack. SUM owns money, bills, credit card, changer, seller, vault (overlaps with A2), bills-display block, the user-facing `/balance` command, and the loot injector. **Effort: ~2–3 weeks.** **Risk: highest of the three; the in-world block migration is the biggest single risk and the playtest period is long.**
+
+There's also a quieter **Approach 4 — Approach 1 forever, but harden the bridge.** SUM stays reflection-only but ships a `EconomyBridge` "shim mod" — a tiny standalone mod-or-companion-class that mimics enough of EconomyInc's `IMoney` to keep SUM working if EconomyInc disappears. This is a defensive variant of Approach 1 that buys insurance without committing to replacement. Effort: ~S (~150 LOC + capability provider).
+
+### Recommendation
+
+**Start at Approach 4, plan toward Approach 2.** Ship a tiny SUM-native `Capability<ISumMoney>` + provider + storage that *only* activates when EconomyInc is absent. The bridge becomes "use EconomyInc's IMoney if present, else use SUM's own." This:
+
+- Removes the hard-dependency vibe (SUM works alone) without committing to bills, credit cards, changers, sellers, or the rest of EconomyInc's surface.
+- Sets up the data model so Approach 2 is a natural extension when (if) we add SUM-native bills.
+- Costs ~S effort and ships in 1 day.
+- Defers the genuinely expensive parts (seller block, plots, migration) until we have a real reason to do them.
+
+**Don't pursue Approach 3 unless EconomyInc actually breaks.** The economic case for full replacement only holds if EconomyInc is unmaintainable; right now it works for the use cases we care about, and the migration risk on existing servers is real.
+
+### Phase plan if we pursue this
+
+If Alex green-lights the path, the natural commit cadence (extending the existing roadmap structure) would be:
+
+| Phase | Goal | Effort | Depends on |
+|---|---|---|---|
+| C1 | SUM-native `ISumMoney` capability + provider/storage + per-player attach event. Inert when EconomyInc present. `EconomyBridge` learns to route. | S | A1 |
+| C2 | SUM bill item set (8 denominations). Lang strings, textures, creative tab. ATM withdraw/deposit accept SUM bills when EconomyInc absent. | S | C1 |
+| C3 | `/balance` user-facing command (no permission gate); admin retains `/sum econ`. | XS | C1 |
+| C4 | SUM debit card item (ItemCreditcard equivalent). NBT-keyed by player UUID, opens GuiSumAtm in any context (not just at an ATM). | S | C1 |
+| C5 | SUM player-shop block (BlockSeller equivalent). Two-GUI setup/buy flow, per-block owner + funds + stock. | L | C1 |
+| C6 | Bill-changer block (BlockChanger equivalent) + 8 packet items. | M | C2 |
+| C7 | Loot injector — bills appear in vanilla chest loot. | XS | C2 |
+| C8 | Bills display block + TESR (BlockBills equivalent). | S | C2 |
+| C9 | (Optional) Migration command `/sum migrate-economy` + per-block conversion + EconomyInc-removal documentation. | M | C1–C8 |
+
+C1 + C3 alone give SUM a self-sufficient money system, which is the highest-value milestone. Everything after that is feature parity for completeness.
+
+### Open questions specific to Section C
+
+These need Alex's calls before any C-phase starts.
+
+1. **Approach 1, 2, 3, or 4?** The recommendation is Approach 4 → 2. Approach 3 (full replacement) is only worth it if there's a triggering event.
+2. **If we do C1, what happens to in-world EconomyInc bills/blocks?** Coexistence is the easy answer; full migration is the hard one. Defer until C9.
+3. **Do we ship our own credit card item (C4) or is the debit-card-as-physical-thing not on-theme for SUM?** Real banks don't issue physical balance objects — phones do. Could swap for a "phone item" that opens the ATM GUI.
+4. **Plots system: in scope or out?** Strongly recommend out for now. Plots is a land-claim mod and SUM is a city-utility mod; they're adjacent but distinct. If desired, that's its own roadmap (Section D).
+5. **Vault-cracker minigame: in scope or out?** Strongly recommend out. PvP burglary doesn't fit SUM's theme.
+
+---
+
 ## Open questions
 
 A1 questions are resolved (see ✅). A2/A3 questions still open at the time of writing.
