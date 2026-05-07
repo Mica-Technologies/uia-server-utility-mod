@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
+import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RenderRoamer;
@@ -22,6 +23,8 @@ public class SumClientProxy implements SumProxy {
         RenderingRegistry.registerEntityRenderingHandler(EntityRoamer.class, RenderRoamer::new);
         FavoritesStore.setStorageFile(event.getModConfigurationDirectory());
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
+        FavoritesClientHandler.registerKeybinds();
+        MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
     }
 
     @Override
