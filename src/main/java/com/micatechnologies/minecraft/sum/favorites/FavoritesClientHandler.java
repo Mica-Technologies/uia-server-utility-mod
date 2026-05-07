@@ -167,6 +167,12 @@ public class FavoritesClientHandler {
         boolean nowPresent = FavoritesStore.toggle(key);
         FavoritesStore.save();
         playFeedback(nowPresent);
+        // If the favorites tab is currently displayed, refresh its snapshot so the add/remove
+        // shows up immediately (e.g. toggling on a hotbar slot from inside the favorites tab).
+        if (CreativeTabFavorites.INSTANCE != null
+            && gui.getSelectedTabIndex() == CreativeTabFavorites.INSTANCE.getIndex()) {
+            refreshFavoritesTab(gui);
+        }
         event.setCanceled(true);
     }
 
