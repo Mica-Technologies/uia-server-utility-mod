@@ -19,25 +19,17 @@ public class SumClientProxy implements SumProxy {
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
-        com.micatechnologies.minecraft.sum.Sum.LOGGER.info("[favorites] SumClientProxy.preInit start");
         MinecraftForge.EVENT_BUS.register(this);
         RenderingRegistry.registerEntityRenderingHandler(EntityRoamer.class, RenderRoamer::new);
         FavoritesStore.setStorageFile(event.getModConfigurationDirectory());
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
-        com.micatechnologies.minecraft.sum.Sum.LOGGER.info("[favorites] tab constructed; registering keybinds and handler");
         FavoritesClientHandler.registerKeybinds();
         MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
-        com.micatechnologies.minecraft.sum.Sum.LOGGER.info(
-            "[favorites] proxy wiring complete; toggleKey={} jumpKey={}",
-            FavoritesClientHandler.TOGGLE.getKeyCode(),
-            FavoritesClientHandler.JUMP.getKeyCode());
     }
 
     @Override
     public void init(FMLInitializationEvent event) {
         FavoritesStore.load();
-        com.micatechnologies.minecraft.sum.Sum.LOGGER.info(
-            "[favorites] store loaded; size={}", FavoritesStore.size());
     }
 
     @SubscribeEvent

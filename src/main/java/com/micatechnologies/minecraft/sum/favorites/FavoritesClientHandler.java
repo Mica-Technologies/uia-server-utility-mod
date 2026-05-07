@@ -20,7 +20,6 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.lwjgl.input.Keyboard;
 
@@ -50,19 +49,6 @@ public class FavoritesClientHandler {
         }
     }
 
-    public FavoritesClientHandler() {
-        Sum.LOGGER.info("[favorites] FavoritesClientHandler instance constructed");
-    }
-
-    // Per-tick edge detection. We poll Keyboard.isKeyDown() every client tick rather than
-    // subscribing to GuiScreenEvent.KeyboardInputEvent.Pre because Pre dispatches reliably
-    // for plain GuiScreens (e.g. GuiControls) but does not reach this handler when the
-    // open screen is a GuiContainerCreative in the Alto pack environment. ClientTickEvent
-    // does dispatch, and Keyboard.isKeyDown() is a non-destructive LWJGL state query that
-    // works regardless of which mod is consuming the keyboard event queue.
-    private boolean toggleHeldPrev = false;
-    private boolean jumpHeldPrev = false;
-
     private Map<ResourceLocation, Set<Integer>> favoritesByItem = Collections.emptyMap();
     private int favoritesCacheVersion = -1;
 
@@ -72,48 +58,38 @@ public class FavoritesClientHandler {
     }
 
     @SubscribeEvent
-    public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
+    public void onKeyboardInput(GuiScreenEvent.KeyboardInputEvent.Pre event) {
+        if (!(event.getGui() instanceof GuiContainerCreative)) {
             return;
         }
-        Minecraft mc = Minecraft.getMinecraft();
-        if (!(mc.currentScreen instanceof GuiContainerCreative)) {
-            // Reset edge state so a key held while opening the menu doesn't auto-fire.
-            toggleHeldPrev = false;
-            jumpHeldPrev = false;
+        if (!Keyboard.getEventKeyState()) {
             return;
         }
-
-        GuiContainerCreative gui = (GuiContainerCreative) mc.currentScreen;
-        int toggleCode = TOGGLE.getKeyCode();
-        int jumpCode = JUMP.getKeyCode();
-
-        boolean toggleHeld = toggleCode > 0 && Keyboard.isKeyDown(toggleCode);
-        boolean jumpHeld = jumpCode > 0 && Keyboard.isKeyDown(jumpCode);
-
-        if (toggleHeld && !toggleHeldPrev) {
-            handleToggle(gui);
+        int eventKey = Keyboard.getEventKey();
+        if (eventKey == 0) {
+            return;
         }
-        if (jumpHeld && !jumpHeldPrev) {
-            handleJump(gui);
+        GuiContainerCreative gui = (GuiContainerCreative) event.getGui();
+        if (eventKey == JUMP.getKeyCode()) {
+            handleJump(gui, event);
+        } else if (eventKey == TOGGLE.getKeyCode()) {
+            handleToggle(gui, event);
         }
-
-        toggleHeldPrev = toggleHeld;
-        jumpHeldPrev = jumpHeld;
     }
 
-    private void handleJump(GuiContainerCreative gui) {
+    private void handleJump(GuiContainerCreative gui, GuiScreenEvent.KeyboardInputEvent.Pre event) {
         if (CreativeTabFavorites.INSTANCE == null || SET_CURRENT_CREATIVE_TAB == null) {
             return;
         }
         try {
             SET_CURRENT_CREATIVE_TAB.invoke(gui, CreativeTabFavorites.INSTANCE);
+            event.setCanceled(true);
         } catch (Exception e) {
             Sum.LOGGER.error("Failed to invoke setCurrentCreativeTab", e);
         }
     }
 
-    private void handleToggle(GuiContainerCreative gui) {
+    private void handleToggle(GuiContainerCreative gui, GuiScreenEvent.KeyboardInputEvent.Pre event) {
         if (gui.getSelectedTabIndex() == CreativeTabs.SEARCH.getIndex()) {
             return;
         }
@@ -132,6 +108,7 @@ public class FavoritesClientHandler {
         boolean nowPresent = FavoritesStore.toggle(key);
         FavoritesStore.save();
         playFeedback(nowPresent);
+        event.setCanceled(true);
     }
 
     private void playFeedback(boolean added) {

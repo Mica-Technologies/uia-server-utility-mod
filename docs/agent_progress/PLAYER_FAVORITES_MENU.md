@@ -288,10 +288,10 @@ These were the open questions at draft time. All resolved with Alex on 2026-05-0
 
 ---
 
-## Open follow-ups (post-MVP playtest, 2026-05-07)
+## Playtest follow-ups (resolved 2026-05-07)
 
-- **`B` toggle silently did nothing on first playtest.** Diagnostic INFO logging added to `FavoritesClientHandler.onKeyboardInput` (and to every bail branch in `handleToggle`) so the next playtest reveals whether the event is reaching us, which key code arrives, and which condition bails. Also added `receiveCanceled = true` so we still fire if another mod (e.g. Inventory Tweaks, JEI) is cancelling `KeyboardInputEvent.Pre` for its own handler. Strip the logs once we know what's happening.
-- **`Ctrl+B` jump conflicted with a narrator-toggle binding** in Alex's setup (not from vanilla 1.12.2 — likely OS-level or a mod). Jump key changed to plain `Z`, no modifier. Toggle is unchanged at `B`.
+- **`Ctrl+B` jump conflicted with a narrator-toggle binding** in Alex's setup (not from vanilla 1.12.2 — likely OS-level or a mod). Jump key changed to plain `Z`, no modifier. Resolved.
+- **First "B does nothing" report was a testing artifact** — Alex was pressing B/Z while in the world (no GUI open). `KeyboardInputEvent.Pre` only fires when a GUI is open, so there was nothing for our handler to receive. Once tested inside `GuiContainerCreative` (i.e. after pressing E to open the inventory), both `B` (toggle) and `Z` (jump-to-favorites) work as designed. The mid-stream switch to tick-based `Keyboard.isKeyDown()` polling has been reverted in favor of the original `KeyboardInputEvent.Pre` handler — efficient, reactive, no per-tick overhead. Toggle is unchanged at `B`.
 
 ## Risks and watch-outs
 
