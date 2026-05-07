@@ -92,7 +92,7 @@ public class FavoritesClientHandler {
         }
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(receiveCanceled = true)
     public void onMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
         if (!(event.getGui() instanceof GuiContainerCreative)) {
             return;
@@ -128,7 +128,23 @@ public class FavoritesClientHandler {
         int target = dWheel > 0 ? index - 1 : index + 1;
         if (FavoritesStore.swap(index, target)) {
             FavoritesStore.save();
+            // ContainerCreative.itemList is a snapshot from when the tab was selected, so the
+            // visible slot stacks don't update on their own when the underlying store changes.
+            // Re-running setCurrentCreativeTab clears that snapshot and repopulates it from
+            // CreativeTabFavorites.displayAllRelevantItems, which now reads the new order.
+            refreshFavoritesTab(gui);
             event.setCanceled(true);
+        }
+    }
+
+    private void refreshFavoritesTab(GuiContainerCreative gui) {
+        if (SET_CURRENT_CREATIVE_TAB == null || CreativeTabFavorites.INSTANCE == null) {
+            return;
+        }
+        try {
+            SET_CURRENT_CREATIVE_TAB.invoke(gui, CreativeTabFavorites.INSTANCE);
+        } catch (Exception e) {
+            Sum.LOGGER.error("Failed to refresh favorites tab after reorder", e);
         }
     }
 
