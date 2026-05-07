@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.atm.BlockAtmDriveThru;
 import com.micatechnologies.minecraft.sum.atm.BlockAtmKiosk;
 import com.micatechnologies.minecraft.sum.atm.BlockAtmWall;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
@@ -20,11 +21,13 @@ public class SumTab {
     public static ItemRoamerConfigurator roamerConfigurator;
     public static BlockAtmKiosk atmKiosk;
     public static BlockAtmWall atmWall;
+    public static BlockAtmDriveThru atmDriveThru;
 
     public static void initTabElements() {
         roamerSpawnEgg = new ItemRoamerSpawnEgg();
         roamerConfigurator = new ItemRoamerConfigurator();
         atmKiosk = new BlockAtmKiosk();
         atmWall = new BlockAtmWall();
+        atmDriveThru = new BlockAtmDriveThru();
     }
 }

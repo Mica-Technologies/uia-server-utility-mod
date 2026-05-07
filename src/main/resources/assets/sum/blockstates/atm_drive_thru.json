@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:atm_drive_thru" },
+    "facing=east":  { "model": "sum:atm_drive_thru", "y": 90 },
+    "facing=south": { "model": "sum:atm_drive_thru", "y": 180 },
+    "facing=west":  { "model": "sum:atm_drive_thru", "y": 270 }
+  }
+}

@@ -8,6 +8,7 @@ key.sum.favorites.toggle=Toggle Favorite (in creative menu)
 key.sum.favorites.jump=Jump to Favorites Tab
 tile.sum.atm_kiosk.name=ATM Kiosk
 tile.sum.atm_wall.name=Wall ATM
+tile.sum.atm_drive_thru.name=Drive-Thru ATM
 sum.atm.title=ATM
 sum.atm.close=Close
 sum.atm.balance.heading=Account Balance

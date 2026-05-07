@@ -126,11 +126,59 @@ def top() -> Image.Image:
     return img
 
 
+def drive_thru_front() -> Image.Image:
+    """Distinct front layout for the drive-thru ATM: keypad shifted lower
+    (car-window height), bigger screen, prominent receipt slot at the top
+    instead of the keypad's usual position. Reads obviously different from
+    the kiosk in-world even with the same body shape.
+    """
+    img = base_canvas()
+    px = img.load()
+
+    # Top highlight rim
+    for x in range(16):
+        px[x, 0] = HOUSING_HI
+        px[x, 1] = HOUSING_LO
+
+    # Receipt slot at the very top - a thin horizontal slit, brushed-metal hint
+    for x in range(5, 11):
+        px[x, 2] = SLOT_BLACK
+    for x in range(4, 12):
+        px[x, 3] = HOUSING_LO
+
+    # Big screen filling rows 4..9 (taller than the kiosk's), cols 2..13
+    for x in range(2, 14):
+        for y in range(4, 10):
+            px[x, y] = SCREEN_FRAME
+    for x in range(3, 13):
+        for y in range(5, 9):
+            px[x, y] = SCREEN
+    for x in range(3, 13):
+        px[x, 5] = SCREEN_GLOW
+    # Gold "$" mark, slightly larger
+    for (mx, my) in ((6, 6), (7, 6), (8, 6), (9, 6), (7, 7), (8, 7)):
+        px[mx, my] = LOGO_GOLD
+
+    # Card slot just below the screen
+    for x in range(4, 12):
+        px[x, 10] = SLOT_BLACK
+
+    # Keypad shifted lower than the kiosk: rows 12..15, cols 5..10, 3x3 grid
+    for ky in range(3):
+        for kx in range(3):
+            cx = 5 + kx * 2
+            cy = 12 + ky
+            px[cx, cy] = KEY_LIGHT
+            px[cx + 1, cy] = KEY_DARK
+    return img
+
+
 def main() -> None:
     front().save(OUT_DIR / "atm_kiosk_front.png")
     side().save(OUT_DIR / "atm_kiosk_side.png")
     top().save(OUT_DIR / "atm_kiosk_top.png")
-    print(f"wrote 3 ATM textures to {OUT_DIR}")
+    drive_thru_front().save(OUT_DIR / "atm_drive_thru_front.png")
+    print(f"wrote 4 ATM textures to {OUT_DIR}")
 
 
 if __name__ == "__main__":
