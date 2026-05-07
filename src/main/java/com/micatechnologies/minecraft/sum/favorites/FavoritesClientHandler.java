@@ -44,9 +44,13 @@ public class FavoritesClientHandler {
                 "setCurrentCreativeTab", "func_147050_b", CreativeTabs.class);
         } catch (Exception e) {
             Sum.LOGGER.error("Could not resolve GuiContainerCreative#setCurrentCreativeTab; "
-                + "Ctrl+B jump-to-favorites will be disabled.", e);
+                + "jump-to-favorites will be disabled.", e);
             return null;
         }
+    }
+
+    public FavoritesClientHandler() {
+        Sum.LOGGER.info("[favorites] FavoritesClientHandler instance constructed");
     }
 
     private Map<ResourceLocation, Set<Integer>> favoritesByItem = Collections.emptyMap();
