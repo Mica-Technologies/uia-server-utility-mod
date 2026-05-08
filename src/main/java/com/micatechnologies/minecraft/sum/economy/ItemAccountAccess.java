@@ -4,7 +4,6 @@ import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
-import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
@@ -49,29 +48,33 @@ public class ItemAccountAccess extends Item {
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);
-        if (world.isRemote) {
-            return new ActionResult<>(EnumActionResult.SUCCESS, stack);
-        }
-
         UUID owner = getOwnerUuid(stack);
         UUID playerId = player.getUniqueID();
 
+        if (world.isRemote) {
+            // Open the GUI client-side directly when this client is the owner. We don't go
+            // through player.openGui because in 1.12.2 it's been observed to silently drop
+            // the open-window packet when invoked from Item.onItemRightClick (works fine from
+            // Block.onBlockActivated). On the very first right-click of an unowned item, the
+            // client has no owner NBT yet, so this branch skips — the server's bind path
+            // sends a chat message and the player's next click opens the GUI.
+            if (owner != null && owner.equals(playerId)) {
+                Sum.proxy.openAccountAccessGui(player);
+            }
+            return new ActionResult<>(EnumActionResult.SUCCESS, stack);
+        }
+
+        // Server-side: bind on first use, reject on owner mismatch. The GUI is displayed
+        // client-side; we just mutate NBT and chat here.
         if (owner == null) {
             setOwner(stack, playerId, player.getName());
             sendMessage(player, TextFormatting.GREEN,
                 "Bound to " + player.getName() + ". Right-click again to access your account.");
-            return new ActionResult<>(EnumActionResult.SUCCESS, stack);
-        }
-
-        if (!owner.equals(playerId)) {
+        } else if (!owner.equals(playerId)) {
             String ownerName = getOwnerName(stack);
             sendMessage(player, TextFormatting.RED,
                 "This belongs to " + (ownerName != null ? ownerName : "another player") + ".");
-            return new ActionResult<>(EnumActionResult.PASS, stack);
         }
-
-        // Owner using their own item. Coordinates are unused by GuiSumAtm.
-        player.openGui(Sum.instance, SumGuiHandler.GUI_ATM, world, 0, 0, 0);
         return new ActionResult<>(EnumActionResult.SUCCESS, stack);
     }
 

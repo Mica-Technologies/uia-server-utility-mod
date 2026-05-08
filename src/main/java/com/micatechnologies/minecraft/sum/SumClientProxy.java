@@ -1,11 +1,14 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.atm.GuiSumAtm;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RenderRoamer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraftforge.client.event.ModelRegistryEvent;
 import net.minecraftforge.client.model.ModelLoader;
@@ -45,5 +48,10 @@ public class SumClientProxy implements SumProxy {
             ModelLoader.setCustomModelResourceLocation(item, meta,
                 new ModelResourceLocation(item.getRegistryName(), id));
         }
+    }
+
+    @Override
+    public void openAccountAccessGui(EntityPlayer player) {
+        Minecraft.getMinecraft().displayGuiScreen(new GuiSumAtm(player));
     }
 }
