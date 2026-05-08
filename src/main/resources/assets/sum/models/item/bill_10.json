@@ -1,1 +1,6 @@
-{\n  "parent": "item/generated",\n  "textures": {\n    "layer0": "sum:items/bill_10"\n  }\n}\n
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "sum:items/bill_10"
+  }
+}
