@@ -1167,11 +1167,94 @@ public class CommandSum extends CommandBase {
     }
 
     private void handlePlotsTrust(ICommandSender sender, String[] args, boolean trust) {
-        sendMessage(sender, TextFormatting.YELLOW, "Plot trust/untrust ships in D5.");
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can manage plot trust.");
+            return;
+        }
+        if (args.length < 4) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum plots " + (trust ? "trust" : "untrust") + " <id-prefix> <player>");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(player.world);
+        SumPlot plot = findPlotByPrefix(data, args[2]);
+        if (plot == null) {
+            sendMessage(sender, TextFormatting.RED, "No plot matches '" + args[2] + "'.");
+            return;
+        }
+        if (!player.getUniqueID().equals(plot.getOwnerUuid())
+            && !player.canUseCommand(2, "sum.plots.admin")) {
+            sendMessage(sender, TextFormatting.RED, "You don't own that plot.");
+            return;
+        }
+        UUID targetUuid = resolvePlayerUuid(player.getServer(), args[3]);
+        if (targetUuid == null) {
+            sendMessage(sender, TextFormatting.RED,
+                "Couldn't resolve player '" + args[3] + "'. They must have logged in once.");
+            return;
+        }
+        if (trust) {
+            plot.addTrustedBuilder(targetUuid);
+            data.touch();
+            sendMessage(sender, TextFormatting.GREEN,
+                "Trusted " + args[3] + " on " + plot.getDisplayName() + ".");
+        } else {
+            if (plot.removeTrustedBuilder(targetUuid)) {
+                data.touch();
+                sendMessage(sender, TextFormatting.GREEN,
+                    "Removed " + args[3] + " from " + plot.getDisplayName() + "'s trust list.");
+            } else {
+                sendMessage(sender, TextFormatting.YELLOW,
+                    args[3] + " wasn't trusted on that plot.");
+            }
+        }
     }
 
     private void handlePlotsTransfer(ICommandSender sender, String[] args) {
-        sendMessage(sender, TextFormatting.YELLOW, "Plot transfer ships in D5.");
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can transfer plot ownership.");
+            return;
+        }
+        if (args.length < 4) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum plots transfer <id-prefix> <player>");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(player.world);
+        SumPlot plot = findPlotByPrefix(data, args[2]);
+        if (plot == null) {
+            sendMessage(sender, TextFormatting.RED, "No plot matches '" + args[2] + "'.");
+            return;
+        }
+        if (!player.getUniqueID().equals(plot.getOwnerUuid())
+            && !player.canUseCommand(2, "sum.plots.admin")) {
+            sendMessage(sender, TextFormatting.RED, "You don't own that plot.");
+            return;
+        }
+        UUID targetUuid = resolvePlayerUuid(player.getServer(), args[3]);
+        if (targetUuid == null) {
+            sendMessage(sender, TextFormatting.RED,
+                "Couldn't resolve player '" + args[3] + "'. They must have logged in once.");
+            return;
+        }
+        plot.setOwner(targetUuid, args[3]);
+        plot.setStatus(PlotStatus.OWNED);
+        data.touch();
+        sendMessage(sender, TextFormatting.GREEN,
+            "Transferred " + plot.getDisplayName() + " to " + args[3] + ".");
+    }
+
+    /** Resolve a player name to a UUID via the online players first, then the server's
+     *  profile cache. Returns null if the name isn't recognized. */
+    @Nullable
+    private static UUID resolvePlayerUuid(MinecraftServer server, String name) {
+        if (server == null) return null;
+        EntityPlayerMP online = server.getPlayerList().getPlayerByUsername(name);
+        if (online != null) return online.getUniqueID();
+        com.mojang.authlib.GameProfile profile = server.getPlayerProfileCache().getGameProfileForUsername(name);
+        return profile == null ? null : profile.getId();
     }
 
     private static String describePos(BlockPos p) {
