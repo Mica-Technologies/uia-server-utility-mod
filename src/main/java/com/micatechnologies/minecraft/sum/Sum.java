@@ -11,7 +11,6 @@ import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
-import com.micatechnologies.minecraft.sum.plots.ItemPlotWand;
 import com.micatechnologies.minecraft.sum.plots.PlotsProtectionHandler;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
@@ -62,7 +61,6 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new SumMoneyEvents());
         MinecraftForge.EVENT_BUS.register(new BillsLootInjector());
         MinecraftForge.EVENT_BUS.register(new SleepVoteHandler());
-        MinecraftForge.EVENT_BUS.register(new ItemPlotWand.Listener());
         MinecraftForge.EVENT_BUS.register(new PlotsProtectionHandler());
         proxy.preInit(event);
         SumTab.initTabElements();

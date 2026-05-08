@@ -17,17 +17,21 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 /**
- * Plot-selection wand. Mirrors the WorldEdit convention: left-click a block to set corner A,
- * right-click to set corner B. The selected corners persist in the wand item's NBT so admins
- * can hand a single wand around or stash one in a chest.
+ * Plot-selection wand. Shift+right-click a block to set corner A; right-click (without sneak)
+ * to set corner B. The selected corners persist in the wand item's NBT so admins can hand a
+ * single wand around or stash it in a chest.
+ *
+ * <p>Earlier versions used a left-click-for-A/right-click-for-B WorldEdit-style gesture, but
+ * the {@code PlayerInteractEvent.LeftClickBlock} path is unreliable in 1.12.2 — client-side
+ * cancellation can suppress the server packet, leaving NBT updates only on the client where
+ * they're invisible to the {@code /sum plots create} command (which runs server-side). The
+ * sneak/no-sneak right-click pattern uses only {@code onItemUse} which fires identically on
+ * both sides and is bulletproof.
  *
  * <p>Used by {@code /sum plots create} which reads the held wand's selection. Op-only —
- * non-ops who somehow get the wand can left/right-click but the create command won't accept
- * their input.
+ * non-ops who somehow get the wand can click but the create command won't accept their input.
  */
 public class ItemPlotWand extends Item {
 
@@ -43,7 +47,6 @@ public class ItemPlotWand extends Item {
         SumRegistry.registerItem(this);
     }
 
-    /** Right-click block → corner B. */
     @Override
     public EnumActionResult onItemUse(EntityPlayer player, World world, BlockPos pos,
                                       EnumHand hand, EnumFacing facing,
@@ -53,17 +56,14 @@ public class ItemPlotWand extends Item {
             return EnumActionResult.PASS;
         }
         ItemStack stack = player.getHeldItem(hand);
-        setCorner(stack, NBT_B, pos, world.provider.getDimension());
-        sendMessage(player, TextFormatting.AQUA, "Corner B set: " + describe(pos));
+        if (player.isSneaking()) {
+            setCorner(stack, NBT_A, pos, world.provider.getDimension());
+            sendMessage(player, TextFormatting.AQUA, "Corner A set: " + describe(pos));
+        } else {
+            setCorner(stack, NBT_B, pos, world.provider.getDimension());
+            sendMessage(player, TextFormatting.AQUA, "Corner B set: " + describe(pos));
+        }
         return EnumActionResult.SUCCESS;
-    }
-
-    /** Left-click block → corner A. Driven by {@link PlayerInteractEvent.LeftClickBlock}
-     *  in {@link Listener}, since {@code Item} has no left-click-block hook of its own. */
-    private static void onLeftClick(EntityPlayer player, World world, BlockPos pos, ItemStack stack) {
-        if (!player.canUseCommand(2, "sum.plots")) return;
-        setCorner(stack, NBT_A, pos, world.provider.getDimension());
-        sendMessage(player, TextFormatting.AQUA, "Corner A set: " + describe(pos));
     }
 
     private static void setCorner(ItemStack stack, String key, BlockPos pos, int dimensionId) {
@@ -100,7 +100,7 @@ public class ItemPlotWand extends Item {
         BlockPos a = getCornerA(stack);
         BlockPos b = getCornerB(stack);
         if (a == null && b == null) {
-            tooltip.add(TextFormatting.GRAY + "Left-click + right-click two corners.");
+            tooltip.add(TextFormatting.GRAY + "Sneak+right-click = A · right-click = B.");
             return;
         }
         tooltip.add(TextFormatting.GRAY + "A: " + (a == null ? "?" : describe(a)));
@@ -115,24 +115,5 @@ public class ItemPlotWand extends Item {
         TextComponentString tcs = new TextComponentString(text);
         tcs.getStyle().setColor(color);
         player.sendMessage(tcs);
-    }
-
-    /** Forge event hook: left-click a block while holding the wand sets corner A and
-     *  cancels the break. Registered on the EVENT_BUS in {@code Sum.preInit}. */
-    public static class Listener {
-
-        @SubscribeEvent
-        public void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
-            ItemStack stack = event.getEntityPlayer().getHeldItem(event.getHand());
-            if (stack.isEmpty() || !(stack.getItem() instanceof ItemPlotWand)) return;
-            // Server-side handling only.
-            if (event.getWorld().isRemote) {
-                event.setCanceled(true);
-                return;
-            }
-            ItemPlotWand.onLeftClick(event.getEntityPlayer(), event.getWorld(),
-                event.getPos(), stack);
-            event.setCanceled(true);  // don't break the block
-        }
     }
 }

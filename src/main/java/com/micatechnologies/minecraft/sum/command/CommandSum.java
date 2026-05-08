@@ -1328,7 +1328,7 @@ public class CommandSum extends CommandBase {
             h("Job board block", "Place + right-click to browse server-wide listings. Posters get a Remove button."),
         }),
         new HelpPage("Plots", new HelpEntry[] {
-            h("/give @s sum:plot_wand", "(creative) Get the plot wand. Left-click = corner A, right-click = corner B."),
+            h("/give @s sum:plot_wand", "(creative) Get the plot wand. Sneak+right-click = corner A, right-click = corner B."),
             h("/sum plots create <name> [price]", "[op] Create a plot from the held wand's selection. price=0 → reserved."),
             h("/sum plots delete <id>", "[op] Delete a plot by id-prefix or display name."),
             h("/sum plots list [near]", "List plots in this dimension; 'near' filters to ~64 blocks of you."),
