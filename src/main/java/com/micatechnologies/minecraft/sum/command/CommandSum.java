@@ -48,7 +48,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots>";
+        return "/sum <help|reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots>";
     }
 
     @Override
@@ -79,8 +79,8 @@ public class CommandSum extends CommandBase {
         }
 
         String sub = args[0].toLowerCase();
-        // Open subcommands (any player): job. plots itself dispatches per-action perms below.
-        boolean isOpenSub = "job".equals(sub) || "plots".equals(sub);
+        // Open subcommands (any player): help, job, plots. plots dispatches per-action perms below.
+        boolean isOpenSub = "help".equals(sub) || "job".equals(sub) || "plots".equals(sub);
         if (!isOpenSub && !requireOp(sender, sub)) {
             return;
         }
@@ -114,6 +114,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "plots":
                 handlePlots(sender, args);
+                break;
+            case "help":
+                handleHelp(sender, args);
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown subcommand. Usage: " + getUsage(sender));
@@ -1261,6 +1264,134 @@ public class CommandSum extends CommandBase {
         return p.getX() + ", " + p.getY() + ", " + p.getZ();
     }
 
+    // --- /sum help ---
+
+    /** A single help entry: a usage line and a one-sentence description. The {@code [op]}
+     *  tag in the usage is shown verbatim; we don't filter by permission so non-ops still
+     *  see what's available, just with the op tag attached. */
+    private static final class HelpEntry {
+        final String usage;
+        final String description;
+        HelpEntry(String usage, String description) {
+            this.usage = usage;
+            this.description = description;
+        }
+    }
+
+    private static final class HelpPage {
+        final String title;
+        final HelpEntry[] entries;
+        HelpPage(String title, HelpEntry[] entries) {
+            this.title = title;
+            this.entries = entries;
+        }
+    }
+
+    private static HelpEntry h(String usage, String description) {
+        return new HelpEntry(usage, description);
+    }
+
+    private static final HelpPage[] HELP_PAGES = new HelpPage[] {
+        new HelpPage("Index", new HelpEntry[] {
+            h("Bank & ATM", "page 2 — balance, econ, vault, migrate"),
+            h("Roamer NPCs", "page 3 — greetings, roles, walkable blocks"),
+            h("Jobs & Mail", "page 4 — job listings, mailbox notes"),
+            h("Plots", "page 5 — land claims, buy/sell, trust"),
+            h("Items & blocks", "page 6 — phone/card/wand, shop, changer, signs"),
+            h("Admin", "page 7 — reloadconfig, favorites, migrate-economy"),
+        }),
+        new HelpPage("Bank & ATM", new HelpEntry[] {
+            h("/balance [player]", "Check balance. Self with no arg; admin (op) can target another player."),
+            h("/sum econ balance [player]", "[op] Same as /balance with explicit subcommand."),
+            h("/sum econ add <player> <amount>", "[op] Add to a player's balance."),
+            h("/sum econ set <player> <amount>", "[op] Set a player's balance to an exact amount."),
+            h("/sum vault unlock <code>", "Unlock the vault door you're looking at (5s auto-close)."),
+            h("/sum vault setcode <code>", "Set passcode on a vault door you own."),
+            h("/sum vault info", "Show owner + passcode-set status of the targeted vault."),
+            h("/sum vault disown", "[op] Wipe owner + passcode on the targeted vault."),
+            h("/sum migrate-economy [verify]", "[op] Move EconomyInc balances + bills to SUM. 'verify' for dry-run."),
+        }),
+        new HelpPage("Roamer NPCs", new HelpEntry[] {
+            h("/sum roamer greet add <target> <message>", "[op] Append a greeting line. <target> = nearest|<uuid>."),
+            h("/sum roamer greet list <target>", "[op] List a roamer's greetings."),
+            h("/sum roamer greet clear <target>", "[op] Clear a roamer's greetings."),
+            h("/sum roamer role set <target> <role-id>", "[op] Set role (generic, bank_teller). Also auto-names unnamed roamers."),
+            h("/sum roamer role get <target>", "[op] Show a roamer's current role."),
+            h("/sum addroamerblock <block>", "[op] Add a block (e.g. minecraft:concrete) to roamer-walkable list."),
+            h("/sum rmroamerblock <block>", "[op] Remove a block from the roamer-walkable list."),
+        }),
+        new HelpPage("Jobs & Mail", new HelpEntry[] {
+            h("/sum job post <reward> <description>", "Post a job listing. Anyone can post; expires in 7 days."),
+            h("/sum job list", "Print active listings to chat."),
+            h("/sum job clear-mine", "Remove all listings you posted."),
+            h("Mailbox block", "Place + right-click to claim. Owner reads inbox; non-owners can deposit only."),
+            h("Job board block", "Place + right-click to browse server-wide listings. Posters get a Remove button."),
+        }),
+        new HelpPage("Plots", new HelpEntry[] {
+            h("/give @s sum:plot_wand", "(creative) Get the plot wand. Left-click = corner A, right-click = corner B."),
+            h("/sum plots create <name> [price]", "[op] Create a plot from the held wand's selection. price=0 → reserved."),
+            h("/sum plots delete <id>", "[op] Delete a plot by id-prefix or display name."),
+            h("/sum plots list [near]", "List plots in this dimension; 'near' filters to ~64 blocks of you."),
+            h("/sum plots info <id>", "Show name, owner, status, corners, volume, price, trust count."),
+            h("/sum plots buy <id>", "Buy a FOR_SALE plot in this dimension; deducts the listed price."),
+            h("/sum plots sell <id> <price>", "Re-list your owned plot at a chosen price (FOR_SALE again)."),
+            h("/sum plots trust <id> <player>", "Owner adds a trusted builder (bypasses your protection)."),
+            h("/sum plots untrust <id> <player>", "Remove a trusted builder."),
+            h("/sum plots transfer <id> <player>", "Transfer ownership outright. Trust list carries over."),
+        }),
+        new HelpPage("Items & blocks", new HelpEntry[] {
+            h("Phone / Debit card", "Right-click air to bind to you, then right-click again to open the ATM GUI anywhere."),
+            h("Shop block", "Vending machine. Owner sets template+stock+price; buyers see item + price + Buy button."),
+            h("Bill changer", "Drop 64 bills + Bundle → packet. Drop a packet + Unbundle → 64 bills."),
+            h("Bills display", "Decorative tray; right-click bills/packet to insert, right-click empty to take."),
+            h("Trash can", "Right-click for ephemeral 9-slot inventory. Closing the GUI destroys contents."),
+            h("Storm-shelter sign", "Roamers seek this during storm alarms; preferred over auto-discovered shelters."),
+            h("Business card", "Right-click air to personalize; right-click another player to give them a copy."),
+        }),
+        new HelpPage("Admin", new HelpEntry[] {
+            h("/sum reloadconfig", "[op] Re-read sum.cfg without a server restart."),
+            h("/sum favorites list", "[op] List server-wide favorites file contents."),
+            h("/sum favorites clear", "[op] Wipe the server-wide favorites file."),
+            h("/sum favorites export", "[op] Print the favorites file path."),
+            h("/sum favorites importfile <path>", "[op] Replace favorites with the contents of a file."),
+            h("/sum favorites file", "[op] Print the favorites file path."),
+            h("Permissions: sum.plots.bypass", "Op-2+ default. Lets ops build inside protected plots; revoke via permissions mod if not wanted."),
+            h("Permissions: sum.plots.admin", "Lets non-owners run trust/untrust/transfer/sell on any plot."),
+            h("Permissions: sum.jobs.remove_any", "Lets a holder remove any job listing, not just their own."),
+        }),
+    };
+
+    private void handleHelp(ICommandSender sender, String[] args) {
+        int totalPages = HELP_PAGES.length;
+        int page = 1;
+        if (args.length >= 2) {
+            try {
+                page = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
+                sendMessage(sender, TextFormatting.RED, "Page must be a number 1-" + totalPages + ".");
+                return;
+            }
+        }
+        if (page < 1 || page > totalPages) {
+            sendMessage(sender, TextFormatting.RED, "Page out of range. Use 1-" + totalPages + ".");
+            return;
+        }
+        HelpPage p = HELP_PAGES[page - 1];
+        sendMessage(sender, TextFormatting.GOLD,
+            "─── SUM Help: " + p.title + " (" + page + "/" + totalPages + ") ───");
+        for (HelpEntry e : p.entries) {
+            sendMessage(sender, TextFormatting.AQUA, e.usage);
+            sendMessage(sender, TextFormatting.GRAY, "  " + e.description);
+        }
+        if (page < totalPages) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "Next: /sum help " + (page + 1));
+        } else {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "Back to index: /sum help 1");
+        }
+    }
+
     @Nullable
     private static SumPlot findPlotByPrefix(SumPlotsWorldSavedData data, String prefix) {
         String p = prefix.toLowerCase();
@@ -1291,8 +1422,8 @@ public class CommandSum extends CommandBase {
                                           @Nullable BlockPos targetPos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args,
-                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ", "vault",
-                "migrate-economy", "job");
+                "help", "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ", "vault",
+                "migrate-economy", "job", "plots");
         }
         if (args.length == 2 && "job".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "post", "list", "clear-mine");
