@@ -22,6 +22,12 @@ public class InventorySafeDeposit extends InventoryBasic {
     private final SafeDepositSavedData savedData;
     private final UUID owner;
     private final BlockPos pos;
+    /** False during the constructor's pre-populate loop, true once the inventory is fully
+     *  loaded. Without this, markDirty fires from inside the first
+     *  {@code setInventorySlotContents} call and copies the still-mostly-empty
+     *  {@code inventoryContents} back over {@code backing}, wiping items in higher slots
+     *  before they get loaded. */
+    private boolean initialized = false;
 
     public InventorySafeDeposit(UUID owner, BlockPos pos, @Nullable SafeDepositSavedData savedData,
                                 NonNullList<ItemStack> backing) {
@@ -32,12 +38,13 @@ public class InventorySafeDeposit extends InventoryBasic {
         for (int i = 0; i < backing.size() && i < this.getSizeInventory(); i++) {
             super.setInventorySlotContents(i, backing.get(i));
         }
+        this.initialized = true;
     }
 
     @Override
     public void markDirty() {
         super.markDirty();
-        if (savedData == null) {
+        if (!initialized || savedData == null) {
             return;
         }
         NonNullList<ItemStack> backing = savedData.getInventory(owner, pos);
