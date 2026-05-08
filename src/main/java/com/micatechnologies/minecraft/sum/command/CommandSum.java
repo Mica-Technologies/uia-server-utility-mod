@@ -7,6 +7,7 @@ import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
+import com.micatechnologies.minecraft.sum.roamer.RoamerRole;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -495,15 +496,57 @@ public class CommandSum extends CommandBase {
     private void handleRoamer(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             sendMessage(sender, TextFormatting.RED,
-                "Usage: /sum roamer <greet> <add|list|clear> [nearest|<uuid>] [message]");
+                "Usage: /sum roamer <greet|role> ...");
             return;
         }
 
         if ("greet".equalsIgnoreCase(args[1])) {
             handleRoamerGreet(sender, args);
+        } else if ("role".equalsIgnoreCase(args[1])) {
+            handleRoamerRole(sender, args);
         } else {
             sendMessage(sender, TextFormatting.RED,
-                "Unknown roamer subcommand. Usage: /sum roamer greet <add|list|clear> [nearest|<uuid>]");
+                "Unknown roamer subcommand. Usage: /sum roamer <greet|role> ...");
+        }
+    }
+
+    private void handleRoamerRole(ICommandSender sender, String[] args) {
+        // /sum roamer role <set|get> <nearest|uuid> [role-id]
+        if (args.length < 4) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum roamer role <set|get> <nearest|uuid> [role]");
+            return;
+        }
+        String action = args[2].toLowerCase();
+        String target = args[3];
+
+        EntityRoamer roamer = findRoamer(sender, target);
+        if (roamer == null) {
+            sendMessage(sender, TextFormatting.RED, "No roamer found for target '" + target + "'.");
+            return;
+        }
+
+        switch (action) {
+            case "set":
+                if (args.length < 5) {
+                    sendMessage(sender, TextFormatting.RED,
+                        "Usage: /sum roamer role set <nearest|uuid> <role>");
+                    return;
+                }
+                RoamerRole newRole = RoamerRole.fromId(args[4]);
+                roamer.setRole(newRole);
+                sendMessage(sender, TextFormatting.GREEN,
+                    "Set " + getRoamerDisplayName(roamer) + " role to " + newRole.getId()
+                        + ". Greetings replaced with the role defaults.");
+                break;
+            case "get":
+                sendMessage(sender, TextFormatting.GOLD,
+                    getRoamerDisplayName(roamer) + " role: " + roamer.getRole().getId());
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED,
+                    "Unknown action '" + action + "'. Use set or get.");
+                break;
         }
     }
 
@@ -615,7 +658,21 @@ public class CommandSum extends CommandBase {
             return getListOfStringsMatchingLastWord(args, SumConfig.getRoamerWalkableBlocks());
         }
         if (args.length == 2 && "roamer".equalsIgnoreCase(args[0])) {
-            return getListOfStringsMatchingLastWord(args, "greet");
+            return getListOfStringsMatchingLastWord(args, "greet", "role");
+        }
+        if (args.length == 3 && "roamer".equalsIgnoreCase(args[0]) && "role".equalsIgnoreCase(args[1])) {
+            return getListOfStringsMatchingLastWord(args, "set", "get");
+        }
+        if (args.length == 4 && "roamer".equalsIgnoreCase(args[0]) && "role".equalsIgnoreCase(args[1])) {
+            return getListOfStringsMatchingLastWord(args, "nearest");
+        }
+        if (args.length == 5 && "roamer".equalsIgnoreCase(args[0]) && "role".equalsIgnoreCase(args[1])
+            && "set".equalsIgnoreCase(args[2])) {
+            String[] roleIds = new String[RoamerRole.values().length];
+            for (int i = 0; i < roleIds.length; i++) {
+                roleIds[i] = RoamerRole.values()[i].getId();
+            }
+            return getListOfStringsMatchingLastWord(args, roleIds);
         }
         if (args.length == 2 && "favorites".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args,

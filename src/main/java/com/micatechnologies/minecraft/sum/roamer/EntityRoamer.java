@@ -31,10 +31,10 @@ public class EntityRoamer extends EntityCreature {
     private static final String NBT_GREET_RADIUS = "GreetRadius";
     private static final String NBT_GREET_COOLDOWN = "GreetCooldown";
     private static final String NBT_GREETINGS = "Greetings";
+    private static final String NBT_ROLE = "Role";
 
     private static final double DEFAULT_GREET_RADIUS = 2.0;
     private static final int DEFAULT_GREET_COOLDOWN = 1200; // 60 seconds
-    private static final String[] DEFAULT_GREETINGS = {"Hello!", "Hey there!", "Welcome!"};
 
     // AI-idle gate: when no player is within IDLE_RANGE blocks, skip the per-tick AI work
     // (pathfinding, task evaluation, helpers). Slightly less than the entity tracker range (80)
@@ -51,6 +51,7 @@ public class EntityRoamer extends EntityCreature {
     private double greetRadius = DEFAULT_GREET_RADIUS;
     private int greetCooldown = DEFAULT_GREET_COOLDOWN;
     private List<String> greetings = new ArrayList<>();
+    private RoamerRole role = RoamerRole.GENERIC;
 
     // When true, the walkable-block pathfinding restriction is bypassed so the roamer can
     // navigate through buildings on any solid block during fire/storm emergencies.
@@ -164,6 +165,7 @@ public class EntityRoamer extends EntityCreature {
         compound.setBoolean(NBT_GREET_ENABLED, greetEnabled);
         compound.setDouble(NBT_GREET_RADIUS, greetRadius);
         compound.setInteger(NBT_GREET_COOLDOWN, greetCooldown);
+        compound.setString(NBT_ROLE, role.getId());
 
         NBTTagList greetingList = new NBTTagList();
         for (String greeting : greetings) {
@@ -183,6 +185,9 @@ public class EntityRoamer extends EntityCreature {
         }
         if (compound.hasKey(NBT_GREET_COOLDOWN)) {
             greetCooldown = compound.getInteger(NBT_GREET_COOLDOWN);
+        }
+        if (compound.hasKey(NBT_ROLE)) {
+            role = RoamerRole.fromId(compound.getString(NBT_ROLE));
         }
         if (compound.hasKey(NBT_GREETINGS, Constants.NBT.TAG_LIST)) {
             NBTTagList greetingList = compound.getTagList(NBT_GREETINGS, Constants.NBT.TAG_STRING);
@@ -248,8 +253,21 @@ public class EntityRoamer extends EntityCreature {
 
     public void resetGreetingsToDefault() {
         greetings.clear();
-        for (String msg : DEFAULT_GREETINGS) {
+        for (String msg : role.getDefaultGreetings()) {
             greetings.add(msg);
         }
+    }
+
+    // --- Role ---
+
+    public RoamerRole getRole() {
+        return role;
+    }
+
+    /** Sets the role and replaces the greeting list with the role's defaults. The caller can
+     *  re-customize via {@link #addGreeting} afterwards. */
+    public void setRole(RoamerRole role) {
+        this.role = role;
+        resetGreetingsToDefault();
     }
 }
