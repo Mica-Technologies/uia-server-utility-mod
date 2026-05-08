@@ -7,6 +7,7 @@ import com.micatechnologies.minecraft.sum.bank.BlockBankCounter;
 import com.micatechnologies.minecraft.sum.bank.BlockSafeDepositBox;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.BlockVelvetRope;
+import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
 import com.micatechnologies.minecraft.sum.economy.ItemSumBill;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
@@ -32,6 +33,8 @@ public class SumTab {
     public static BlockVelvetRope velvetRope;
     public static BlockVaultDoor vaultDoor;
     public static ItemSumBill[] bills;
+    public static ItemAccountAccess phone;
+    public static ItemAccountAccess debitCard;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -51,5 +54,7 @@ public class SumTab {
         for (int i = 0; i < BILL_DENOMINATIONS.length; i++) {
             bills[i] = new ItemSumBill(BILL_DENOMINATIONS[i]);
         }
+        phone = new ItemAccountAccess("phone");
+        debitCard = new ItemAccountAccess("debit_card");
     }
 }
