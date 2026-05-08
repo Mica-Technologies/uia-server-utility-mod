@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Sections A and C are both complete as of 2026-05-08.** Shipped this session beyond what came before: A2 (bank lobby kit), A3 (bank teller role with auto-naming), C1 (SUM money capability), C2 (bill items + render fix), C3 (`/balance`), C4 (phone + debit card with the GUI-open fix), C5 (player shop block), C6 (bill changer + 8 packet items), C7 (chest-loot bill injection), C8 (decorative bills display block + TESR), C9 (`/sum migrate-economy` + removal docs). SUM is now a self-sufficient economy mod that can replace EconomyInc on the modpack. Section D plots stays research-only. Section B sketches remain on hold.
+Status: **Sections A, B, and C are all complete as of 2026-05-08.** Shipped this session: full Section C (C1–C9) + a slate of bug fixes + full Section B (TR trash can, ST storm-shelter sign, SV sleep voting, BC business cards, MX mailbox, JB job board with `/sum job post`). SUM is now a feature-complete server-utility + economy mod. Only Section D (plots) remains, and it's still research-only and intentionally deferred.
 
 ---
 
@@ -8,7 +8,7 @@ Status: **Sections A and C are both complete as of 2026-05-08.** Shipped this se
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. **As of HEAD `97c1a85` (2026-05-08): Section A and Section C are both fully shipped (A1–A3, C1–C9). SUM is now a complete self-sufficient economy + bank/ATM kit. Section D plots stays research-only and intentionally out of scope until Alex green-lights it. Section B sketches (mailbox, sleep voting, trash can, business cards, job board, storm-shelter signs) are still on hold; pick whichever Alex picks up next.**
+> I'm continuing the SUM mod's feature roadmap. **As of HEAD `5fca248` (2026-05-08): Sections A, B, and C are all fully shipped. The mod is feature-complete for everything that was on the originally-planned headline list — bank/ATM kit, full SUM-native economy that can replace EconomyInc, all six Section B utility features (trash can, storm-shelter sign, sleep voting, business cards, mailbox, job board). Only Section D (plots) remains, and it's still research-only and intentionally deferred.**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
@@ -118,16 +118,16 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | C8 | Decorative bills display block + TESR | ✅ shipped | `0df41a4` |
 | C9 | `/sum migrate-economy` command + EconomyInc-removal docs | ✅ shipped | `97c1a85` |
 
-### Section B — Other server-utility ideas (sketches; on hold)
+### Section B — Other server-utility ideas (✅ COMPLETE)
 
-| Phase | Goal | Effort | Status |
-|---|---|---|---|
-| MX | Mailbox + postal system | M | ☐ on hold |
-| SV | Sleep voting / time skip | S | ☐ on hold |
-| TR | Trash can / item-disposal block | XS | ☐ on hold |
-| BC | Business cards (item-based player profile exchange) | S | ☐ on hold |
-| JB | Job board (bulletin-board block for player-listed jobs) | L | ☐ on hold |
-| ST | Storm-shelter signage tied to existing Roamer storm cache | XS | ☐ on hold |
+| Phase | Goal | Effort | Status | Commit |
+|---|---|---|---|---|
+| TR | Trash can / item-disposal block | XS | ✅ shipped | `f178d62` |
+| ST | Storm-shelter signage tied to existing Roamer storm cache | XS | ✅ shipped | `568aa54` |
+| SV | Sleep voting / time skip | S | ✅ shipped | `a9f04b8` |
+| BC | Business cards (item-based player profile exchange) | S | ✅ shipped | `ff3555b` |
+| MX | Mailbox + postal system | M | ✅ shipped | `2c7d263` |
+| JB | Job board (bulletin-board block for player-listed jobs) | L | ✅ shipped | `5fca248` |
 
 ### Section D — Plots system (research only; deferred)
 
@@ -137,7 +137,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 ---
 
-## Testing status (as of HEAD `97c1a85`)
+## Testing status (as of HEAD `5fca248`)
 
 What Alex has playtested in-game:
 
@@ -162,6 +162,12 @@ What's **unverified** (may have bugs; flag any oddness):
 - [ ] **C7 chest loot**: spawn (or `/locate`) a stronghold/mineshaft/jungle temple/desert temple/igloo/etc., open the chest. ~30% of chests should drop a bill (small denominations far more common than $100; $200/$500 never appear).
 - [ ] **C8 bills display**: place block, right-click with a bill or packet — the held items get added to the tray and the TESR renders a rotating stack above. Right-click empty-handed to take everything back. Layer count grows with stack count (1, 5, 16, 32, 64+ tiers).
 - [ ] **C9 migrate-economy**: with EconomyInc still loaded, run `/sum migrate-economy verify` — should print per-player balance + bill counts and totals without changing anything. Then `/sum migrate-economy` for real → balances move from EconomyInc to SUM, bills convert to `sum:` namespace. Stop server, remove EconomyInc, restart, confirm `/balance` reports the migrated value.
+- [ ] **TR trash can**: place block, right-click → 9-slot trash GUI. Drop items in, close GUI → items destroyed. Reopen → empty. Shift-click items back out before closing as the rescue path.
+- [ ] **ST storm-shelter sign**: place a sign inside a building, run a CSM storm alarm, watch nearest roamers head straight for the sign instead of doing the full hazard scan. Sign survives a server restart and re-registers on chunk load.
+- [ ] **SV sleep voting**: with two+ players online in the overworld, have one go to bed → "X/2 players sleeping (1 needed to skip)" announcement. Confirm night skip + clear weather. Try with `sleep_vote.enabled=false` in config to confirm it falls back to vanilla "everyone must sleep".
+- [ ] **BC business cards**: spawn a card from creative tab. Right-click air → personalized message + tooltip shows owner/dim/coords. Anvil-rename the card → title shows on tooltip. Right-click another player → they receive a copy.
+- [ ] **MX mailbox**: place block, right-click → "Mailbox claimed" + GUI opens. As another player, right-click → owner-tagged GUI opens, can deposit but can't take. Owner reopens → can take. Break box → all contents drop.
+- [ ] **JB job board**: `/sum job post 50 Need help building a roof` → confirms posting. Place a job board, right-click → see the listing. Switch to a different player, browse → see same listing, no Remove button. Original poster sees Remove button → click → listing disappears.
 
 Pre-flight items still relevant for future work:
 
@@ -808,4 +814,4 @@ Order, by my read of value-vs-effort and how the pieces interlock:
 12. **C9 — `/sum migrate-economy` + EconomyInc removal docs.** Hardest because in-world EconomyInc blocks need conversion. Defer until everything else lands.
 13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for after Section C lands.
 
-All of Section A and Section C are shipped. SUM can now ship as a standalone economy mod that fully replaces EconomyInc on the modpack. Section B sketches (mailbox, sleep voting, trash can, business cards, job board, storm-shelter signs) are the next batch of headline features whenever Alex picks the next direction.
+All of Section A, Section B, and Section C are shipped. SUM is feature-complete for everything that was on the originally-planned headline list. Section D plots remains research-only — that's the only major item left if Alex wants to keep extending the mod.
