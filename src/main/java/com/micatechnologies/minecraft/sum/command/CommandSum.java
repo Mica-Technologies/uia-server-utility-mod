@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.command.CommandBase;
@@ -40,7 +41,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault>";
+        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy>";
     }
 
     @Override
@@ -76,6 +77,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "vault":
                 handleVault(sender, args);
+                break;
+            case "migrate-economy":
+                handleMigrateEconomy(server, sender, args);
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown subcommand. Usage: " + getUsage(sender));
@@ -644,12 +648,126 @@ public class CommandSum extends CommandBase {
         return roamer.hasCustomName() ? roamer.getCustomNameTag() : "(unnamed)";
     }
 
+    // --- /sum migrate-economy ---
+
+    private void handleMigrateEconomy(MinecraftServer server, ICommandSender sender, String[] args) {
+        boolean verify = args.length >= 2 && "verify".equalsIgnoreCase(args[1]);
+        if (!EconomyBridge.isEconomyIncBackend()) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "EconomyInc is not loaded — there's nothing to migrate from. SUM is already the active economy.");
+            return;
+        }
+        if (server.getPlayerList().getCurrentPlayerCount() == 0) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "No online players to migrate. Migration only runs for currently-online players; have everyone log in, then run this command.");
+            return;
+        }
+        sendMessage(sender, TextFormatting.GOLD,
+            (verify ? "[verify] " : "") + "Migrating EconomyInc data → SUM for "
+            + server.getPlayerList().getCurrentPlayerCount() + " online players...");
+
+        int playersDone = 0;
+        double totalBalance = 0.0;
+        int totalBills = 0;
+
+        for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
+            // Read EconomyInc balance (the bridge's getBalance routes to EconomyInc when it's
+            // the active backend, which it is at this point).
+            double balance = EconomyBridge.getBalance(player);
+            if (Double.isNaN(balance)) balance = 0.0;
+            int bills = countEconomyIncBills(player);
+
+            if (verify) {
+                sendMessage(sender, TextFormatting.AQUA, "  " + player.getName()
+                    + ": balance=$" + String.format(Locale.ROOT, "%.2f", balance)
+                    + ", bill items=" + bills);
+            } else {
+                // Move balance: zero EconomyInc, credit SUM.
+                if (balance > 0.0) {
+                    EconomyBridge.adjustBalance(player, -balance);
+                    com.micatechnologies.minecraft.sum.economy.ISumMoney sum =
+                        player.getCapability(
+                            com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney.CAPABILITY,
+                            null);
+                    if (sum != null) {
+                        sum.setBalance(sum.getBalance() + balance);
+                        sum.sync(player);
+                    }
+                }
+                // Convert any EconomyInc bills in main inventory + offhand to SUM bills.
+                int converted = convertEconomyIncBillsToSum(player);
+                player.inventoryContainer.detectAndSendChanges();
+                sendMessage(sender, TextFormatting.AQUA, "  " + player.getName()
+                    + ": migrated $" + String.format(Locale.ROOT, "%.2f", balance)
+                    + ", converted " + converted + " bill items");
+            }
+
+            playersDone++;
+            totalBalance += balance;
+            totalBills += bills;
+        }
+
+        if (verify) {
+            sendMessage(sender, TextFormatting.GREEN,
+                "[verify] Total: $" + String.format(Locale.ROOT, "%.2f", totalBalance)
+                + " across " + playersDone + " players, " + totalBills + " bill items would be converted.");
+            sendMessage(sender, TextFormatting.GRAY,
+                "Run without 'verify' to actually migrate. After migration, restart the server with EconomyInc removed from the modpack.");
+        } else {
+            sendMessage(sender, TextFormatting.GREEN, "Migration complete. Total: $"
+                + String.format(Locale.ROOT, "%.2f", totalBalance)
+                + " across " + playersDone + " players.");
+            sendMessage(sender, TextFormatting.GRAY,
+                "Now safe to remove EconomyInc from the modpack. Restart the server; SUM will own the economy.");
+        }
+    }
+
+    /** Returns the total count of EconomyInc bill items in the player's main inventory + offhand. */
+    private static int countEconomyIncBills(EntityPlayerMP player) {
+        int total = 0;
+        for (int slot = 0; slot < player.inventory.getSizeInventory(); slot++) {
+            net.minecraft.item.ItemStack stack = player.inventory.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+            net.minecraft.util.ResourceLocation reg = stack.getItem().getRegistryName();
+            if (reg != null && "economy".equals(reg.getNamespace())
+                && com.micatechnologies.minecraft.sum.atm.Bills.denominationOf(stack.getItem()) > 0) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
+    /** Replaces every EconomyInc bill in the player's main inventory + offhand with the
+     *  equivalent SUM bill of the same denomination. Returns the total bill count converted. */
+    private static int convertEconomyIncBillsToSum(EntityPlayerMP player) {
+        int converted = 0;
+        for (int slot = 0; slot < player.inventory.getSizeInventory(); slot++) {
+            net.minecraft.item.ItemStack stack = player.inventory.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+            net.minecraft.util.ResourceLocation reg = stack.getItem().getRegistryName();
+            if (reg == null || !"economy".equals(reg.getNamespace())) continue;
+            int denom = com.micatechnologies.minecraft.sum.atm.Bills.denominationOf(stack.getItem());
+            if (denom <= 0) continue;
+            net.minecraft.item.Item sumBill = net.minecraft.item.Item.REGISTRY.getObject(
+                new net.minecraft.util.ResourceLocation("sum", "bill_" + denom));
+            if (sumBill == null) continue;
+            int count = stack.getCount();
+            player.inventory.setInventorySlotContents(slot, new net.minecraft.item.ItemStack(sumBill, count));
+            converted += count;
+        }
+        return converted;
+    }
+
     @Override
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args,
                                           @Nullable BlockPos targetPos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args,
-                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ", "vault");
+                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ", "vault",
+                "migrate-economy");
+        }
+        if (args.length == 2 && "migrate-economy".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, "verify");
         }
         if (args.length == 2 && "vault".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "unlock", "setcode", "info", "disown");
