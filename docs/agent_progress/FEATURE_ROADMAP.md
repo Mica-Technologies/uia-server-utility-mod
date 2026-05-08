@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Section A complete + Section C foundation in place as of 2026-05-07.** Shipped this session: A2 (bank lobby kit: counter, safe deposit, velvet rope, vault door), A3 (bank teller Roamer role), C1 (SUM-native `ISumMoney` capability + facade `EconomyBridge`), C2 (8 SUM bill items), C3 (`/balance` user-facing command), plus Section D research stub for the future plots system. Section A is feature-complete; Section C work remaining is C4–C9. Section B sketches are on hold.
+Status: **Section A complete + Section C through C4 in place as of 2026-05-08.** Shipped: A2 (bank lobby kit: counter, safe deposit, velvet rope, vault door), A3 (bank teller Roamer role, with auto-naming so the role shows up at a glance), C1 (SUM-native `ISumMoney` capability + facade `EconomyBridge`), C2 (8 SUM bill items, JSON-rendering bug fixed in `15192f2`), C3 (`/balance` user-facing command), C4 (phone + debit card items, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere), plus Section D research stub for the future plots system. Section A is feature-complete; Section C work remaining is C5–C9. Section B sketches are on hold.
 
 ---
 
@@ -8,7 +8,7 @@ Status: **Section A complete + Section C foundation in place as of 2026-05-07.**
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. **As of HEAD `2f6ebc2` (2026-05-07): Section A is fully shipped (A1+A2+A3); Section C foundation is shipped (C1, C2, C3); Section D plots is research-only and intentionally out of scope until Alex green-lights it. Next priority is C4 (phone + debit card items), then C5 (player-shop block — biggest remaining piece).**
+> I'm continuing the SUM mod's feature roadmap. **As of HEAD `c9a40e2` (2026-05-08): Section A is fully shipped (A1+A2+A3); Section C through C4 is shipped (C1–C4); Section D plots is research-only and intentionally out of scope until Alex green-lights it. Next priority is C5 (player-shop block — biggest remaining piece, ~600 LOC).**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
@@ -27,6 +27,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - `SumMoneyEvents`: handles AttachCapabilities, login sync, dimension-change sync, death-respawn carry-over.
 > - `Bills` (`.atm` package): denomination ↔ Item lookup. Accepts BOTH EconomyInc bills (`economy:item_oneb` etc.) AND SUM bills (`sum:bill_1` etc.) for deposits. `billItem(denom)` returns the preferred backend's bill (EconomyInc when loaded, SUM otherwise) for new withdraws.
 > - `ItemSumBill`: 8 bill items, denominations $1/$5/$10/$20/$50/$100/$200/$500.
+> - `ItemAccountAccess`: single class, two registry instances (`sum:phone`, `sum:debit_card`). NBT-binds to first right-clicker (OwnerUUID + OwnerName). Owner right-clicks again to open `GuiSumAtm`; non-owner sees a "belongs to X" rejection. Tooltip shows owner. **Pattern to copy** for any future bound-to-player item.
 >
 > *Blocks (all in `.atm` and `.bank` subpackages):*
 > - `BlockAtmBase` → `BlockAtmKiosk` / `BlockAtmWall` / `BlockAtmDriveThru`: ATM block family, all open `GuiSumAtm`. **Don't create new ATM variants without asking — three is plenty.**
@@ -42,7 +43,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - `SumRegistry.registerBlock` / `registerItem`: called from constructors of every Block/Item.
 >
 > *NPCs:*
-> - `EntityRoamer` + `RoamerRole` enum: Roamer NPCs have a role tag (GENERIC, BANK_TELLER) that sets default greetings. Add new roles via `RoamerRole` enum. `/sum roamer role set <target> <role-id>` admin command.
+> - `EntityRoamer` + `RoamerRole` enum: Roamer NPCs have a role tag (GENERIC, BANK_TELLER) that sets default greetings AND auto-applies a default name if the roamer doesn't already have one (so `setRole(BANK_TELLER)` makes the entity say "Bank Teller" above its head and unlocks the greeting AI, which only fires on named roamers). Add new roles by appending to `RoamerRole` enum with id, default name (or null), and greetings array. `/sum roamer role set <target> <role-id>` admin command.
 >
 > *Commands:*
 > - `/balance [player]` (perm 0 self / perm 2 admin): user-facing.
@@ -65,15 +66,17 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - **Safe deposit box: 3×3** single-chest equivalent, per-(player, position).
 > - **Bills coexistence:** when EconomyInc is loaded, ATM produces EconomyInc bills (compat); deposits accept both EconomyInc and SUM bills. When EconomyInc is absent, SUM owns everything.
 >
-> **Watchpoints from this session that need playtest verification:**
+> **Watchpoints that need playtest verification:**
 > - **Vault door open-state model uses `"elements": []`** (empty array). May render fine, may need a transparent stub quad — flag if you see purple/black missing-texture squares.
 > - **C1 standalone path** (with EconomyInc removed from the pack) is unverified end-to-end. The smoke test: remove EconomyInc → `/sum econ add 100` should still work, `/balance` should report $100, ATM should produce SUM bills.
-> - **A3 bank teller role** is unverified — `/sum roamer role set nearest bank_teller` should swap greetings.
-> - **SUM bills** rendered, sized, tooltipped correctly is unverified.
+> - **C4 phone + debit card**: bind on first right-click, reject for non-owner, open ATM GUI for owner. Tooltip shows owner.
+> - **A3 bank teller role** auto-naming — `/sum roamer role set nearest bank_teller` on an unnamed roamer should set the entity's name to "Bank Teller" AND start firing the bank-teller greetings.
 >
 > **Known fixed bugs (just for reference, don't reintroduce):**
 > - `7c74d4e` Safe deposit box wiped items on reopen — fixed via `initialized` flag in `InventorySafeDeposit` to gate write-back during constructor.
 > - `59cf108` Velvet rope crashed on registry — fixed by adding default `getStateFromMeta`/`getMetaFromState` overrides since the four directional bools aren't persisted in metadata (matches vanilla fence pattern).
+> - `15192f2` All 8 SUM bill model JSONs contained literal backslash-n characters instead of real newlines, so GSON rejected them and bills rendered as the missing-model purple/black grid. Rewrote each file with real newlines. **Watch for this** if anything in your toolchain ever serializes JSON via a heredoc or template that double-escapes.
+> - `c9a40e2` `/sum roamer role set <target> bank_teller` produced no visible difference because (a) the greeting AI only fires on named roamers and (b) the role tag had no display effect. `setRole` now auto-applies the role's default name when the entity is unnamed; greetings start firing immediately after.
 >
 > **Watch out for:** Alex maintains a separate Weather 2 Remastered fork at `E:\gitRepos\LDW2` for weather/snow features — *not* this repo. The repo working tree should be clean at `2f6ebc2`; if you find unfamiliar uncommitted WIP, preserve it (`git restore --staged` anything not yours before committing).
 
@@ -103,8 +106,8 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | C1 | SUM-native `ISumMoney` capability + facade `EconomyBridge` | ✅ shipped | `46f7696` |
 | C2 | 8 SUM bill items + `Bills` lookup accepts both backends | ✅ shipped | `2f6ebc2` |
 | C3 | `/balance` user-facing command | ✅ shipped | `9f35cdf` |
-| C4 | Phone item + classic debit card item (NBT-bound to UUID) | ☐ next | — |
-| C5 | Player shop block (BlockSeller equivalent) | ☐ pending | — |
+| C4 | Phone item + classic debit card item (NBT-bound to UUID) | ✅ shipped | `a79f100` |
+| C5 | Player shop block (BlockSeller equivalent) | ☐ next | — |
 | C6 | Bill changer + 8 packet items | ☐ pending | — |
 | C7 | Bills in vanilla chest loot tables | ☐ pending | — |
 | C8 | Decorative bills display block + TESR | ☐ pending | — |
@@ -129,7 +132,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 ---
 
-## Testing status (as of HEAD `2f6ebc2`)
+## Testing status (as of HEAD `c9a40e2`)
 
 What Alex has playtested in-game:
 
@@ -137,14 +140,18 @@ What Alex has playtested in-game:
 - [x] **A2.1 bank counter**: places, renders correctly with marble top + walnut body.
 - [x] **A2.2 safe deposit box**: persistence works across save/reload after the `7c74d4e` fix; multiple items in different slots stay put.
 - [x] **A2.4 velvet rope**: brass color reads as brass after `f3d63d1`; auto-connecting burgundy rope segments appear between adjacent stanchions.
+- [x] **C1 partial**: `/sum econ add 100` → `/balance` reports $100 and persists across save/reload. EconomyInc was loaded during this test, so the SUM-only path is still unverified.
+- [x] **C2 bug found**: bills rendered as the missing-texture purple/black grid. Cause: bill model JSONs were written with literal `\n` characters; fixed in `15192f2`.
+- [x] **A3 bug found**: role change had no visible effect — fixed in `c9a40e2` by auto-naming the entity.
 
 What's **unverified** (may have bugs; flag any oddness):
 
 - [ ] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. **The empty `"elements": []` open-state model is the primary watchpoint** — could render as missing-texture squares on some renderers; will need a transparent stub quad if so.
-- [ ] **A3 bank teller**: `/sum roamer role set nearest bank_teller` and resulting greeting rotation.
+- [ ] **A3 bank teller (post-fix)**: `/sum roamer role set nearest bank_teller` should now name the roamer "Bank Teller" (visible) and start sending bank-teller greetings to nearby players.
 - [ ] **C1 standalone path**: `/sum econ add 100` and `/balance` with EconomyInc *removed* from the pack. This is the highest-value smoke test for the SUM money capability — if it works, SUM has a self-sufficient money system.
-- [ ] **C2 SUM bills**: visual rendering of all 8 textures, tooltip names, ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
+- [ ] **C2 SUM bills (post-fix)**: visual rendering of all 8 textures with the JSON fix in place, tooltip names, ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
 - [ ] **C3 `/balance`** user-facing command from non-op player; admin `/balance <player>` with op.
+- [ ] **C4 phone + debit card**: spawn from creative tab, first right-click binds to player (chat: "Bound to <name>"), second right-click opens ATM GUI, non-owner sees rejection. Tooltip shows "Owner: <name>".
 
 Pre-flight items still relevant for future work:
 
@@ -580,10 +587,10 @@ Alex green-lit Approach 3 (full replacement) on 2026-05-07. Phases shipping iter
 | Phase | Goal | Effort | Status | Commit |
 |---|---|---|---|---|
 | C1 | SUM-native `ISumMoney` capability + provider/storage + per-player attach event. Inert when EconomyInc present. `EconomyBridge` becomes a facade. | S | ✅ shipped | `46f7696` |
-| C2 | SUM bill item set (8 denominations). Lang strings, textures, creative tab. `Bills` lookup accepts both EconomyInc and SUM bills as deposits. | S | ✅ shipped | `2f6ebc2` |
+| C2 | SUM bill item set (8 denominations). Lang strings, textures, creative tab. `Bills` lookup accepts both EconomyInc and SUM bills as deposits. | S | ✅ shipped | `2f6ebc2` (+ JSON-render fix `15192f2`) |
 | C3 | `/balance` user-facing command (perm 0 self / perm 2 admin). Admin retains `/sum econ`. | XS | ✅ shipped | `9f35cdf` |
-| C4 | Phone item + classic debit card item, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere. **Both phone and card** per Alex's call. | S | ☐ next | — |
-| C5 | SUM player-shop block (BlockSeller equivalent). Two-phase setup, per-block owner + funds + stock, owner can withdraw funds, non-owners buy. | L | ☐ pending | — |
+| C4 | Phone item + classic debit card item, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere. **Both phone and card** per Alex's call. | S | ✅ shipped | `a79f100` |
+| C5 | SUM player-shop block (BlockSeller equivalent). Two-phase setup, per-block owner + funds + stock, owner can withdraw funds, non-owners buy. | L | ☐ next | — |
 | C6 | Bill-changer block (BlockChanger equivalent) + 8 packet items. | M | ☐ pending | — |
 | C7 | Loot injector — SUM bills appear in vanilla chest loot at low rates. Configurable. | XS | ☐ pending | — |
 | C8 | Bills display block + TESR (BlockBills equivalent). | S | ☐ pending | — |
@@ -777,14 +784,14 @@ Order, by my read of value-vs-effort and how the pieces interlock:
 2. ✅ **A2 — Bank lobby kit.** Shipped 2026-05-07 (counter, safe deposit, velvet rope, vault door).
 3. ✅ **A3 — Bank teller NPC.** Shipped 2026-05-07 as a Roamer role tag.
 4. ✅ **C1 — SUM money capability + facade.** Shipped 2026-05-07.
-5. ✅ **C2 — SUM bill items.** Shipped 2026-05-07.
+5. ✅ **C2 — SUM bill items.** Shipped 2026-05-07; render fix `15192f2` 2026-05-08.
 6. ✅ **C3 — `/balance` user-facing command.** Shipped 2026-05-07.
-7. **C4 — Phone + debit card items.** ← **Next.** Both items NBT-bound to OwnerUUID; right-click opens `GuiSumAtm` from anywhere. Phone is the modern, recommended UX; classic card is the on-pack-removal upgrade for players coming from EconomyInc. ~150 LOC + textures.
-8. **C5 — Player shop block.** Biggest single C-phase. Two-phase setup (place → configure → enable), per-block owner/cost/stock, GUI for non-owner buy + owner-withdraw. ~600 LOC.
+7. ✅ **C4 — Phone + debit card items.** Shipped 2026-05-08 as `a79f100`.
+8. **C5 — Player shop block.** ← **Next.** Biggest single C-phase. Two-phase setup (place → configure → enable), per-block owner/cost/stock, GUI for non-owner buy + owner-withdraw. ~600 LOC.
 9. **C6 — Bill changer + packets.** ~300 LOC. Pairs with C2's bills.
 10. **C7 — Bills loot inject.** ~30 LOC. Free win once bills exist.
 11. **C8 — Decorative bills display block + TESR.** ~250 LOC.
 12. **C9 — `/sum migrate-economy` + EconomyInc removal docs.** Hardest because in-world EconomyInc blocks need conversion. Defer until everything else lands.
 13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for after Section C lands.
 
-Phases A2+A3+C1+C2+C3 are done — ~3 days of work shipped this session. Remaining Section C (C4–C9) is roughly 5–7 days. Section B is on top of that.
+A2+A3+C1+C2+C3+C4 are all done. Remaining Section C (C5–C9) is roughly 4–5 days, and C5 alone is about half of that. Section B is on top.
