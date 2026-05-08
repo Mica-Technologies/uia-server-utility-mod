@@ -7,6 +7,7 @@ import com.micatechnologies.minecraft.sum.bank.BlockBankCounter;
 import com.micatechnologies.minecraft.sum.bank.BlockSafeDepositBox;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.BlockVelvetRope;
+import com.micatechnologies.minecraft.sum.contacts.ItemBusinessCard;
 import com.micatechnologies.minecraft.sum.economy.BlockBillChanger;
 import com.micatechnologies.minecraft.sum.economy.BlockBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
@@ -47,6 +48,7 @@ public class SumTab {
     public static BlockBillsDisplay billsDisplay;
     public static BlockTrashCan trashCan;
     public static BlockStormShelterSign stormShelterSign;
+    public static ItemBusinessCard businessCard;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -77,5 +79,6 @@ public class SumTab {
         billsDisplay = new BlockBillsDisplay();
         trashCan = new BlockTrashCan();
         stormShelterSign = new BlockStormShelterSign();
+        businessCard = new ItemBusinessCard();
     }
 }

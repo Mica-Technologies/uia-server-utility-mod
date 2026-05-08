@@ -31,6 +31,7 @@ tile.sum.bills_display.name=Bills Display
 tile.sum.trash_can.name=Trash Can
 sum.trash.title=Trash
 tile.sum.storm_shelter_sign.name=Storm Shelter Sign
+item.sum.business_card.name=Business Card
 sum.changer.title=Bill Changer
 item.sum.packet_1.name=Packet of $1 Bills
 item.sum.packet_5.name=Packet of $5 Bills
