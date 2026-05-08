@@ -7,8 +7,10 @@ import com.micatechnologies.minecraft.sum.bank.BlockBankCounter;
 import com.micatechnologies.minecraft.sum.bank.BlockSafeDepositBox;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.BlockVelvetRope;
+import com.micatechnologies.minecraft.sum.economy.BlockBillChanger;
 import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
 import com.micatechnologies.minecraft.sum.economy.ItemSumBill;
+import com.micatechnologies.minecraft.sum.economy.ItemSumPacket;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.shop.BlockSumShop;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
@@ -37,6 +39,8 @@ public class SumTab {
     public static ItemAccountAccess phone;
     public static ItemAccountAccess debitCard;
     public static BlockSumShop shop;
+    public static BlockBillChanger billChanger;
+    public static ItemSumPacket[] packets;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -59,5 +63,10 @@ public class SumTab {
         phone = new ItemAccountAccess("phone");
         debitCard = new ItemAccountAccess("debit_card");
         shop = new BlockSumShop();
+        billChanger = new BlockBillChanger();
+        packets = new ItemSumPacket[BILL_DENOMINATIONS.length];
+        for (int i = 0; i < BILL_DENOMINATIONS.length; i++) {
+            packets[i] = new ItemSumPacket(BILL_DENOMINATIONS[i]);
+        }
     }
 }

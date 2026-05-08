@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum.atm;
 
 import com.micatechnologies.minecraft.sum.SumConstants;
+import com.micatechnologies.minecraft.sum.economy.PacketBillChangerAction;
 import com.micatechnologies.minecraft.sum.economy.PacketSyncSumMoney;
 import com.micatechnologies.minecraft.sum.shop.PacketShopBuy;
 import com.micatechnologies.minecraft.sum.shop.PacketShopOwnerAction;
@@ -33,6 +34,8 @@ public final class SumNetwork {
             PacketShopOwnerAction.class, 2, Side.SERVER);
         CHANNEL.registerMessage(PacketShopBuy.Handler.class,
             PacketShopBuy.class, 3, Side.SERVER);
+        CHANNEL.registerMessage(PacketBillChangerAction.Handler.class,
+            PacketBillChangerAction.class, 4, Side.SERVER);
         initialized = true;
     }
 }

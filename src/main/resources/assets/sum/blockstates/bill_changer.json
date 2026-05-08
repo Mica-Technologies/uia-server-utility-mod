@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:bill_changer" },
+    "facing=east":  { "model": "sum:bill_changer", "y": 90 },
+    "facing=south": { "model": "sum:bill_changer", "y": 180 },
+    "facing=west":  { "model": "sum:bill_changer", "y": 270 }
+  }
+}

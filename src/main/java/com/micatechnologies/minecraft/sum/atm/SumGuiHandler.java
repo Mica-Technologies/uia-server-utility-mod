@@ -4,6 +4,9 @@ import com.micatechnologies.minecraft.sum.bank.ContainerSafeDeposit;
 import com.micatechnologies.minecraft.sum.bank.GuiSafeDeposit;
 import com.micatechnologies.minecraft.sum.bank.InventorySafeDeposit;
 import com.micatechnologies.minecraft.sum.bank.SafeDepositSavedData;
+import com.micatechnologies.minecraft.sum.economy.ContainerBillChanger;
+import com.micatechnologies.minecraft.sum.economy.GuiBillChanger;
+import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopBuyer;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopOwner;
 import com.micatechnologies.minecraft.sum.shop.GuiShopBuyer;
@@ -29,6 +32,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_SAFE_DEPOSIT = 1;
     public static final int GUI_SHOP_OWNER = 2;
     public static final int GUI_SHOP_BUYER = 3;
+    public static final int GUI_BILL_CHANGER = 4;
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -47,6 +51,10 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_SHOP_BUYER) {
             TileEntityShop shop = lookupShop(world, x, y, z);
             return shop == null ? null : new ContainerShopBuyer(shop, player);
+        }
+        if (id == GUI_BILL_CHANGER) {
+            TileEntityBillChanger ch = lookupChanger(world, x, y, z);
+            return ch == null ? null : new ContainerBillChanger(ch, player);
         }
         // ATM is GuiScreen-only (no inventory slots), so no Container is needed server-side.
         return null;
@@ -74,11 +82,20 @@ public class SumGuiHandler implements IGuiHandler {
             TileEntityShop shop = lookupShop(world, x, y, z);
             return shop == null ? null : new GuiShopBuyer(new ContainerShopBuyer(shop, player), player);
         }
+        if (id == GUI_BILL_CHANGER) {
+            TileEntityBillChanger ch = lookupChanger(world, x, y, z);
+            return ch == null ? null : new GuiBillChanger(new ContainerBillChanger(ch, player));
+        }
         return null;
     }
 
     private static TileEntityShop lookupShop(World world, int x, int y, int z) {
         TileEntity te = world.getTileEntity(new BlockPos(x, y, z));
         return te instanceof TileEntityShop ? (TileEntityShop) te : null;
+    }
+
+    private static TileEntityBillChanger lookupChanger(World world, int x, int y, int z) {
+        TileEntity te = world.getTileEntity(new BlockPos(x, y, z));
+        return te instanceof TileEntityBillChanger ? (TileEntityBillChanger) te : null;
     }
 }
