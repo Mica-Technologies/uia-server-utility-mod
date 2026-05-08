@@ -1,0 +1,21 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "rope":     "sum:blocks/velvet_rope_rope",
+    "particle": "sum:blocks/velvet_rope_rope"
+  },
+  "elements": [
+    {
+      "from": [7, 10, 0],
+      "to":   [9, 12, 6],
+      "faces": {
+        "north": { "uv": [0, 6, 2, 8], "texture": "#rope" },
+        "south": { "uv": [0, 6, 2, 8], "texture": "#rope" },
+        "east":  { "uv": [0, 6, 6, 8], "texture": "#rope" },
+        "west":  { "uv": [0, 6, 6, 8], "texture": "#rope" },
+        "up":    { "uv": [0, 0, 2, 6], "texture": "#rope" },
+        "down":  { "uv": [0, 0, 2, 6], "texture": "#rope" }
+      }
+    }
+  ]
+}

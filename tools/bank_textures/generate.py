@@ -39,9 +39,12 @@ STEEL_DARK    = (74, 78, 86, 255)
 STEEL_MID     = (110, 116, 128, 255)
 STEEL_HI      = (162, 170, 184, 255)
 STEEL_BLACK   = (28, 30, 36, 255)
-BRASS_BASE    = (170, 132, 56, 255)
-BRASS_DARK    = (118, 86, 28, 255)
-BRASS_HI      = (224, 188, 110, 255)
+BRASS_BASE    = (218, 165, 32, 255)   # goldenrod - reads as brass, not wood
+BRASS_DARK    = (139, 105, 20, 255)
+BRASS_HI      = (255, 215, 100, 255)
+ROPE_RED      = (140, 30, 50, 255)    # burgundy velvet
+ROPE_RED_DARK = (90, 18, 30, 255)
+ROPE_RED_HI   = (180, 60, 80, 255)
 BOLT_DARK     = (40, 42, 48, 255)
 BOLT_HI       = (188, 196, 208, 255)
 
@@ -214,6 +217,20 @@ def velvet_rope_pole() -> Image.Image:
     return img
 
 
+def velvet_rope_rope() -> Image.Image:
+    """Burgundy velvet rope, horizontal band centered at rows 6-9. Used by the
+    rope-segment models that connect adjacent stanchions in the multipart blockstate.
+    """
+    img = fill((0, 0, 0, 0))  # transparent base
+    px = img.load()
+    for x in range(16):
+        px[x, 6] = ROPE_RED_DARK
+        px[x, 7] = ROPE_RED
+        px[x, 8] = ROPE_RED_HI
+        px[x, 9] = ROPE_RED
+    return img
+
+
 def main() -> None:
     bank_counter_top().save(OUT_DIR / "bank_counter_top.png")
     bank_counter_side().save(OUT_DIR / "bank_counter_side.png")
@@ -222,7 +239,8 @@ def main() -> None:
     vault_door_front().save(OUT_DIR / "vault_door_front.png")
     vault_door_side().save(OUT_DIR / "vault_door_side.png")
     velvet_rope_pole().save(OUT_DIR / "velvet_rope_pole.png")
-    print(f"wrote 7 bank textures to {OUT_DIR}")
+    velvet_rope_rope().save(OUT_DIR / "velvet_rope_rope.png")
+    print(f"wrote 8 bank textures to {OUT_DIR}")
 
 
 if __name__ == "__main__":

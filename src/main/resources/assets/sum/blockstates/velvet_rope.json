@@ -1,5 +1,9 @@
 {
-  "variants": {
-    "normal": { "model": "sum:velvet_rope" }
-  }
+  "multipart": [
+    { "apply": { "model": "sum:velvet_rope_post" } },
+    { "when": { "north": "true" }, "apply": { "model": "sum:velvet_rope_side", "uvlock": true } },
+    { "when": { "east":  "true" }, "apply": { "model": "sum:velvet_rope_side", "y": 90,  "uvlock": true } },
+    { "when": { "south": "true" }, "apply": { "model": "sum:velvet_rope_side", "y": 180, "uvlock": true } },
+    { "when": { "west":  "true" }, "apply": { "model": "sum:velvet_rope_side", "y": 270, "uvlock": true } }
+  ]
 }

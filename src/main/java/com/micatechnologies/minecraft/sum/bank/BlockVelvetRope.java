@@ -6,6 +6,8 @@ import com.micatechnologies.minecraft.sum.SumTab;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
 import net.minecraft.block.material.Material;
+import net.minecraft.block.properties.PropertyBool;
+import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -13,16 +15,20 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 
 /**
- * Decorative velvet rope stanchion - a thin brass pole with a knob on top, occupying a
- * 4x16x4 cuboid centered in its block. Players line them up to make queue lines.
- *
- * <p>v1 is a single pole only - no auto-connecting rope between adjacent stanchions. The
- * rope between two posts is implied visually rather than rendered. A future polish pass can
- * add fence-style neighbor detection for actual rope rendering.
+ * Decorative velvet rope stanchion. Always renders the brass post; auto-connects with adjacent
+ * {@code BlockVelvetRope} instances in any of the four horizontal directions to render a
+ * burgundy rope segment between them. Mirrors the vanilla fence pattern - the four directional
+ * properties are computed in {@link #getActualState} and consumed by the multipart blockstate
+ * JSON, never stored in metadata.
  */
 public class BlockVelvetRope extends Block {
 
-    private static final AxisAlignedBB BB = new AxisAlignedBB(
+    public static final PropertyBool NORTH = PropertyBool.create("north");
+    public static final PropertyBool EAST = PropertyBool.create("east");
+    public static final PropertyBool SOUTH = PropertyBool.create("south");
+    public static final PropertyBool WEST = PropertyBool.create("west");
+
+    private static final AxisAlignedBB POST_AABB = new AxisAlignedBB(
         6.0 / 16.0, 0.0, 6.0 / 16.0,
         10.0 / 16.0, 1.0, 10.0 / 16.0);
 
@@ -34,6 +40,11 @@ public class BlockVelvetRope extends Block {
         setResistance(2.0F);
         setSoundType(SoundType.METAL);
         setCreativeTab(SumTab.TAB);
+        setDefaultState(blockState.getBaseState()
+            .withProperty(NORTH, false)
+            .withProperty(EAST, false)
+            .withProperty(SOUTH, false)
+            .withProperty(WEST, false));
 
         SumRegistry.registerBlock(this);
         ItemBlock itemBlock = new ItemBlock(this);
@@ -42,8 +53,21 @@ public class BlockVelvetRope extends Block {
     }
 
     @Override
+    public IBlockState getActualState(IBlockState state, IBlockAccess world, BlockPos pos) {
+        return state
+            .withProperty(NORTH, isRopeNeighbor(world, pos.north()))
+            .withProperty(EAST,  isRopeNeighbor(world, pos.east()))
+            .withProperty(SOUTH, isRopeNeighbor(world, pos.south()))
+            .withProperty(WEST,  isRopeNeighbor(world, pos.west()));
+    }
+
+    private static boolean isRopeNeighbor(IBlockAccess world, BlockPos pos) {
+        return world.getBlockState(pos).getBlock() instanceof BlockVelvetRope;
+    }
+
+    @Override
     public AxisAlignedBB getBoundingBox(IBlockState state, IBlockAccess source, BlockPos pos) {
-        return BB;
+        return POST_AABB;
     }
 
     @Override
@@ -54,5 +78,10 @@ public class BlockVelvetRope extends Block {
     @Override
     public boolean isOpaqueCube(IBlockState state) {
         return false;
+    }
+
+    @Override
+    protected BlockStateContainer createBlockState() {
+        return new BlockStateContainer(this, NORTH, EAST, SOUTH, WEST);
     }
 }
