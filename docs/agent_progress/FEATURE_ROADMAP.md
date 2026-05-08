@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Section A complete + Section C through C5 in place as of 2026-05-08.** Shipped: A2 (bank lobby kit: counter, safe deposit, velvet rope, vault door), A3 (bank teller Roamer role, with auto-naming so the role shows up at a glance), C1 (SUM-native `ISumMoney` capability + facade `EconomyBridge`), C2 (8 SUM bill items, JSON-rendering bug fixed in `15192f2`), C3 (`/balance` user-facing command), C4 (phone + debit card items, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere), C5 (player shop block — vending machine with owner/buyer GUIs, slot-based stock, admin infinite-stock flag, NBT-exact item matching), plus Section D research stub for the future plots system. Section A is feature-complete; Section C work remaining is C6–C9. Section B sketches are on hold.
+Status: **Sections A and C are both complete as of 2026-05-08.** Shipped this session beyond what came before: A2 (bank lobby kit), A3 (bank teller role with auto-naming), C1 (SUM money capability), C2 (bill items + render fix), C3 (`/balance`), C4 (phone + debit card with the GUI-open fix), C5 (player shop block), C6 (bill changer + 8 packet items), C7 (chest-loot bill injection), C8 (decorative bills display block + TESR), C9 (`/sum migrate-economy` + removal docs). SUM is now a self-sufficient economy mod that can replace EconomyInc on the modpack. Section D plots stays research-only. Section B sketches remain on hold.
 
 ---
 
@@ -8,7 +8,7 @@ Status: **Section A complete + Section C through C5 in place as of 2026-05-08.**
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. **As of HEAD `efb8e47` (2026-05-08): Section A is fully shipped (A1+A2+A3); Section C through C5 is shipped (C1–C5); Section D plots is research-only and intentionally out of scope until Alex green-lights it. Next priority is C6 (bill changer + 8 packet items), then C7 (loot inject), C8 (decorative bills display block), C9 (migration + EconomyInc removal).**
+> I'm continuing the SUM mod's feature roadmap. **As of HEAD `97c1a85` (2026-05-08): Section A and Section C are both fully shipped (A1–A3, C1–C9). SUM is now a complete self-sufficient economy + bank/ATM kit. Section D plots stays research-only and intentionally out of scope until Alex green-lights it. Section B sketches (mailbox, sleep voting, trash can, business cards, job board, storm-shelter signs) are still on hold; pick whichever Alex picks up next.**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
@@ -113,10 +113,10 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | C3 | `/balance` user-facing command | ✅ shipped | `9f35cdf` |
 | C4 | Phone item + classic debit card item (NBT-bound to UUID) | ✅ shipped | `a79f100` |
 | C5 | Player shop block (BlockSeller equivalent) | ✅ shipped | `efb8e47` |
-| C6 | Bill changer + 8 packet items | ☐ next | — |
-| C7 | Bills in vanilla chest loot tables | ☐ pending | — |
-| C8 | Decorative bills display block + TESR | ☐ pending | — |
-| C9 | `/sum migrate-economy` command + EconomyInc-removal docs | ☐ pending | — |
+| C6 | Bill changer + 8 packet items | ✅ shipped | `9cbe648` |
+| C7 | Bills in vanilla chest loot tables | ✅ shipped | `9b43be2` |
+| C8 | Decorative bills display block + TESR | ✅ shipped | `0df41a4` |
+| C9 | `/sum migrate-economy` command + EconomyInc-removal docs | ✅ shipped | `97c1a85` |
 
 ### Section B — Other server-utility ideas (sketches; on hold)
 
@@ -137,7 +137,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 ---
 
-## Testing status (as of HEAD `efb8e47`)
+## Testing status (as of HEAD `97c1a85`)
 
 What Alex has playtested in-game:
 
@@ -158,6 +158,10 @@ What's **unverified** (may have bugs; flag any oddness):
 - [ ] **C3 `/balance`** user-facing command from non-op player; admin `/balance <player>` with op.
 - [ ] **C4 phone + debit card (post-fix `03f715d`)**: spawn from creative tab, first right-click binds (chat: "Bound to <name>"), **second right-click opens the ATM GUI** (this was the part that wasn't working before; now driven by direct client-side `displayGuiScreen` rather than `player.openGui`), non-owner sees a rejection message. Tooltip shows "Owner: <name>".
 - [ ] **C5 player shop**: place + right-click claims (chat: "Shop claimed."); owner GUI shows template + 3x3 stock slots, +/- buttons set amount/price, Withdraw moves funds to balance. Op-only "Infinite: ON/OFF" toggle. Second player right-clicks → buyer GUI with item icon, x N for $X.XX, stock readout, balance, Buy button. Buyer with insufficient funds is rejected before deduction. Breaking the shop drops stock + funds as bills.
+- [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet in output. 1 packet + Unbundle → 64 bills in output. Output rejects mismatched stacks rather than overwriting. Works with both EconomyInc and SUM bills as input.
+- [ ] **C7 chest loot**: spawn (or `/locate`) a stronghold/mineshaft/jungle temple/desert temple/igloo/etc., open the chest. ~30% of chests should drop a bill (small denominations far more common than $100; $200/$500 never appear).
+- [ ] **C8 bills display**: place block, right-click with a bill or packet — the held items get added to the tray and the TESR renders a rotating stack above. Right-click empty-handed to take everything back. Layer count grows with stack count (1, 5, 16, 32, 64+ tiers).
+- [ ] **C9 migrate-economy**: with EconomyInc still loaded, run `/sum migrate-economy verify` — should print per-player balance + bill counts and totals without changing anything. Then `/sum migrate-economy` for real → balances move from EconomyInc to SUM, bills convert to `sum:` namespace. Stop server, remove EconomyInc, restart, confirm `/balance` reports the migrated value.
 
 Pre-flight items still relevant for future work:
 
@@ -597,10 +601,10 @@ Alex green-lit Approach 3 (full replacement) on 2026-05-07. Phases shipping iter
 | C3 | `/balance` user-facing command (perm 0 self / perm 2 admin). Admin retains `/sum econ`. | XS | ✅ shipped | `9f35cdf` |
 | C4 | Phone item + classic debit card item, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere. **Both phone and card** per Alex's call. | S | ✅ shipped | `a79f100` |
 | C5 | SUM player-shop block (BlockSeller equivalent). Two-phase setup, per-block owner + funds + stock, owner can withdraw funds, non-owners buy. | L | ✅ shipped | `efb8e47` |
-| C6 | Bill-changer block (BlockChanger equivalent) + 8 packet items. | M | ☐ next | — |
-| C7 | Loot injector — SUM bills appear in vanilla chest loot at low rates. Configurable. | XS | ☐ pending | — |
-| C8 | Bills display block + TESR (BlockBills equivalent). | S | ☐ pending | — |
-| C9 | Migration command `/sum migrate-economy` + per-block conversion + EconomyInc-removal documentation. | M | ☐ pending | — |
+| C6 | Bill-changer block (BlockChanger equivalent) + 8 packet items. | M | ✅ shipped | `9cbe648` |
+| C7 | Loot injector — SUM bills appear in vanilla chest loot at low rates. | XS | ✅ shipped | `9b43be2` |
+| C8 | Bills display block + TESR (BlockBills equivalent). | S | ✅ shipped | `0df41a4` |
+| C9 | Migration command `/sum migrate-economy` + EconomyInc-removal documentation (`docs/ECONOMYINC_MIGRATION.md`). | M | ✅ shipped | `97c1a85` |
 
 C1 + C2 + C3 together give SUM a self-sufficient money system — that milestone is now hit. Everything after C3 is feature parity for completeness, on the way to letting Alto remove EconomyInc.
 
@@ -792,12 +796,16 @@ Order, by my read of value-vs-effort and how the pieces interlock:
 4. ✅ **C1 — SUM money capability + facade.** Shipped 2026-05-07.
 5. ✅ **C2 — SUM bill items.** Shipped 2026-05-07; render fix `15192f2` 2026-05-08.
 6. ✅ **C3 — `/balance` user-facing command.** Shipped 2026-05-07.
-7. ✅ **C4 — Phone + debit card items.** Shipped 2026-05-08 as `a79f100`.
+7. ✅ **C4 — Phone + debit card items.** Shipped 2026-05-08 as `a79f100` (with second-click-open fix in `03f715d`).
 8. ✅ **C5 — Player shop block.** Shipped 2026-05-08 as `efb8e47`. Vending-machine block, slot stock + admin infinite-stock flag, NBT-exact item matching. TESR for in-glass floating item deferred (buyer GUI shows the item).
-9. **C6 — Bill changer + packets.** ← **Next.** ~300 LOC. Pairs with C2's bills.
+9. ✅ **C6 — Bill changer + packets.** Shipped 2026-05-08 as `9cbe648`. 64 bills ↔ 1 packet, eight denominations, accepts EconomyInc bills as input.
+10. ✅ **C7 — Bills loot inject.** Shipped 2026-05-08 as `9b43be2`. ~71% empty, weighted toward small denominations; $200/$500 don't world-gen.
+11. ✅ **C8 — Bills display block + TESR.** Shipped 2026-05-08 as `0df41a4`. Tray block holding one stack; TESR renders 1–5 layered sheets that rotate slowly above the tray.
+12. ✅ **C9 — `/sum migrate-economy`.** Shipped 2026-05-08 as `97c1a85`. Online-player balance + bill migration; verify mode for dry-run; `docs/ECONOMYINC_MIGRATION.md` documents the EconomyInc-removal procedure.
+13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for next.
 10. **C7 — Bills loot inject.** ~30 LOC. Free win once bills exist.
 11. **C8 — Decorative bills display block + TESR.** ~250 LOC.
 12. **C9 — `/sum migrate-economy` + EconomyInc removal docs.** Hardest because in-world EconomyInc blocks need conversion. Defer until everything else lands.
 13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for after Section C lands.
 
-A2+A3+C1+C2+C3+C4+C5 are all done. Remaining Section C (C6–C9) is roughly 2–3 days. Section B is on top.
+All of Section A and Section C are shipped. SUM can now ship as a standalone economy mod that fully replaces EconomyInc on the modpack. Section B sketches (mailbox, sleep voting, trash can, business cards, job board, storm-shelter signs) are the next batch of headline features whenever Alex picks the next direction.
