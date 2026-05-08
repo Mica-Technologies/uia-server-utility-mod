@@ -12,6 +12,7 @@ import com.micatechnologies.minecraft.sum.economy.BlockBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
 import com.micatechnologies.minecraft.sum.economy.ItemSumBill;
 import com.micatechnologies.minecraft.sum.economy.ItemSumPacket;
+import com.micatechnologies.minecraft.sum.roamer.BlockStormShelterSign;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.shop.BlockSumShop;
 import com.micatechnologies.minecraft.sum.trash.BlockTrashCan;
@@ -45,6 +46,7 @@ public class SumTab {
     public static ItemSumPacket[] packets;
     public static BlockBillsDisplay billsDisplay;
     public static BlockTrashCan trashCan;
+    public static BlockStormShelterSign stormShelterSign;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -74,5 +76,6 @@ public class SumTab {
         }
         billsDisplay = new BlockBillsDisplay();
         trashCan = new BlockTrashCan();
+        stormShelterSign = new BlockStormShelterSign();
     }
 }

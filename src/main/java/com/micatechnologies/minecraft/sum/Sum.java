@@ -12,6 +12,7 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
+import com.micatechnologies.minecraft.sum.roamer.TileEntityStormShelterSign;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
@@ -67,6 +68,8 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "bill_changer"));
         GameRegistry.registerTileEntity(TileEntityBillsDisplay.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "bills_display"));
+        GameRegistry.registerTileEntity(TileEntityStormShelterSign.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "storm_shelter_sign"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "normal": { "model": "sum:storm_shelter_sign" }
+  }
+}
