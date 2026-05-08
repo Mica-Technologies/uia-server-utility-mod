@@ -1074,11 +1074,96 @@ public class CommandSum extends CommandBase {
     }
 
     private void handlePlotsBuy(ICommandSender sender, String[] args) {
-        sendMessage(sender, TextFormatting.YELLOW, "Plot buy/sell ships in D3.");
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can buy plots.");
+            return;
+        }
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum plots buy <id-prefix>");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(player.world);
+        SumPlot plot = findPlotByPrefix(data, args[2]);
+        if (plot == null) {
+            sendMessage(sender, TextFormatting.RED, "No plot matches '" + args[2] + "'.");
+            return;
+        }
+        if (plot.getDimensionId() != player.dimension) {
+            sendMessage(sender, TextFormatting.RED,
+                "That plot is in a different dimension. Travel there to buy it.");
+            return;
+        }
+        if (plot.getStatus() != PlotStatus.FOR_SALE) {
+            sendMessage(sender, TextFormatting.RED,
+                "That plot isn't for sale (status: " + plot.getStatus() + ").");
+            return;
+        }
+        if (plot.getPrice() <= 0) {
+            sendMessage(sender, TextFormatting.RED,
+                "That plot has no listed price; ask an admin to set one.");
+            return;
+        }
+        if (!EconomyBridge.isAvailable()) {
+            sendMessage(sender, TextFormatting.RED, "No economy backend is loaded.");
+            return;
+        }
+        double balance = EconomyBridge.getBalance(player);
+        if (Double.isNaN(balance) || balance < plot.getPrice()) {
+            sendMessage(sender, TextFormatting.RED,
+                "Insufficient funds. Need $"
+                + String.format(Locale.ROOT, "%.2f", plot.getPrice())
+                + ", have $" + String.format(Locale.ROOT, "%.2f", balance) + ".");
+            return;
+        }
+        if (!EconomyBridge.adjustBalance(player, -plot.getPrice())) {
+            sendMessage(sender, TextFormatting.RED, "Charge failed; purchase aborted.");
+            return;
+        }
+        plot.setOwner(player.getUniqueID(), player.getName());
+        plot.setStatus(PlotStatus.OWNED);
+        data.touch();
+        sendMessage(sender, TextFormatting.GREEN, "Bought " + plot.getDisplayName()
+            + " for $" + String.format(Locale.ROOT, "%.2f", plot.getPrice()) + ".");
     }
 
     private void handlePlotsSell(ICommandSender sender, String[] args) {
-        sendMessage(sender, TextFormatting.YELLOW, "Plot buy/sell ships in D3.");
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can list plots.");
+            return;
+        }
+        if (args.length < 4) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum plots sell <id-prefix> <price>");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(player.world);
+        SumPlot plot = findPlotByPrefix(data, args[2]);
+        if (plot == null) {
+            sendMessage(sender, TextFormatting.RED, "No plot matches '" + args[2] + "'.");
+            return;
+        }
+        if (!player.getUniqueID().equals(plot.getOwnerUuid())
+            && !player.canUseCommand(2, "sum.plots.admin")) {
+            sendMessage(sender, TextFormatting.RED, "You don't own that plot.");
+            return;
+        }
+        double price;
+        try {
+            price = Double.parseDouble(args[3]);
+        } catch (NumberFormatException e) {
+            sendMessage(sender, TextFormatting.RED, "Price must be a number.");
+            return;
+        }
+        if (price < 0) {
+            sendMessage(sender, TextFormatting.RED, "Price can't be negative.");
+            return;
+        }
+        plot.setPrice(price);
+        plot.setStatus(PlotStatus.FOR_SALE);
+        data.touch();
+        sendMessage(sender, TextFormatting.GREEN, "Listed " + plot.getDisplayName()
+            + " for sale at $" + String.format(Locale.ROOT, "%.2f", price) + ".");
     }
 
     private void handlePlotsTrust(ICommandSender sender, String[] args, boolean trust) {
