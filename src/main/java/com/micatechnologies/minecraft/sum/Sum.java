@@ -2,6 +2,7 @@ package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
+import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.command.CommandBalance;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
@@ -25,6 +26,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.EntityEntry;
 import net.minecraftforge.fml.common.registry.EntityEntryBuilder;
+import net.minecraftforge.fml.common.registry.GameRegistry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -52,6 +54,8 @@ public class Sum {
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();
+        GameRegistry.registerTileEntity(TileEntityVaultDoor.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "vault_door"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

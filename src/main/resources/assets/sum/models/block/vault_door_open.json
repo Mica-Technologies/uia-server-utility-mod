@@ -1,0 +1,7 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "sum:blocks/vault_door_side"
+  },
+  "elements": []
+}

@@ -1,0 +1,8 @@
+{
+  "parent": "block/orientable",
+  "textures": {
+    "front": "sum:blocks/vault_door_front",
+    "side":  "sum:blocks/vault_door_side",
+    "top":   "sum:blocks/vault_door_side"
+  }
+}

@@ -5,6 +5,7 @@ import com.micatechnologies.minecraft.sum.atm.BlockAtmKiosk;
 import com.micatechnologies.minecraft.sum.atm.BlockAtmWall;
 import com.micatechnologies.minecraft.sum.bank.BlockBankCounter;
 import com.micatechnologies.minecraft.sum.bank.BlockSafeDepositBox;
+import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.BlockVelvetRope;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
@@ -28,6 +29,7 @@ public class SumTab {
     public static BlockBankCounter bankCounter;
     public static BlockSafeDepositBox safeDepositBox;
     public static BlockVelvetRope velvetRope;
+    public static BlockVaultDoor vaultDoor;
 
     public static void initTabElements() {
         roamerSpawnEgg = new ItemRoamerSpawnEgg();
@@ -38,5 +40,6 @@ public class SumTab {
         bankCounter = new BlockBankCounter();
         safeDepositBox = new BlockSafeDepositBox();
         velvetRope = new BlockVelvetRope();
+        vaultDoor = new BlockVaultDoor();
     }
 }

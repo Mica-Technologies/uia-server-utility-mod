@@ -1,6 +1,8 @@
 package com.micatechnologies.minecraft.sum.command;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
+import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
+import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
@@ -17,10 +19,13 @@ import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
@@ -34,7 +39,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ>";
+        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault>";
     }
 
     @Override
@@ -67,6 +72,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "econ":
                 handleEcon(server, sender, args);
+                break;
+            case "vault":
+                handleVault(sender, args);
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown subcommand. Usage: " + getUsage(sender));
@@ -340,6 +348,148 @@ public class CommandSum extends CommandBase {
         return String.format(java.util.Locale.ROOT, "%.2f", amount);
     }
 
+    // --- /sum vault subcommands ---
+
+    private void handleVault(ICommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum vault <unlock|setcode|info|disown> [args...]");
+            return;
+        }
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Vault commands must be run by a player.");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        switch (args[1].toLowerCase()) {
+            case "unlock":
+                handleVaultUnlock(player, args);
+                break;
+            case "setcode":
+                handleVaultSetCode(player, args);
+                break;
+            case "info":
+                handleVaultInfo(player);
+                break;
+            case "disown":
+                handleVaultDisown(player);
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED,
+                    "Unknown vault subcommand. Usage: /sum vault <unlock|setcode|info|disown> [args...]");
+                break;
+        }
+    }
+
+    private void handleVaultUnlock(EntityPlayerMP player, String[] args) {
+        if (args.length < 3) {
+            sendMessage(player, TextFormatting.RED, "Usage: /sum vault unlock <code>");
+            return;
+        }
+        TileEntityVaultDoor vault = getTargetedVault(player);
+        if (vault == null) {
+            return;
+        }
+        if (!vault.hasPasscode()) {
+            sendMessage(player, TextFormatting.YELLOW,
+                "This vault has no passcode set. Right-click it to open.");
+            return;
+        }
+        // Reconstruct the code in case it had spaces (already stripped on chat parse, but defensive)
+        String code = joinFromIndex(args, 2);
+        if (vault.checkPasscode(code)) {
+            BlockVaultDoor.openDoor(vault.getWorld(), vault.getPos());
+            sendMessage(player, TextFormatting.GREEN, "Vault unlocked.");
+        } else {
+            sendMessage(player, TextFormatting.RED, "Incorrect code.");
+        }
+    }
+
+    private void handleVaultSetCode(EntityPlayerMP player, String[] args) {
+        TileEntityVaultDoor vault = getTargetedVault(player);
+        if (vault == null) {
+            return;
+        }
+        if (!vault.isClaimed()) {
+            sendMessage(player, TextFormatting.YELLOW,
+                "This vault is not claimed yet. Right-click it to claim.");
+            return;
+        }
+        if (!vault.isOwner(player)) {
+            sendMessage(player, TextFormatting.RED,
+                "Only the owner (" + vault.getOwnerName() + ") can change this vault's passcode.");
+            return;
+        }
+        if (args.length < 3) {
+            // Empty code = clear
+            vault.setPasscode("");
+            sendMessage(player, TextFormatting.GREEN,
+                "Vault passcode cleared. Anyone with right-click can now open it.");
+            return;
+        }
+        String code = joinFromIndex(args, 2);
+        vault.setPasscode(code);
+        sendMessage(player, TextFormatting.GREEN, "Vault passcode set.");
+    }
+
+    private void handleVaultInfo(EntityPlayerMP player) {
+        TileEntityVaultDoor vault = getTargetedVault(player);
+        if (vault == null) {
+            return;
+        }
+        if (!vault.isClaimed()) {
+            sendMessage(player, TextFormatting.GOLD, "Vault: unclaimed.");
+            return;
+        }
+        sendMessage(player, TextFormatting.GOLD, "Vault owner: " + vault.getOwnerName());
+        sendMessage(player, TextFormatting.GOLD,
+            "Passcode: " + (vault.hasPasscode() ? "set" : "(none)"));
+    }
+
+    private void handleVaultDisown(EntityPlayerMP player) {
+        TileEntityVaultDoor vault = getTargetedVault(player);
+        if (vault == null) {
+            return;
+        }
+        if (!vault.isClaimed()) {
+            sendMessage(player, TextFormatting.YELLOW, "This vault is not claimed.");
+            return;
+        }
+        if (!vault.isOwner(player)) {
+            sendMessage(player, TextFormatting.RED,
+                "Only the owner (" + vault.getOwnerName() + ") can disown this vault.");
+            return;
+        }
+        vault.disown();
+        sendMessage(player, TextFormatting.GREEN,
+            "Vault disowned. The next player to right-click claims it.");
+    }
+
+    /** Ray-trace from the player's eye for up to 5 blocks; return the targeted vault TE
+     *  or null (with a chat error sent on miss). */
+    @Nullable
+    private TileEntityVaultDoor getTargetedVault(EntityPlayer player) {
+        RayTraceResult result = player.rayTrace(5.0, 1.0F);
+        if (result == null || result.typeOfHit != RayTraceResult.Type.BLOCK) {
+            sendMessage(player, TextFormatting.RED, "Look at a vault door first (within 5 blocks).");
+            return null;
+        }
+        TileEntity te = player.world.getTileEntity(result.getBlockPos());
+        if (!(te instanceof TileEntityVaultDoor)) {
+            sendMessage(player, TextFormatting.RED, "That's not a vault door.");
+            return null;
+        }
+        return (TileEntityVaultDoor) te;
+    }
+
+    private static String joinFromIndex(String[] args, int from) {
+        StringBuilder sb = new StringBuilder(args[from]);
+        for (int i = from + 1; i < args.length; i++) {
+            sb.append(' ').append(args[i]);
+        }
+        return sb.toString();
+    }
+
     // --- /sum roamer subcommands ---
 
     private void handleRoamer(ICommandSender sender, String[] args) {
@@ -456,7 +606,10 @@ public class CommandSum extends CommandBase {
                                           @Nullable BlockPos targetPos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args,
-                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ");
+                "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ", "vault");
+        }
+        if (args.length == 2 && "vault".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, "unlock", "setcode", "info", "disown");
         }
         if (args.length == 2 && "rmroamerblock".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, SumConfig.getRoamerWalkableBlocks());
