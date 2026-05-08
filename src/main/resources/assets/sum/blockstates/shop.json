@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:shop" },
+    "facing=east":  { "model": "sum:shop", "y": 90 },
+    "facing=south": { "model": "sum:shop", "y": 180 },
+    "facing=west":  { "model": "sum:shop", "y": 270 }
+  }
+}

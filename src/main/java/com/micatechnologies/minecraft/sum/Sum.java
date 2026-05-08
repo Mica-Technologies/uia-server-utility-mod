@@ -9,6 +9,7 @@ import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
+import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.IRecipe;
@@ -56,6 +57,8 @@ public class Sum {
         SumNetwork.init();
         GameRegistry.registerTileEntity(TileEntityVaultDoor.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "vault_door"));
+        GameRegistry.registerTileEntity(TileEntityShop.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "shop"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

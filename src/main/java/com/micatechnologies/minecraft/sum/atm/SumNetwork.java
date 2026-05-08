@@ -2,6 +2,8 @@ package com.micatechnologies.minecraft.sum.atm;
 
 import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.economy.PacketSyncSumMoney;
+import com.micatechnologies.minecraft.sum.shop.PacketShopBuy;
+import com.micatechnologies.minecraft.sum.shop.PacketShopOwnerAction;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
@@ -27,6 +29,10 @@ public final class SumNetwork {
             AtmPacketTransaction.class, 0, Side.SERVER);
         CHANNEL.registerMessage(PacketSyncSumMoney.Handler.class,
             PacketSyncSumMoney.class, 1, Side.CLIENT);
+        CHANNEL.registerMessage(PacketShopOwnerAction.Handler.class,
+            PacketShopOwnerAction.class, 2, Side.SERVER);
+        CHANNEL.registerMessage(PacketShopBuy.Handler.class,
+            PacketShopBuy.class, 3, Side.SERVER);
         initialized = true;
     }
 }
