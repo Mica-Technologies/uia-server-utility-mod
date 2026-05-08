@@ -1,0 +1,20 @@
+{
+  "parent": "block/cube_all",
+  "textures": {
+    "all": "sum:blocks/job_board"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 2],
+      "faces": {
+        "down":  { "uv": [0, 0, 16, 2], "texture": "#all" },
+        "up":    { "uv": [0, 0, 16, 2], "texture": "#all" },
+        "north": { "uv": [0, 0, 16, 16], "texture": "#all" },
+        "south": { "uv": [0, 0, 16, 16], "texture": "#all" },
+        "west":  { "uv": [0, 0, 2, 16], "texture": "#all" },
+        "east":  { "uv": [0, 0, 2, 16], "texture": "#all" }
+      }
+    }
+  ]
+}

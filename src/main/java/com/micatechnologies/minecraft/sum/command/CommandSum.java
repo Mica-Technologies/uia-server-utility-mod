@@ -6,6 +6,8 @@ import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
+import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
+import com.micatechnologies.minecraft.sum.jobs.JobListing;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RoamerRole;
 import java.io.File;
@@ -41,12 +43,27 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy>";
+        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job>";
     }
 
     @Override
     public int getRequiredPermissionLevel() {
         return 2;
+    }
+
+    /** Most subcommands stay op-only via {@link #getRequiredPermissionLevel}, but the
+     *  {@code job} subcommand lets any player post a listing. We override
+     *  {@code checkPermission} to short-circuit to true when args[0] == "job" and otherwise
+     *  defer to the default level-2 check. */
+    @Override
+    public boolean checkPermission(MinecraftServer server, ICommandSender sender) {
+        return true;  // dispatcher allows entry; per-subcommand checks gate the rest
+    }
+
+    private static boolean requireOp(ICommandSender sender, String name) {
+        if (sender.canUseCommand(2, name)) return true;
+        sendMessage(sender, TextFormatting.RED, "You don't have permission for /sum " + name + ".");
+        return false;
     }
 
     @Override
@@ -56,7 +73,12 @@ public class CommandSum extends CommandBase {
             return;
         }
 
-        switch (args[0].toLowerCase()) {
+        String sub = args[0].toLowerCase();
+        // job is the only sub anyone can invoke; everything else is op-only.
+        if (!"job".equals(sub) && !requireOp(sender, sub)) {
+            return;
+        }
+        switch (sub) {
             case "reloadconfig":
                 handleReloadConfig(sender);
                 break;
@@ -80,6 +102,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "migrate-economy":
                 handleMigrateEconomy(server, sender, args);
+                break;
+            case "job":
+                handleJob(sender, args);
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown subcommand. Usage: " + getUsage(sender));
@@ -758,13 +783,123 @@ public class CommandSum extends CommandBase {
         return converted;
     }
 
+    // --- /sum job ---
+
+    /** Default 7-day expiry for new listings. */
+    private static final long JOB_EXPIRY_MILLIS = 7L * 24L * 60L * 60L * 1000L;
+    /** Maximum description length to avoid spam/oversize NBT. */
+    private static final int JOB_MAX_DESCRIPTION = 200;
+
+    private void handleJob(ICommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum job <post|list|clear-mine> ...");
+            return;
+        }
+        switch (args[1].toLowerCase()) {
+            case "post":
+                handleJobPost(sender, args);
+                break;
+            case "list":
+                handleJobList(sender);
+                break;
+            case "clear-mine":
+                handleJobClearMine(sender);
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED,
+                    "Unknown action. Usage: /sum job <post|list|clear-mine>");
+                break;
+        }
+    }
+
+    private void handleJobPost(ICommandSender sender, String[] args) {
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can post job listings.");
+            return;
+        }
+        if (args.length < 4) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum job post <reward> <description...>");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        double reward;
+        try {
+            reward = Double.parseDouble(args[2]);
+        } catch (NumberFormatException e) {
+            sendMessage(sender, TextFormatting.RED, "Reward must be a number.");
+            return;
+        }
+        if (reward < 0) {
+            sendMessage(sender, TextFormatting.RED, "Reward can't be negative.");
+            return;
+        }
+        StringBuilder desc = new StringBuilder();
+        for (int i = 3; i < args.length; i++) {
+            if (desc.length() > 0) desc.append(' ');
+            desc.append(args[i]);
+        }
+        String description = desc.toString().trim();
+        if (description.isEmpty()) {
+            sendMessage(sender, TextFormatting.RED, "Description can't be empty.");
+            return;
+        }
+        if (description.length() > JOB_MAX_DESCRIPTION) {
+            description = description.substring(0, JOB_MAX_DESCRIPTION);
+        }
+        long now = System.currentTimeMillis();
+        JobListing listing = new JobListing(
+            UUID.randomUUID(),
+            player.getUniqueID(),
+            player.getName(),
+            description,
+            reward,
+            now,
+            now + JOB_EXPIRY_MILLIS);
+        JobBoardSavedData.get(player.world).addListing(listing);
+        sendMessage(sender, TextFormatting.GREEN,
+            "Posted listing — $" + String.format(Locale.ROOT, "%.2f", reward)
+            + " — expires in 7 days.");
+    }
+
+    private void handleJobList(ICommandSender sender) {
+        JobBoardSavedData data = JobBoardSavedData.get(sender.getEntityWorld());
+        List<JobListing> active = data.getActive(System.currentTimeMillis());
+        if (active.isEmpty()) {
+            sendMessage(sender, TextFormatting.YELLOW, "No active job listings.");
+            return;
+        }
+        sendMessage(sender, TextFormatting.GOLD, "Active listings (" + active.size() + "):");
+        for (JobListing l : active) {
+            sendMessage(sender, TextFormatting.AQUA,
+                "  $" + String.format(Locale.ROOT, "%.2f", l.reward)
+                + " — " + l.description + " (by " + l.posterName + ")");
+        }
+    }
+
+    private void handleJobClearMine(ICommandSender sender) {
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can clear their listings.");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        JobBoardSavedData data = JobBoardSavedData.get(player.world);
+        int removed = data.removeByPoster(player.getUniqueID());
+        sendMessage(sender, TextFormatting.GREEN,
+            "Removed " + removed + " listing(s).");
+    }
+
     @Override
     public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args,
                                           @Nullable BlockPos targetPos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args,
                 "reloadconfig", "addroamerblock", "rmroamerblock", "roamer", "favorites", "econ", "vault",
-                "migrate-economy");
+                "migrate-economy", "job");
+        }
+        if (args.length == 2 && "job".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args, "post", "list", "clear-mine");
         }
         if (args.length == 2 && "migrate-economy".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "verify");

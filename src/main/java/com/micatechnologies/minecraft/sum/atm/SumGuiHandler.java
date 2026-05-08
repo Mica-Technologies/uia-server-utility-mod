@@ -7,6 +7,8 @@ import com.micatechnologies.minecraft.sum.bank.SafeDepositSavedData;
 import com.micatechnologies.minecraft.sum.economy.ContainerBillChanger;
 import com.micatechnologies.minecraft.sum.economy.GuiBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
+import com.micatechnologies.minecraft.sum.jobs.GuiJobBoard;
+import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.mailbox.ContainerMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.GuiMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
@@ -41,6 +43,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_BILL_CHANGER = 4;
     public static final int GUI_TRASH_CAN = 5;
     public static final int GUI_MAILBOX = 6;
+    public static final int GUI_JOB_BOARD = 7;
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -111,6 +114,10 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_MAILBOX) {
             TileEntityMailbox mb = lookupMailbox(world, x, y, z);
             return mb == null ? null : new GuiMailbox(new ContainerMailbox(mb, player));
+        }
+        if (id == GUI_JOB_BOARD) {
+            return new GuiJobBoard(player,
+                JobBoardSavedData.get(world).getActive(System.currentTimeMillis()));
         }
         return null;
     }

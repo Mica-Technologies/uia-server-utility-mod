@@ -13,6 +13,7 @@ import com.micatechnologies.minecraft.sum.economy.BlockBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
 import com.micatechnologies.minecraft.sum.economy.ItemSumBill;
 import com.micatechnologies.minecraft.sum.economy.ItemSumPacket;
+import com.micatechnologies.minecraft.sum.jobs.BlockJobBoard;
 import com.micatechnologies.minecraft.sum.mailbox.BlockMailbox;
 import com.micatechnologies.minecraft.sum.roamer.BlockStormShelterSign;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
@@ -51,6 +52,7 @@ public class SumTab {
     public static BlockStormShelterSign stormShelterSign;
     public static ItemBusinessCard businessCard;
     public static BlockMailbox mailbox;
+    public static BlockJobBoard jobBoard;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -83,5 +85,6 @@ public class SumTab {
         stormShelterSign = new BlockStormShelterSign();
         businessCard = new ItemBusinessCard();
         mailbox = new BlockMailbox();
+        jobBoard = new BlockJobBoard();
     }
 }
