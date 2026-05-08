@@ -5,6 +5,7 @@ import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.command.CommandBalance;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
+import com.micatechnologies.minecraft.sum.economy.BillsLootInjector;
 import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
@@ -53,6 +54,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new RoadRunnerHandler());
         MinecraftForge.EVENT_BUS.register(new SumMoneyEvents());
+        MinecraftForge.EVENT_BUS.register(new BillsLootInjector());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();
