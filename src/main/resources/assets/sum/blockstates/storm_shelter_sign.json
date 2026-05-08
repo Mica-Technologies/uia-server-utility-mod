@@ -1,5 +1,8 @@
 {
   "variants": {
-    "normal": { "model": "sum:storm_shelter_sign" }
+    "facing=north": { "model": "sum:storm_shelter_sign" },
+    "facing=south": { "model": "sum:storm_shelter_sign", "y": 180 },
+    "facing=east":  { "model": "sum:storm_shelter_sign", "y": 90 },
+    "facing=west":  { "model": "sum:storm_shelter_sign", "y": 270 }
   }
 }

@@ -51,8 +51,12 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     /** When the roamer is already indoors, only consider sign-marked shelters within this
      *  horizontal range as "same building" candidates. Past ~24 blocks the sign is more
      *  likely in a different building or detached structure. */
-    private static final int INDOOR_SIGN_HORIZONTAL_RANGE = 24;
-    private static final int INDOOR_SIGN_VERTICAL_RANGE = 4;
+    private static final int INDOOR_SIGN_HORIZONTAL_RANGE = 48;
+    private static final int INDOOR_SIGN_VERTICAL_RANGE = 6;
+    /** Tolerate up to this many consecutive sky-exposed nodes along a path before rejecting
+     *  it as "leaves the building". Lets the path cross a single open doorway / skylight gap
+     *  without false-rejecting an otherwise-internal route. */
+    private static final int INSIDE_PATH_TOLERANCE = 2;
     // Lowered from 3 to 2: a window or door 3 blocks past a wall is on the other side of the
     // building and not really a hazard for the position being evaluated. Cuts the hazard scan
     // from 7*4*7=196 to 5*4*5=100 block-state lookups per kept candidate.
@@ -301,18 +305,20 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
      * A position is a good storm shelter if it cannot see the sky and is away from doors,
      * windows (glass/pane blocks), and sky-exposed openings.
      */
-    /** Returns the closest sign-marked shelter that's both nearby (within
+    /** Returns the closest sign-marked shelter that's nearby (within
      *  {@link #INDOOR_SIGN_HORIZONTAL_RANGE} horizontal + {@link #INDOOR_SIGN_VERTICAL_RANGE}
-     *  vertical) and reachable via a path that never crosses a sky-exposed block (the
-     *  "stay inside the building" check). Returns null if no such sign exists. Used only
-     *  when the roamer is already in a valid shelter position. */
+     *  vertical) and reachable via a path that doesn't traverse an extended outdoor stretch.
+     *
+     *  <p><b>No claim check</b> — designated shelter rooms (e.g. an airport bathroom) are
+     *  meant to attract many roamers at once. The cube-scan path elsewhere uses claims to
+     *  spread roamers across organic shelter spots; signed shelters opt out so a crowd can
+     *  converge on the same room. */
     private BlockPos findPreferredSignedShelterInside(World world, BlockPos from) {
         for (BlockPos signed : RoamerShelterCache.findNearestSigned(from)) {
             if (signed.equals(from)) continue;
             if (Math.abs(signed.getX() - from.getX()) > INDOOR_SIGN_HORIZONTAL_RANGE) continue;
             if (Math.abs(signed.getZ() - from.getZ()) > INDOOR_SIGN_HORIZONTAL_RANGE) continue;
             if (Math.abs(signed.getY() - from.getY()) > INDOOR_SIGN_VERTICAL_RANGE) continue;
-            if (isPositionClaimed(signed)) continue;
             if (!isShelterPosition(world, signed)) continue;
             Path path = roamer.getNavigator().getPathToXYZ(
                 signed.getX() + 0.5, signed.getY(), signed.getZ() + 0.5);
@@ -323,15 +329,22 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         return null;
     }
 
-    /** True if every node along {@code path} is sky-shielded (canSeeSky=false above the
-     *  node). A single sky-exposed step means the roamer would have to leave the building
-     *  to reach the destination, which we explicitly want to avoid during a storm. */
+    /** True if {@code path} doesn't traverse a long outdoor stretch. We tolerate up to
+     *  {@link #INSIDE_PATH_TOLERANCE} consecutive sky-exposed nodes (covers a doorway or
+     *  skylight gap) but reject anything longer — that indicates the path actually leaves
+     *  the building, which is exactly what we want to avoid during a storm. */
     private static boolean pathStaysInside(World world, Path path) {
         int n = path.getCurrentPathLength();
+        int run = 0;
         for (int i = 0; i < n; i++) {
             PathPoint pt = path.getPathPointFromIndex(i);
             BlockPos pos = new BlockPos(pt.x, pt.y, pt.z);
-            if (world.canSeeSky(pos.up())) return false;
+            if (world.canSeeSky(pos.up())) {
+                run++;
+                if (run > INSIDE_PATH_TOLERANCE) return false;
+            } else {
+                run = 0;
+            }
         }
         return true;
     }
