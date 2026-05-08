@@ -14,6 +14,8 @@ import net.minecraft.block.BlockStainedGlassPane;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.ai.EntityAIBase;
 import net.minecraft.entity.ai.RandomPositionGenerator;
+import net.minecraft.pathfinding.Path;
+import net.minecraft.pathfinding.PathPoint;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -46,6 +48,11 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private static final int SEARCH_RADIUS_XZ = 25;
     private static final int SEARCH_RADIUS_Y_DOWN = 20;
     private static final int SEARCH_RADIUS_Y_UP = 5;
+    /** When the roamer is already indoors, only consider sign-marked shelters within this
+     *  horizontal range as "same building" candidates. Past ~24 blocks the sign is more
+     *  likely in a different building or detached structure. */
+    private static final int INDOOR_SIGN_HORIZONTAL_RANGE = 24;
+    private static final int INDOOR_SIGN_VERTICAL_RANGE = 4;
     // Lowered from 3 to 2: a window or door 3 blocks past a wall is on the other side of the
     // building and not really a hazard for the position being evaluated. Cuts the hazard scan
     // from 7*4*7=196 to 5*4*5=100 block-state lookups per kept candidate.
@@ -111,8 +118,23 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
             return false;
         }
 
-        // Even if already sheltered, take over from wander AI to keep the roamer indoors
+        // Even if already sheltered, take over from wander AI to keep the roamer indoors.
         if (isShelterPosition(world, entityPos)) {
+            // Prefer a sign-marked shelter within the same building if there's one nearby.
+            // Use case: a large building (airport, mall) has a designated bathroom shelter;
+            // roamers caught in the lobby should walk to the bathroom rather than stop where
+            // they are. The path-stays-inside check below ensures we never send a roamer
+            // outside to reach the sign — if the path goes through any sky-exposed block, we
+            // skip that sign and the roamer just shelters in place.
+            BlockPos preferred = findPreferredSignedShelterInside(world, entityPos);
+            if (preferred != null && !preferred.equals(entityPos)) {
+                shelterTarget = preferred;
+                claimPosition(shelterTarget);
+                searching = false;
+                searchFailed = false;
+                sheltered = false;  // we'll mark sheltered once we arrive
+                return true;
+            }
             sheltered = true;
             shelterTarget = entityPos;
             RoamerShelterCache.recordShelter(entityPos);
@@ -279,6 +301,41 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
      * A position is a good storm shelter if it cannot see the sky and is away from doors,
      * windows (glass/pane blocks), and sky-exposed openings.
      */
+    /** Returns the closest sign-marked shelter that's both nearby (within
+     *  {@link #INDOOR_SIGN_HORIZONTAL_RANGE} horizontal + {@link #INDOOR_SIGN_VERTICAL_RANGE}
+     *  vertical) and reachable via a path that never crosses a sky-exposed block (the
+     *  "stay inside the building" check). Returns null if no such sign exists. Used only
+     *  when the roamer is already in a valid shelter position. */
+    private BlockPos findPreferredSignedShelterInside(World world, BlockPos from) {
+        for (BlockPos signed : RoamerShelterCache.findNearestSigned(from)) {
+            if (signed.equals(from)) continue;
+            if (Math.abs(signed.getX() - from.getX()) > INDOOR_SIGN_HORIZONTAL_RANGE) continue;
+            if (Math.abs(signed.getZ() - from.getZ()) > INDOOR_SIGN_HORIZONTAL_RANGE) continue;
+            if (Math.abs(signed.getY() - from.getY()) > INDOOR_SIGN_VERTICAL_RANGE) continue;
+            if (isPositionClaimed(signed)) continue;
+            if (!isShelterPosition(world, signed)) continue;
+            Path path = roamer.getNavigator().getPathToXYZ(
+                signed.getX() + 0.5, signed.getY(), signed.getZ() + 0.5);
+            if (path == null) continue;
+            if (!pathStaysInside(world, path)) continue;
+            return signed;
+        }
+        return null;
+    }
+
+    /** True if every node along {@code path} is sky-shielded (canSeeSky=false above the
+     *  node). A single sky-exposed step means the roamer would have to leave the building
+     *  to reach the destination, which we explicitly want to avoid during a storm. */
+    private static boolean pathStaysInside(World world, Path path) {
+        int n = path.getCurrentPathLength();
+        for (int i = 0; i < n; i++) {
+            PathPoint pt = path.getPathPointFromIndex(i);
+            BlockPos pos = new BlockPos(pt.x, pt.y, pt.z);
+            if (world.canSeeSky(pos.up())) return false;
+        }
+        return true;
+    }
+
     private boolean isShelterPosition(World world, BlockPos pos) {
         if (world.canSeeSky(pos.up())) {
             return false;

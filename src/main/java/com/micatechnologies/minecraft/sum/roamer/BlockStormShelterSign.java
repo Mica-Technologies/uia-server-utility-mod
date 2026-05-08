@@ -59,7 +59,7 @@ public class BlockStormShelterSign extends Block implements ITileEntityProvider 
     public void onBlockPlacedBy(World world, BlockPos pos, IBlockState state,
                                 EntityLivingBase placer, ItemStack stack) {
         if (!world.isRemote) {
-            RoamerShelterCache.recordShelter(pos);
+            RoamerShelterCache.recordSignedShelter(pos);
         }
     }
 

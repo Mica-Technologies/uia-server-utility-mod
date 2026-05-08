@@ -17,7 +17,7 @@ public class TileEntityStormShelterSign extends TileEntity {
     public void onLoad() {
         super.onLoad();
         if (world != null && !world.isRemote) {
-            RoamerShelterCache.recordShelter(pos);
+            RoamerShelterCache.recordSignedShelter(pos);
         }
     }
 }

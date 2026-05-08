@@ -2,7 +2,9 @@ package com.micatechnologies.minecraft.sum.roamer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.util.math.BlockPos;
 
 /**
@@ -23,6 +25,12 @@ public class RoamerShelterCache {
     private static final double MAX_DISTANCE_SQ = 100.0 * 100.0;
 
     private static final List<BlockPos> shelters = new ArrayList<>();
+
+    /** Subset of {@link #shelters} that came from a player-placed
+     *  {@link BlockStormShelterSign}. Roamers already inside a building prefer these over
+     *  organic shelter positions, treating them as "designated shelter" within the same
+     *  building (e.g. an airport bathroom marked as the storm shelter). */
+    private static final Set<BlockPos> signedShelters = new LinkedHashSet<>();
 
     /**
      * Records a confirmed shelter position. Duplicate positions within ~3 blocks of an existing
@@ -52,7 +60,29 @@ public class RoamerShelterCache {
         return nearby;
     }
 
+    /** Records a sign-marked shelter position. Adds to both the general cache and the
+     *  {@link #signedShelters} set so the storm AI can prefer it when already indoors. */
+    public static void recordSignedShelter(BlockPos pos) {
+        signedShelters.add(pos);
+        recordShelter(pos);
+    }
+
+    /** Sign-marked shelter positions sorted by distance, filtered to within
+     *  {@link #MAX_DISTANCE_SQ}. Caller is expected to filter for current claimedness,
+     *  hazard validity, and reachability. */
+    public static List<BlockPos> findNearestSigned(BlockPos from) {
+        List<BlockPos> nearby = new ArrayList<>();
+        for (BlockPos shelter : signedShelters) {
+            if (from.distanceSq(shelter) <= MAX_DISTANCE_SQ) {
+                nearby.add(shelter);
+            }
+        }
+        nearby.sort(Comparator.comparingDouble(from::distanceSq));
+        return nearby;
+    }
+
     public static void clear() {
         shelters.clear();
+        signedShelters.clear();
     }
 }
