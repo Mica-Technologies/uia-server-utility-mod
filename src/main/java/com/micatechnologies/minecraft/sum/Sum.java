@@ -9,6 +9,7 @@ import com.micatechnologies.minecraft.sum.economy.BillsLootInjector;
 import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
+import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
@@ -64,6 +65,8 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "shop"));
         GameRegistry.registerTileEntity(TileEntityBillChanger.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "bill_changer"));
+        GameRegistry.registerTileEntity(TileEntityBillsDisplay.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "bills_display"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

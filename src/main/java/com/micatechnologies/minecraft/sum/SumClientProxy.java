@@ -1,6 +1,8 @@
 package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.atm.GuiSumAtm;
+import com.micatechnologies.minecraft.sum.economy.TESRBillsDisplay;
+import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
@@ -24,6 +26,8 @@ public class SumClientProxy implements SumProxy {
     public void preInit(FMLPreInitializationEvent event) {
         MinecraftForge.EVENT_BUS.register(this);
         RenderingRegistry.registerEntityRenderingHandler(EntityRoamer.class, RenderRoamer::new);
+        net.minecraftforge.fml.client.registry.ClientRegistry.bindTileEntitySpecialRenderer(
+            TileEntityBillsDisplay.class, new TESRBillsDisplay());
         FavoritesStore.setStorageFile(event.getModConfigurationDirectory());
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
         FavoritesClientHandler.registerKeybinds();

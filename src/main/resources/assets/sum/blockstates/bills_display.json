@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "normal": { "model": "sum:bills_display" }
+  }
+}
