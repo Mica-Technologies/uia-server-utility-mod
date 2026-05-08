@@ -80,6 +80,20 @@ public class BlockVelvetRope extends Block {
         return false;
     }
 
+    /** The four directional booleans aren't stored in metadata - they're recomputed in
+     *  {@link #getActualState} from neighbor lookups, fence-style. So both directions of the
+     *  meta conversion are no-ops. Without these overrides, registration crashes the moment
+     *  Forge tries to round-trip a non-default state through meta. */
+    @Override
+    public IBlockState getStateFromMeta(int meta) {
+        return getDefaultState();
+    }
+
+    @Override
+    public int getMetaFromState(IBlockState state) {
+        return 0;
+    }
+
     @Override
     protected BlockStateContainer createBlockState() {
         return new BlockStateContainer(this, NORTH, EAST, SOUTH, WEST);
