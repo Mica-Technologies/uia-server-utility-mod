@@ -264,10 +264,17 @@ public class EntityRoamer extends EntityCreature {
         return role;
     }
 
-    /** Sets the role and replaces the greeting list with the role's defaults. The caller can
-     *  re-customize via {@link #addGreeting} afterwards. */
+    /** Sets the role and replaces the greeting list with the role's defaults. If the roamer
+     *  has no custom name and the role provides a {@link RoamerRole#getDefaultName default
+     *  name}, the entity is also named accordingly so the role is visible at a glance — and
+     *  so {@link EntityAIRoamerGreet} starts firing (it bails out on unnamed roamers). The
+     *  caller can re-customize via {@link #addGreeting} or rename via a name tag afterwards. */
     public void setRole(RoamerRole role) {
         this.role = role;
         resetGreetingsToDefault();
+        if (!hasCustomName() && role.getDefaultName() != null) {
+            setCustomNameTag(role.getDefaultName());
+            setAlwaysRenderNameTag(true);
+        }
     }
 }

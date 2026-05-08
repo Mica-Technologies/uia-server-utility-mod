@@ -11,13 +11,13 @@ package com.micatechnologies.minecraft.sum.roamer;
  */
 public enum RoamerRole {
 
-    GENERIC("generic", new String[]{
+    GENERIC("generic", null, new String[]{
         "Hello!",
         "Hey there!",
         "Welcome!"
     }),
 
-    BANK_TELLER("bank_teller", new String[]{
+    BANK_TELLER("bank_teller", "Bank Teller", new String[]{
         "Welcome to First National.",
         "Cash or check?",
         "Have a nice day.",
@@ -27,15 +27,23 @@ public enum RoamerRole {
     });
 
     private final String id;
+    private final String defaultName;
     private final String[] defaultGreetings;
 
-    RoamerRole(String id, String[] defaultGreetings) {
+    RoamerRole(String id, String defaultName, String[] defaultGreetings) {
         this.id = id;
+        this.defaultName = defaultName;
         this.defaultGreetings = defaultGreetings;
     }
 
     public String getId() {
         return id;
+    }
+
+    /** Display name auto-applied on role assignment when the roamer has no custom name yet.
+     *  Null means "leave the name alone" (used by GENERIC). */
+    public String getDefaultName() {
+        return defaultName;
     }
 
     public String[] getDefaultGreetings() {
