@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Sections A, B, and C are all complete as of 2026-05-08.** Shipped this session: full Section C (C1–C9) + a slate of bug fixes + full Section B (TR trash can, ST storm-shelter sign, SV sleep voting, BC business cards, MX mailbox, JB job board with `/sum job post`). SUM is now a feature-complete server-utility + economy mod. Only Section D (plots) remains, and it's still research-only and intentionally deferred.
+Status: **Sections A, B, C, and Section D core (D1–D5) all complete as of 2026-05-08.** Shipped this session: full Section C (C1–C9) + a slate of bug fixes + full Section B (TR/ST/SV/BC/MX/JB) + Section D core (D1 data model, D2 wand + admin commands, D3 buy/sell, D4 protection events, D5 trust/transfer). The plots system is fully functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration are deferred polish that can land later if Alex wants the in-GUI experience.
 
 ---
 
@@ -8,7 +8,7 @@ Status: **Sections A, B, and C are all complete as of 2026-05-08.** Shipped this
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. **As of HEAD `5fca248` (2026-05-08): Sections A, B, and C are all fully shipped. The mod is feature-complete for everything that was on the originally-planned headline list — bank/ATM kit, full SUM-native economy that can replace EconomyInc, all six Section B utility features (trash can, storm-shelter sign, sleep voting, business cards, mailbox, job board). Only Section D (plots) remains, and it's still research-only and intentionally deferred.**
+> I'm continuing the SUM mod's feature roadmap. **As of HEAD `ae24693` (2026-05-08): Sections A, B, C, and Section D core (D1–D5) are all shipped. The mod is feature-complete for everything originally planned. Plots are functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration remain as deferred polish that can land later if needed. Storm-shelter signs now influence roamer AI for the "designated shelter inside a large building" use case (`ae24693`). The only major missing UX is the in-game plot-browser GUI; everything else is fully usable.**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
@@ -104,7 +104,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | A2.3 | Passcode-locked vault door + auto-close TileEntity | ✅ shipped | `c7a3034` |
 | A3 | Bank teller Roamer role + bank-themed greetings | ✅ shipped | `0c525fc` |
 
-### Section C — EconomyInc replacement (in progress)
+### Section C — EconomyInc replacement (✅ COMPLETE)
 
 | Phase | Goal | Status | Commit |
 |---|---|---|---|
@@ -129,9 +129,20 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | MX | Mailbox + postal system | M | ✅ shipped | `2c7d263` |
 | JB | Job board (bulletin-board block for player-listed jobs) | L | ✅ shipped | `5fca248` |
 
-### Section D — Plots system (research only; deferred)
+### Section D — Plots system (D1–D5 shipped; D6–D8 deferred polish)
 
-Spec written 2026-05-07 in this doc. No code; D1–D8 phase plan exists but waits for explicit green-light.
+| Phase | Goal | Status | Commit |
+|---|---|---|---|
+| D1 | Data model: `SumPlot`, `PlotStatus`, `SumPlotsWorldSavedData` (per-dimension) + `SumPlotsChunkIndex` for fast contains() lookup | ✅ shipped | `c930136` |
+| D2 | Plot wand + `/sum plots create/delete/list/info` admin commands | ✅ shipped | `db55bf6` |
+| D3 | `/sum plots buy/sell` — currency via `EconomyBridge` | ✅ shipped | `20d6e16` |
+| D4 | `PlotsProtectionHandler` events: BlockBreak/Place/LivingDestroyBlock/ExplosionDetonate | ✅ shipped | `fdf6393` |
+| D5 | `/sum plots trust/untrust/transfer` permissions | ✅ shipped | `5bd9474` |
+| D6 | Plot-browser GUI (`/sum plots gui`) | ☐ deferred | — |
+| D7 | Optional rental flow + auto-balance-deduction | ☐ deferred | — |
+| D8 | EconomyInc plots migration command | ☐ deferred | — |
+
+Storm-shelter sign preference (`ae24693`) — not strictly part of D, but landed alongside it: roamers indoors during a storm now prefer a sign-marked shelter within the same building if reachable without leaving (path-walk check rejects sky-exposed routes).
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day), L (≥500 LOC, full day or more).
 
