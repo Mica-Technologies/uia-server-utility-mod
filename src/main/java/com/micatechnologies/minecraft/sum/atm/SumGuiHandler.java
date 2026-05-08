@@ -12,6 +12,9 @@ import com.micatechnologies.minecraft.sum.shop.ContainerShopOwner;
 import com.micatechnologies.minecraft.sum.shop.GuiShopBuyer;
 import com.micatechnologies.minecraft.sum.shop.GuiShopOwner;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
+import com.micatechnologies.minecraft.sum.trash.ContainerTrashCan;
+import com.micatechnologies.minecraft.sum.trash.GuiTrashCan;
+import net.minecraft.inventory.InventoryBasic;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
@@ -33,6 +36,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_SHOP_OWNER = 2;
     public static final int GUI_SHOP_BUYER = 3;
     public static final int GUI_BILL_CHANGER = 4;
+    public static final int GUI_TRASH_CAN = 5;
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -55,6 +59,11 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_BILL_CHANGER) {
             TileEntityBillChanger ch = lookupChanger(world, x, y, z);
             return ch == null ? null : new ContainerBillChanger(ch, player);
+        }
+        if (id == GUI_TRASH_CAN) {
+            return new ContainerTrashCan(
+                new InventoryBasic("sum.trash.title", false, ContainerTrashCan.TRASH_SLOTS),
+                player);
         }
         // ATM is GuiScreen-only (no inventory slots), so no Container is needed server-side.
         return null;
@@ -85,6 +94,11 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_BILL_CHANGER) {
             TileEntityBillChanger ch = lookupChanger(world, x, y, z);
             return ch == null ? null : new GuiBillChanger(new ContainerBillChanger(ch, player));
+        }
+        if (id == GUI_TRASH_CAN) {
+            return new GuiTrashCan(new ContainerTrashCan(
+                new InventoryBasic("sum.trash.title", false, ContainerTrashCan.TRASH_SLOTS),
+                player));
         }
         return null;
     }

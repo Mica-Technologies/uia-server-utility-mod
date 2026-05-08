@@ -14,6 +14,7 @@ import com.micatechnologies.minecraft.sum.economy.ItemSumBill;
 import com.micatechnologies.minecraft.sum.economy.ItemSumPacket;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
 import com.micatechnologies.minecraft.sum.shop.BlockSumShop;
+import com.micatechnologies.minecraft.sum.trash.BlockTrashCan;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraft.item.ItemStack;
@@ -43,6 +44,7 @@ public class SumTab {
     public static BlockBillChanger billChanger;
     public static ItemSumPacket[] packets;
     public static BlockBillsDisplay billsDisplay;
+    public static BlockTrashCan trashCan;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -71,5 +73,6 @@ public class SumTab {
             packets[i] = new ItemSumPacket(BILL_DENOMINATIONS[i]);
         }
         billsDisplay = new BlockBillsDisplay();
+        trashCan = new BlockTrashCan();
     }
 }

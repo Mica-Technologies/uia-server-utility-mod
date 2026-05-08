@@ -1,0 +1,7 @@
+{
+  "parent": "block/cube_column",
+  "textures": {
+    "side": "sum:blocks/trash_can_side",
+    "end":  "sum:blocks/trash_can_top"
+  }
+}
