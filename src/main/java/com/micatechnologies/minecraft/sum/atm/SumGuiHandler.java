@@ -7,6 +7,9 @@ import com.micatechnologies.minecraft.sum.bank.SafeDepositSavedData;
 import com.micatechnologies.minecraft.sum.economy.ContainerBillChanger;
 import com.micatechnologies.minecraft.sum.economy.GuiBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
+import com.micatechnologies.minecraft.sum.mailbox.ContainerMailbox;
+import com.micatechnologies.minecraft.sum.mailbox.GuiMailbox;
+import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopBuyer;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopOwner;
 import com.micatechnologies.minecraft.sum.shop.GuiShopBuyer;
@@ -37,6 +40,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_SHOP_BUYER = 3;
     public static final int GUI_BILL_CHANGER = 4;
     public static final int GUI_TRASH_CAN = 5;
+    public static final int GUI_MAILBOX = 6;
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -64,6 +68,10 @@ public class SumGuiHandler implements IGuiHandler {
             return new ContainerTrashCan(
                 new InventoryBasic("sum.trash.title", false, ContainerTrashCan.TRASH_SLOTS),
                 player);
+        }
+        if (id == GUI_MAILBOX) {
+            TileEntityMailbox mb = lookupMailbox(world, x, y, z);
+            return mb == null ? null : new ContainerMailbox(mb, player);
         }
         // ATM is GuiScreen-only (no inventory slots), so no Container is needed server-side.
         return null;
@@ -100,7 +108,16 @@ public class SumGuiHandler implements IGuiHandler {
                 new InventoryBasic("sum.trash.title", false, ContainerTrashCan.TRASH_SLOTS),
                 player));
         }
+        if (id == GUI_MAILBOX) {
+            TileEntityMailbox mb = lookupMailbox(world, x, y, z);
+            return mb == null ? null : new GuiMailbox(new ContainerMailbox(mb, player));
+        }
         return null;
+    }
+
+    private static TileEntityMailbox lookupMailbox(World world, int x, int y, int z) {
+        TileEntity te = world.getTileEntity(new BlockPos(x, y, z));
+        return te instanceof TileEntityMailbox ? (TileEntityMailbox) te : null;
     }
 
     private static TileEntityShop lookupShop(World world, int x, int y, int z) {

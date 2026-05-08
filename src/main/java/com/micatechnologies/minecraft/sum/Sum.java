@@ -10,6 +10,7 @@ import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
+import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
@@ -72,6 +73,8 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "bills_display"));
         GameRegistry.registerTileEntity(TileEntityStormShelterSign.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "storm_shelter_sign"));
+        GameRegistry.registerTileEntity(TileEntityMailbox.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "mailbox"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:mailbox" },
+    "facing=east":  { "model": "sum:mailbox", "y": 90 },
+    "facing=south": { "model": "sum:mailbox", "y": 180 },
+    "facing=west":  { "model": "sum:mailbox", "y": 270 }
+  }
+}

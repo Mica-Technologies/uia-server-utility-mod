@@ -1,0 +1,22 @@
+{
+  "parent": "block/orientable",
+  "textures": {
+    "front": "sum:blocks/mailbox_front",
+    "side":  "sum:blocks/mailbox_side",
+    "top":   "sum:blocks/mailbox_top"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 13, 14],
+      "faces": {
+        "down":  { "uv": [0, 0, 12, 12], "texture": "#top" },
+        "up":    { "uv": [0, 0, 12, 12], "texture": "#top" },
+        "north": { "uv": [0, 3, 12, 16], "texture": "#front" },
+        "south": { "uv": [0, 3, 12, 16], "texture": "#side" },
+        "west":  { "uv": [0, 3, 12, 16], "texture": "#side" },
+        "east":  { "uv": [0, 3, 12, 16], "texture": "#side" }
+      }
+    }
+  ]
+}
