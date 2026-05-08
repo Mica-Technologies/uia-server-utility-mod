@@ -8,6 +8,10 @@ import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.jobs.JobListing;
+import com.micatechnologies.minecraft.sum.plots.ItemPlotWand;
+import com.micatechnologies.minecraft.sum.plots.PlotStatus;
+import com.micatechnologies.minecraft.sum.plots.SumPlot;
+import com.micatechnologies.minecraft.sum.plots.SumPlotsWorldSavedData;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RoamerRole;
 import java.io.File;
@@ -25,6 +29,7 @@ import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -43,7 +48,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job>";
+        return "/sum <reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots>";
     }
 
     @Override
@@ -74,8 +79,9 @@ public class CommandSum extends CommandBase {
         }
 
         String sub = args[0].toLowerCase();
-        // job is the only sub anyone can invoke; everything else is op-only.
-        if (!"job".equals(sub) && !requireOp(sender, sub)) {
+        // Open subcommands (any player): job. plots itself dispatches per-action perms below.
+        boolean isOpenSub = "job".equals(sub) || "plots".equals(sub);
+        if (!isOpenSub && !requireOp(sender, sub)) {
             return;
         }
         switch (sub) {
@@ -105,6 +111,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "job":
                 handleJob(sender, args);
+                break;
+            case "plots":
+                handlePlots(sender, args);
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown subcommand. Usage: " + getUsage(sender));
@@ -888,6 +897,225 @@ public class CommandSum extends CommandBase {
         int removed = data.removeByPoster(player.getUniqueID());
         sendMessage(sender, TextFormatting.GREEN,
             "Removed " + removed + " listing(s).");
+    }
+
+    // --- /sum plots ---
+
+    private void handlePlots(ICommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum plots <create|delete|list|info|buy|sell|trust|untrust|transfer>");
+            return;
+        }
+        String action = args[1].toLowerCase();
+        switch (action) {
+            // Op-only actions
+            case "create":
+            case "delete":
+                if (!requireOp(sender, "plots " + action)) return;
+                if ("create".equals(action)) handlePlotsCreate(sender, args);
+                else handlePlotsDelete(sender, args);
+                break;
+            // Open actions
+            case "list":
+                handlePlotsList(sender, args);
+                break;
+            case "info":
+                handlePlotsInfo(sender, args);
+                break;
+            case "buy":
+                handlePlotsBuy(sender, args);
+                break;
+            case "sell":
+                handlePlotsSell(sender, args);
+                break;
+            case "trust":
+                handlePlotsTrust(sender, args, true);
+                break;
+            case "untrust":
+                handlePlotsTrust(sender, args, false);
+                break;
+            case "transfer":
+                handlePlotsTransfer(sender, args);
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED, "Unknown plots action.");
+                break;
+        }
+    }
+
+    private void handlePlotsCreate(ICommandSender sender, String[] args) {
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Run from a player; the plot wand selection is per-player.");
+            return;
+        }
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum plots create <name> [price]");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        ItemStack wand = findHeldWand(player);
+        if (wand.isEmpty()) {
+            sendMessage(sender, TextFormatting.RED,
+                "Hold a plot wand. Get one with /give @s sum:plot_wand.");
+            return;
+        }
+        BlockPos a = ItemPlotWand.getCornerA(wand);
+        BlockPos b = ItemPlotWand.getCornerB(wand);
+        if (a == null || b == null) {
+            sendMessage(sender, TextFormatting.RED,
+                "Set both corners with the wand first (left-click + right-click two blocks).");
+            return;
+        }
+        int dim = ItemPlotWand.getDimensionId(wand, player.dimension);
+        if (dim != player.dimension) {
+            sendMessage(sender, TextFormatting.RED,
+                "Wand selection is in a different dimension. Re-select in the current dimension.");
+            return;
+        }
+        // Default to full-column claim (y0=0..255). Custom 3D claims are supported by passing
+        // a wand selection that explicitly sets non-default y values; we keep it simple here
+        // and always full-column for the v1 admin UX.
+        BlockPos cornerA = new BlockPos(a.getX(), 0, a.getZ());
+        BlockPos cornerB = new BlockPos(b.getX(), 255, b.getZ());
+
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(player.world);
+        if (data.overlapsAny(cornerA, cornerB, dim)) {
+            sendMessage(sender, TextFormatting.RED,
+                "That selection overlaps an existing plot. Delete the conflict first.");
+            return;
+        }
+
+        String name = args[2];
+        double price = 0.0;
+        if (args.length >= 4) {
+            try {
+                price = Double.parseDouble(args[3]);
+            } catch (NumberFormatException e) {
+                sendMessage(sender, TextFormatting.RED, "Price must be a number.");
+                return;
+            }
+            if (price < 0) price = 0;
+        }
+        PlotStatus status = price > 0 ? PlotStatus.FOR_SALE : PlotStatus.RESERVED;
+        SumPlot plot = new SumPlot(UUID.randomUUID(), name, cornerA, cornerB,
+            dim, price, status, System.currentTimeMillis());
+        data.addPlot(plot);
+        sendMessage(sender, TextFormatting.GREEN, "Plot created: " + name
+            + " (id " + plot.getPlotId().toString().substring(0, 8) + ", "
+            + (price > 0 ? "$" + String.format(Locale.ROOT, "%.2f", price) + " for sale" : "reserved")
+            + ").");
+    }
+
+    private void handlePlotsDelete(ICommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum plots delete <id-prefix>");
+            return;
+        }
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(sender.getEntityWorld());
+        SumPlot plot = findPlotByPrefix(data, args[2]);
+        if (plot == null) {
+            sendMessage(sender, TextFormatting.RED, "No plot matches '" + args[2] + "'.");
+            return;
+        }
+        data.removePlot(plot.getPlotId());
+        sendMessage(sender, TextFormatting.GREEN, "Deleted plot " + plot.getDisplayName() + ".");
+    }
+
+    private void handlePlotsList(ICommandSender sender, String[] args) {
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(sender.getEntityWorld());
+        boolean nearOnly = args.length >= 3 && "near".equalsIgnoreCase(args[2]);
+        java.util.Collection<SumPlot> plots;
+        if (nearOnly && sender instanceof EntityPlayerMP) {
+            plots = data.getPlotsNear(((EntityPlayerMP) sender).getPosition(), 64);
+        } else {
+            plots = data.getAll();
+        }
+        if (plots.isEmpty()) {
+            sendMessage(sender, TextFormatting.YELLOW, "No plots.");
+            return;
+        }
+        sendMessage(sender, TextFormatting.GOLD, "Plots (" + plots.size() + "):");
+        for (SumPlot p : plots) {
+            String idHash = p.getPlotId().toString().substring(0, 8);
+            String summary = idHash + "  " + p.getDisplayName()
+                + " [" + p.getStatus().name() + "]"
+                + (p.getOwnerName().isEmpty() ? "" : " — owned by " + p.getOwnerName())
+                + (p.getStatus() == PlotStatus.FOR_SALE
+                    ? " — $" + String.format(Locale.ROOT, "%.2f", p.getPrice())
+                    : "");
+            sendMessage(sender, TextFormatting.AQUA, "  " + summary);
+        }
+    }
+
+    private void handlePlotsInfo(ICommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum plots info <id-prefix>");
+            return;
+        }
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(sender.getEntityWorld());
+        SumPlot plot = findPlotByPrefix(data, args[2]);
+        if (plot == null) {
+            sendMessage(sender, TextFormatting.RED, "No plot matches '" + args[2] + "'.");
+            return;
+        }
+        sendMessage(sender, TextFormatting.GOLD, "--- " + plot.getDisplayName() + " ---");
+        sendMessage(sender, TextFormatting.AQUA, "Id: " + plot.getPlotId());
+        sendMessage(sender, TextFormatting.AQUA, "Status: " + plot.getStatus().name());
+        sendMessage(sender, TextFormatting.AQUA,
+            "Owner: " + (plot.getOwnerName().isEmpty() ? "(none)" : plot.getOwnerName()));
+        sendMessage(sender, TextFormatting.AQUA, "Dimension: " + plot.getDimensionId());
+        sendMessage(sender, TextFormatting.AQUA, "Corner A: " + describePos(plot.getCornerA()));
+        sendMessage(sender, TextFormatting.AQUA, "Corner B: " + describePos(plot.getCornerB()));
+        sendMessage(sender, TextFormatting.AQUA, "Volume: " + plot.volume() + " blocks");
+        sendMessage(sender, TextFormatting.AQUA, "Price: $"
+            + String.format(Locale.ROOT, "%.2f", plot.getPrice()));
+        sendMessage(sender, TextFormatting.AQUA, "Trusted: " + plot.getTrustedBuilders().size());
+    }
+
+    private void handlePlotsBuy(ICommandSender sender, String[] args) {
+        sendMessage(sender, TextFormatting.YELLOW, "Plot buy/sell ships in D3.");
+    }
+
+    private void handlePlotsSell(ICommandSender sender, String[] args) {
+        sendMessage(sender, TextFormatting.YELLOW, "Plot buy/sell ships in D3.");
+    }
+
+    private void handlePlotsTrust(ICommandSender sender, String[] args, boolean trust) {
+        sendMessage(sender, TextFormatting.YELLOW, "Plot trust/untrust ships in D5.");
+    }
+
+    private void handlePlotsTransfer(ICommandSender sender, String[] args) {
+        sendMessage(sender, TextFormatting.YELLOW, "Plot transfer ships in D5.");
+    }
+
+    private static String describePos(BlockPos p) {
+        return p.getX() + ", " + p.getY() + ", " + p.getZ();
+    }
+
+    @Nullable
+    private static SumPlot findPlotByPrefix(SumPlotsWorldSavedData data, String prefix) {
+        String p = prefix.toLowerCase();
+        SumPlot match = null;
+        for (SumPlot plot : data.getAll()) {
+            String id = plot.getPlotId().toString().toLowerCase();
+            if (id.startsWith(p) || plot.getDisplayName().equalsIgnoreCase(prefix)) {
+                if (match != null) {
+                    // ambiguous; bail
+                    return null;
+                }
+                match = plot;
+            }
+        }
+        return match;
+    }
+
+    private static ItemStack findHeldWand(EntityPlayerMP player) {
+        ItemStack main = player.getHeldItemMainhand();
+        if (!main.isEmpty() && main.getItem() instanceof ItemPlotWand) return main;
+        ItemStack off = player.getHeldItemOffhand();
+        if (!off.isEmpty() && off.getItem() instanceof ItemPlotWand) return off;
+        return ItemStack.EMPTY;
     }
 
     @Override

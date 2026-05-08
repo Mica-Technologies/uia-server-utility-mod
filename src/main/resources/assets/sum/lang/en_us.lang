@@ -36,6 +36,7 @@ tile.sum.mailbox.name=Mailbox
 sum.mailbox.title=Mailbox
 tile.sum.job_board.name=Job Board
 sum.jobboard.title=Job Board
+item.sum.plot_wand.name=Plot Wand
 sum.changer.title=Bill Changer
 item.sum.packet_1.name=Packet of $1 Bills
 item.sum.packet_5.name=Packet of $5 Bills
