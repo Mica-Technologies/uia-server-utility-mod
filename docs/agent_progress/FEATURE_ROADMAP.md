@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Section A complete + Section C through C4 in place as of 2026-05-08.** Shipped: A2 (bank lobby kit: counter, safe deposit, velvet rope, vault door), A3 (bank teller Roamer role, with auto-naming so the role shows up at a glance), C1 (SUM-native `ISumMoney` capability + facade `EconomyBridge`), C2 (8 SUM bill items, JSON-rendering bug fixed in `15192f2`), C3 (`/balance` user-facing command), C4 (phone + debit card items, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere), plus Section D research stub for the future plots system. Section A is feature-complete; Section C work remaining is C5–C9. Section B sketches are on hold.
+Status: **Section A complete + Section C through C5 in place as of 2026-05-08.** Shipped: A2 (bank lobby kit: counter, safe deposit, velvet rope, vault door), A3 (bank teller Roamer role, with auto-naming so the role shows up at a glance), C1 (SUM-native `ISumMoney` capability + facade `EconomyBridge`), C2 (8 SUM bill items, JSON-rendering bug fixed in `15192f2`), C3 (`/balance` user-facing command), C4 (phone + debit card items, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere), C5 (player shop block — vending machine with owner/buyer GUIs, slot-based stock, admin infinite-stock flag, NBT-exact item matching), plus Section D research stub for the future plots system. Section A is feature-complete; Section C work remaining is C6–C9. Section B sketches are on hold.
 
 ---
 
@@ -8,7 +8,7 @@ Status: **Section A complete + Section C through C4 in place as of 2026-05-08.**
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. **As of HEAD `c9a40e2` (2026-05-08): Section A is fully shipped (A1+A2+A3); Section C through C4 is shipped (C1–C4); Section D plots is research-only and intentionally out of scope until Alex green-lights it. Next priority is C5 (player-shop block — biggest remaining piece, ~600 LOC).**
+> I'm continuing the SUM mod's feature roadmap. **As of HEAD `efb8e47` (2026-05-08): Section A is fully shipped (A1+A2+A3); Section C through C5 is shipped (C1–C5); Section D plots is research-only and intentionally out of scope until Alex green-lights it. Next priority is C6 (bill changer + 8 packet items), then C7 (loot inject), C8 (decorative bills display block), C9 (migration + EconomyInc removal).**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
@@ -29,16 +29,17 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - `ItemSumBill`: 8 bill items, denominations $1/$5/$10/$20/$50/$100/$200/$500.
 > - `ItemAccountAccess`: single class, two registry instances (`sum:phone`, `sum:debit_card`). NBT-binds to first right-clicker (OwnerUUID + OwnerName). Owner right-clicks again to open `GuiSumAtm`; non-owner sees a "belongs to X" rejection. Tooltip shows owner. **Pattern to copy** for any future bound-to-player item.
 >
-> *Blocks (all in `.atm` and `.bank` subpackages):*
+> *Blocks (in `.atm`, `.bank`, and `.shop` subpackages):*
 > - `BlockAtmBase` → `BlockAtmKiosk` / `BlockAtmWall` / `BlockAtmDriveThru`: ATM block family, all open `GuiSumAtm`. **Don't create new ATM variants without asking — three is plenty.**
 > - `BlockBankCounter`: decorative 1×1 counter, no rotation, no GUI.
 > - `BlockSafeDepositBox`: wall-mounted block opening a per-(player, position) 3×3 inventory. Persistence via `SafeDepositSavedData` (per-dimension `WorldSavedData`). **NB:** `InventorySafeDeposit` has an `initialized` flag to prevent the constructor's pre-populate loop from wiping the backing list — replicate this pattern for any future inventory wrapper.
 > - `BlockVelvetRope`: multipart-blockstate decorative stanchion. Auto-connecting rope segments via fence-style getActualState. **Reference for any future fence-pattern blocks.**
 > - `BlockVaultDoor` + `TileEntityVaultDoor`: passcode-locked single-block door with auto-close. SHA-256 passcode hashing; cleartext never stored. Owner = first right-clicker (claim model).
+> - `BlockSumShop` + `TileEntityShop`: vending-machine player shop. Owner=first-right-clicker (claim model). 10-slot inventory: slot 0 is the sale-item template, slots 1–9 are stock. Stock matches template by item + meta + NBT (so an enchanted-sword shop works). Two GUIs (`ContainerShopOwner` for owner, `ContainerShopBuyer` for buyers); GUI is selected by the block via the matching `SumGuiHandler.GUI_SHOP_*` ID. Owner ops: edit amount/cost via +/- buttons, withdraw funds, toggle infinite-stock (admin only). Buy ops via `PacketShopBuy` server packet. **Pattern to copy** for any future TE-backed block with state sync (`getUpdateTag`/`onDataPacket` plus `world.notifyBlockUpdate` on every mutation).
 >
 > *Networking, GUIs, registry:*
-> - `SumNetwork` (`.atm` package): single SimpleNetworkWrapper. Add new packets via `CHANNEL.registerMessage(...)` in `SumNetwork.init()` — don't create a second wrapper.
-> - `SumGuiHandler` (`.atm` package): GUI dispatcher with `GUI_ATM=0`, `GUI_SAFE_DEPOSIT=1`. Add new GUI IDs here.
+> - `SumNetwork` (`.atm` package): single SimpleNetworkWrapper. Add new packets via `CHANNEL.registerMessage(...)` in `SumNetwork.init()` — don't create a second wrapper. Slots 0–3 are taken (atm transaction, money sync, shop owner action, shop buy); use 4 next.
+> - `SumGuiHandler` (`.atm` package): GUI dispatcher with `GUI_ATM=0`, `GUI_SAFE_DEPOSIT=1`, `GUI_SHOP_OWNER=2`, `GUI_SHOP_BUYER=3`. Add new GUI IDs here.
 > - `SumTab.initTabElements()`: where new blocks/items are constructed in `Sum.preInit`. Add new entries here.
 > - `SumRegistry.registerBlock` / `registerItem`: called from constructors of every Block/Item.
 >
@@ -56,6 +57,8 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - `tools/atm_textures/generate.py` — ATM block textures
 > - `tools/bank_textures/generate.py` — bank lobby block textures (counter, safe deposit, vault door, velvet rope)
 > - `tools/bill_textures/generate.py` — 8 SUM bill item textures
+> - `tools/account_items_textures/generate.py` — phone + debit card item textures
+> - `tools/shop_textures/generate.py` — player-shop block textures (front, side, top)
 >
 > **Critical decisions already locked (don't re-litigate without explicit ask):**
 > - **Section C approach: full replacement** (Approach 3 from the research). SUM is on a path to absorb EconomyInc entirely. C1+C2+C3 done; C4–C9 are the rest.
@@ -70,6 +73,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - **Vault door open-state model uses `"elements": []`** (empty array). May render fine, may need a transparent stub quad — flag if you see purple/black missing-texture squares.
 > - **C1 standalone path** (with EconomyInc removed from the pack) is unverified end-to-end. The smoke test: remove EconomyInc → `/sum econ add 100` should still work, `/balance` should report $100, ATM should produce SUM bills.
 > - **C4 phone + debit card**: bind on first right-click, reject for non-owner, open ATM GUI for owner. Tooltip shows owner.
+> - **C5 player shop**: place block, claim by right-click, drop a stack into template slot, refill stock, set price/amount. Have a second player buy. Shop drops stock + funds-as-bills when broken. Admin-toggle infinite stock visible only to ops.
 > - **A3 bank teller role** auto-naming — `/sum roamer role set nearest bank_teller` on an unnamed roamer should set the entity's name to "Bank Teller" AND start firing the bank-teller greetings.
 >
 > **Known fixed bugs (just for reference, don't reintroduce):**
@@ -107,8 +111,8 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | C2 | 8 SUM bill items + `Bills` lookup accepts both backends | ✅ shipped | `2f6ebc2` |
 | C3 | `/balance` user-facing command | ✅ shipped | `9f35cdf` |
 | C4 | Phone item + classic debit card item (NBT-bound to UUID) | ✅ shipped | `a79f100` |
-| C5 | Player shop block (BlockSeller equivalent) | ☐ next | — |
-| C6 | Bill changer + 8 packet items | ☐ pending | — |
+| C5 | Player shop block (BlockSeller equivalent) | ✅ shipped | `efb8e47` |
+| C6 | Bill changer + 8 packet items | ☐ next | — |
 | C7 | Bills in vanilla chest loot tables | ☐ pending | — |
 | C8 | Decorative bills display block + TESR | ☐ pending | — |
 | C9 | `/sum migrate-economy` command + EconomyInc-removal docs | ☐ pending | — |
@@ -132,7 +136,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 ---
 
-## Testing status (as of HEAD `c9a40e2`)
+## Testing status (as of HEAD `efb8e47`)
 
 What Alex has playtested in-game:
 
@@ -152,6 +156,7 @@ What's **unverified** (may have bugs; flag any oddness):
 - [ ] **C2 SUM bills (post-fix)**: visual rendering of all 8 textures with the JSON fix in place, tooltip names, ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
 - [ ] **C3 `/balance`** user-facing command from non-op player; admin `/balance <player>` with op.
 - [ ] **C4 phone + debit card**: spawn from creative tab, first right-click binds to player (chat: "Bound to <name>"), second right-click opens ATM GUI, non-owner sees rejection. Tooltip shows "Owner: <name>".
+- [ ] **C5 player shop**: place + right-click claims (chat: "Shop claimed."); owner GUI shows template + 3x3 stock slots, +/- buttons set amount/price, Withdraw moves funds to balance. Op-only "Infinite: ON/OFF" toggle. Second player right-clicks → buyer GUI with item icon, x N for $X.XX, stock readout, balance, Buy button. Buyer with insufficient funds is rejected before deduction. Breaking the shop drops stock + funds as bills.
 
 Pre-flight items still relevant for future work:
 
@@ -590,8 +595,8 @@ Alex green-lit Approach 3 (full replacement) on 2026-05-07. Phases shipping iter
 | C2 | SUM bill item set (8 denominations). Lang strings, textures, creative tab. `Bills` lookup accepts both EconomyInc and SUM bills as deposits. | S | ✅ shipped | `2f6ebc2` (+ JSON-render fix `15192f2`) |
 | C3 | `/balance` user-facing command (perm 0 self / perm 2 admin). Admin retains `/sum econ`. | XS | ✅ shipped | `9f35cdf` |
 | C4 | Phone item + classic debit card item, NBT-bound to OwnerUUID, open `GuiSumAtm` from anywhere. **Both phone and card** per Alex's call. | S | ✅ shipped | `a79f100` |
-| C5 | SUM player-shop block (BlockSeller equivalent). Two-phase setup, per-block owner + funds + stock, owner can withdraw funds, non-owners buy. | L | ☐ next | — |
-| C6 | Bill-changer block (BlockChanger equivalent) + 8 packet items. | M | ☐ pending | — |
+| C5 | SUM player-shop block (BlockSeller equivalent). Two-phase setup, per-block owner + funds + stock, owner can withdraw funds, non-owners buy. | L | ✅ shipped | `efb8e47` |
+| C6 | Bill-changer block (BlockChanger equivalent) + 8 packet items. | M | ☐ next | — |
 | C7 | Loot injector — SUM bills appear in vanilla chest loot at low rates. Configurable. | XS | ☐ pending | — |
 | C8 | Bills display block + TESR (BlockBills equivalent). | S | ☐ pending | — |
 | C9 | Migration command `/sum migrate-economy` + per-block conversion + EconomyInc-removal documentation. | M | ☐ pending | — |
@@ -787,11 +792,11 @@ Order, by my read of value-vs-effort and how the pieces interlock:
 5. ✅ **C2 — SUM bill items.** Shipped 2026-05-07; render fix `15192f2` 2026-05-08.
 6. ✅ **C3 — `/balance` user-facing command.** Shipped 2026-05-07.
 7. ✅ **C4 — Phone + debit card items.** Shipped 2026-05-08 as `a79f100`.
-8. **C5 — Player shop block.** ← **Next.** Biggest single C-phase. Two-phase setup (place → configure → enable), per-block owner/cost/stock, GUI for non-owner buy + owner-withdraw. ~600 LOC.
-9. **C6 — Bill changer + packets.** ~300 LOC. Pairs with C2's bills.
+8. ✅ **C5 — Player shop block.** Shipped 2026-05-08 as `efb8e47`. Vending-machine block, slot stock + admin infinite-stock flag, NBT-exact item matching. TESR for in-glass floating item deferred (buyer GUI shows the item).
+9. **C6 — Bill changer + packets.** ← **Next.** ~300 LOC. Pairs with C2's bills.
 10. **C7 — Bills loot inject.** ~30 LOC. Free win once bills exist.
 11. **C8 — Decorative bills display block + TESR.** ~250 LOC.
 12. **C9 — `/sum migrate-economy` + EconomyInc removal docs.** Hardest because in-world EconomyInc blocks need conversion. Defer until everything else lands.
 13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for after Section C lands.
 
-A2+A3+C1+C2+C3+C4 are all done. Remaining Section C (C5–C9) is roughly 4–5 days, and C5 alone is about half of that. Section B is on top.
+A2+A3+C1+C2+C3+C4+C5 are all done. Remaining Section C (C6–C9) is roughly 2–3 days. Section B is on top.
