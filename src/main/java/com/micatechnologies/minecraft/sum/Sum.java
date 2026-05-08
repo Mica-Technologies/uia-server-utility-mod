@@ -11,6 +11,7 @@ import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
+import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.TileEntityStormShelterSign;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
@@ -57,6 +58,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new RoadRunnerHandler());
         MinecraftForge.EVENT_BUS.register(new SumMoneyEvents());
         MinecraftForge.EVENT_BUS.register(new BillsLootInjector());
+        MinecraftForge.EVENT_BUS.register(new SleepVoteHandler());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();

@@ -51,6 +51,20 @@ public class SumConfig {
         "minecraft:concrete=1.25"
     };
 
+    private static final String CATEGORY_SLEEP_VOTE = "sleep_vote";
+
+    private static final String FIELD_KEY_SLEEP_VOTE_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_SLEEP_VOTE_ENABLED =
+        "When true, the night ends if at least 'thresholdPercent' of online players are asleep "
+            + "in the overworld. Set to false to fall back to vanilla's all-must-sleep behavior.";
+    private static final boolean FIELD_DEFAULT_SLEEP_VOTE_ENABLED = true;
+
+    private static final String FIELD_KEY_SLEEP_VOTE_THRESHOLD = "thresholdPercent";
+    private static final String FIELD_DESCRIPTION_SLEEP_VOTE_THRESHOLD =
+        "Percentage of online players (1-100) who must be in bed for the night to be skipped. "
+            + "Default 50. The required count is rounded up so 50% on a server of 3 needs 2.";
+    private static final int FIELD_DEFAULT_SLEEP_VOTE_THRESHOLD = 50;
+
     private static String[] roamerWalkableBlocks;
     private static Set<String> roamerWalkableBlockSet;
     // Resolved lazily on first use. Block instances aren't available at preInit, since the block
@@ -61,6 +75,8 @@ public class SumConfig {
     private static Map<String, Double> roadRunnerSpeedBlocks;
 
     private static boolean favoritesStarOverlay;
+    private static boolean sleepVoteEnabled;
+    private static int sleepVoteThresholdPercent;
 
     private static Configuration config;
 
@@ -100,9 +116,25 @@ public class SumConfig {
             FIELD_KEY_FAVORITES_STAR_OVERLAY, CATEGORY_FAVORITES,
             FIELD_DEFAULT_FAVORITES_STAR_OVERLAY, FIELD_DESCRIPTION_FAVORITES_STAR_OVERLAY);
 
+        sleepVoteEnabled = config.getBoolean(
+            FIELD_KEY_SLEEP_VOTE_ENABLED, CATEGORY_SLEEP_VOTE,
+            FIELD_DEFAULT_SLEEP_VOTE_ENABLED, FIELD_DESCRIPTION_SLEEP_VOTE_ENABLED);
+        sleepVoteThresholdPercent = config.getInt(
+            FIELD_KEY_SLEEP_VOTE_THRESHOLD, CATEGORY_SLEEP_VOTE,
+            FIELD_DEFAULT_SLEEP_VOTE_THRESHOLD, 1, 100,
+            FIELD_DESCRIPTION_SLEEP_VOTE_THRESHOLD);
+
         if (config.hasChanged()) {
             config.save();
         }
+    }
+
+    public static boolean isSleepVoteEnabled() {
+        return sleepVoteEnabled;
+    }
+
+    public static int getSleepVoteThresholdPercent() {
+        return sleepVoteThresholdPercent;
     }
 
     public static boolean isFavoritesStarOverlayEnabled() {
