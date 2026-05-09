@@ -168,6 +168,30 @@ public class SumConfig {
             + "of leaving an empty pocket. Off by default to preserve vanilla bucket behavior.";
     private static final boolean FIELD_DEFAULT_BEACHES_INFINITE_BUCKET = false;
 
+    private static final String FIELD_KEY_BEACHES_REALISTIC = "realisticErosion";
+    private static final String FIELD_DESCRIPTION_BEACHES_REALISTIC =
+        "When true, the flooding behavior also fires for a curated set of \"erodible\" blocks: dirt, "
+            + "grass, gravel, clay, mycelium, soul sand, snow blocks, and snow layers. Lets water "
+            + "carve through riverbanks and other soft terrain, not just sand. The 'affectedBlocks' "
+            + "list is still respected — this just adds the realistic-erosion set on top.";
+    private static final boolean FIELD_DEFAULT_BEACHES_REALISTIC = false;
+
+    /** Hardcoded set of blocks that get the beaches treatment when {@code realisticErosion}
+     *  is enabled. Curated for materials water plausibly erodes — soft soil, gravel, snow.
+     *  Stone and harder materials are deliberately excluded since flooding any hole next to
+     *  water in stone caves would be unwanted. */
+    private static final Set<String> REALISTIC_EROSION_BLOCKS = new HashSet<>(Arrays.asList(
+        "minecraft:sand",
+        "minecraft:dirt",
+        "minecraft:grass",
+        "minecraft:gravel",
+        "minecraft:clay",
+        "minecraft:mycelium",
+        "minecraft:soul_sand",
+        "minecraft:snow",
+        "minecraft:snow_layer"
+    ));
+
     private static final String CATEGORY_SLEEP_VOTE = "sleep_vote";
 
     private static final String FIELD_KEY_SLEEP_VOTE_ENABLED = "enabled";
@@ -198,6 +222,7 @@ public class SumConfig {
     private static boolean beachesEnabled;
     private static boolean beachesAnimatedFlooding;
     private static boolean beachesInfiniteBucketWater;
+    private static boolean beachesRealisticErosion;
     private static Set<String> beachesAffectedBlockNames;
     private static boolean beachesAffectsAllBlocks;
 
@@ -275,6 +300,9 @@ public class SumConfig {
             FIELD_DEFAULT_BEACHES_AFFECTED_BLOCKS, FIELD_DESCRIPTION_BEACHES_AFFECTED_BLOCKS);
         beachesAffectedBlockNames = new HashSet<>(Arrays.asList(beachesAffectedEntries));
         beachesAffectsAllBlocks = beachesAffectedBlockNames.contains("*");
+        beachesRealisticErosion = config.getBoolean(
+            FIELD_KEY_BEACHES_REALISTIC, CATEGORY_BEACHES,
+            FIELD_DEFAULT_BEACHES_REALISTIC, FIELD_DESCRIPTION_BEACHES_REALISTIC);
 
         pauserEnabled = config.getBoolean(
             FIELD_KEY_PAUSER_ENABLED, CATEGORY_PAUSER,
@@ -479,7 +507,14 @@ public class SumConfig {
             return true;
         }
         net.minecraft.util.ResourceLocation registryName = block.getRegistryName();
-        return registryName != null && beachesAffectedBlockNames.contains(registryName.toString());
+        if (registryName == null) {
+            return false;
+        }
+        String name = registryName.toString();
+        if (beachesAffectedBlockNames.contains(name)) {
+            return true;
+        }
+        return beachesRealisticErosion && REALISTIC_EROSION_BLOCKS.contains(name);
     }
 
     public static int getSleepVoteThresholdPercent() {

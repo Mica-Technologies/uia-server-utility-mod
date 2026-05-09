@@ -47,7 +47,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 ### World / movement
 
 - Roadrunner — per-block speed multipliers configured via string-array (`block=multiplier`).
-- Pretty Beaches — breaking sand (or other configured blocks) adjacent to water replaces it with water and animates flooding the column at sea level, eliminating ugly partial-flow artifacts.
+- Pretty Beaches — breaking sand (or other configured blocks) adjacent to water replaces it with water and animates flooding the column at sea level, eliminating ugly partial-flow artifacts. Optional `realisticErosion` config flag also affects dirt, grass, gravel, clay, mycelium, soul sand, and snow — water carves through soft riverbanks, not just sand.
 - Server Pauser — cancels `WorldServer.tick()` entirely when no players online (Mixin-based), resuming on first login. Halts time, weather, scheduled block updates, TE ticks, mob spawning, random ticks. Chunk-loaded farms genuinely freeze.
 - World border — per-dimension square borders with bounce-back or Pac-Man-style loop modes; configurable per dim via `<dimId>=<radius>:<mode>` strings.
 - Lag-tolerant movement — relaxes vanilla's "moved too quickly" rubberband threshold in `NetHandlerPlayServer` via Mixin (`@ModifyConstant`); configurable multiplier (default 10× vanilla).
