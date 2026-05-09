@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Sections A, B, C, and Section D core (D1–D5) all complete as of 2026-05-08.** Shipped this session: full Section C (C1–C9) + a slate of bug fixes + full Section B (TR/ST/SV/BC/MX/JB) + Section D core (D1 data model, D2 wand + admin commands, D3 buy/sell, D4 protection events, D5 trust/transfer). The plots system is fully functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration are deferred polish that can land later if Alex wants the in-GUI experience.
+Status: **Sections A, B, C, and Section D core (D1–D5) all complete as of 2026-05-08.** Latest HEAD is `6866ebc`. Shipped this session: full Section C (C1–C9) + a slate of bug fixes + full Section B (TR/ST/SV/BC/MX/JB) + Section D core (D1–D5: data model, wand + admin commands, buy/sell, protection events, trust/transfer) + the storm-shelter sign preference enhancement (signed shelters preferred over auto-discovered when reachable inside the same building) + the storm-shelter sign converted to wall-mounted + `/sum help` paginated command + several playtest-driven bug fixes (bill render, role auto-name, phone/card second-click, plot wand corner-A capture). The plots system is fully functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration are deferred polish that can land later if Alex wants the in-GUI experience.
 
 ---
 
@@ -8,82 +8,116 @@ Status: **Sections A, B, C, and Section D core (D1–D5) all complete as of 2026
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm continuing the SUM mod's feature roadmap. **As of HEAD `ae24693` (2026-05-08): Sections A, B, C, and Section D core (D1–D5) are all shipped. The mod is feature-complete for everything originally planned. Plots are functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration remain as deferred polish that can land later if needed. Storm-shelter signs now influence roamer AI for the "designated shelter inside a large building" use case (`ae24693`). The only major missing UX is the in-game plot-browser GUI; everything else is fully usable.**
+> I'm picking up the SUM mod after a feature-completion sprint. **As of HEAD `6866ebc` (2026-05-08): Sections A, B, C, and Section D core (D1–D5) are all shipped. The mod has every headline feature originally planned: bank/ATM kit, full SUM-native economy that can replace EconomyInc, six server-utility blocks/items (TR/ST/SV/BC/MX/JB), and a working land-claim plots system with protection. The only deferred items are D6 plot-browser GUI, D7 rental flow, and D8 EconomyInc-plot migration; those are polish that can land later if Alex asks. Most of the new surface still needs in-game playtesting (see "Testing status" section below).**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
 > **Read first, in this order:**
 >
-> 1. `docs/agent_progress/FEATURE_ROADMAP.md` — this doc. Status snapshot at the top, Section C phase plan in the middle, Section D plots spec at the end.
-> 2. `docs/agent_progress/PLAYER_FAVORITES_MENU.md` — older feature, useful only for commit-cadence/wiring conventions if needed.
-> 3. `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` — older Roamer-perf doc; useful background for any new Roamer roles (postal worker for MX, trader for Section C shop NPC).
-> 4. `CLAUDE.md` and the project memory under `~/.claude/projects/E--gitRepos-uia-server-utility-mod/memory/`. **Standing prefs:** never `git push`; include `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` on every commit; JDK at `~/.jdks/azul-17.0.18`; no real usernames in committed files (use `<username>` placeholder); LDW2 fork at `E:\gitRepos\LDW2` is a separate repo for weather/snow work — don't touch it.
+> 1. `docs/agent_progress/FEATURE_ROADMAP.md` — this doc. Status snapshot, phase tables, testing checklists, and the Section D research at the end (which is now mostly built).
+> 2. `docs/ECONOMYINC_MIGRATION.md` — admin-facing doc for the C9 migration command and the EconomyInc-removal procedure.
+> 3. `docs/agent_progress/PLAYER_FAVORITES_MENU.md` — older feature, useful only for commit-cadence/wiring conventions if needed.
+> 4. `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` — older Roamer-perf doc; useful background for any new Roamer roles or AI work.
+> 5. `CLAUDE.md` and the project memory under `~/.claude/projects/E--gitRepos-uia-server-utility-mod/memory/`. **Standing prefs:** never `git push`; include `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` on every commit; JDK at `~/.jdks/azul-17.0.18`; no real usernames in committed files (use `<username>` placeholder); LDW2 fork at `E:\gitRepos\LDW2` is a separate repo for weather/snow work — don't touch it.
 >
 > **Reuse, don't rebuild.** Reusable infrastructure available in the codebase right now:
 >
-> *Economy & money:*
-> - `EconomyBridge` (`.economy` package): facade with two backends. `isAvailable()`, `getBalance(player)`, `adjustBalance(player, delta)`. Routes to EconomyInc when loaded, falls back to SUM's `ISumMoney` capability when absent. **All money ops go through this.**
-> - `ISumMoney` / `DefaultSumMoney` / `CapabilitySumMoney`: SUM-native balance capability attached to every player. Persisted in player NBT, synced to client via `PacketSyncSumMoney`.
-> - `SumMoneyEvents`: handles AttachCapabilities, login sync, dimension-change sync, death-respawn carry-over.
-> - `Bills` (`.atm` package): denomination ↔ Item lookup. Accepts BOTH EconomyInc bills (`economy:item_oneb` etc.) AND SUM bills (`sum:bill_1` etc.) for deposits. `billItem(denom)` returns the preferred backend's bill (EconomyInc when loaded, SUM otherwise) for new withdraws.
-> - `ItemSumBill`: 8 bill items, denominations $1/$5/$10/$20/$50/$100/$200/$500.
-> - `ItemAccountAccess`: single class, two registry instances (`sum:phone`, `sum:debit_card`). NBT-binds to first right-clicker (OwnerUUID + OwnerName). Owner right-clicks again to open `GuiSumAtm`; non-owner sees a "belongs to X" rejection. Tooltip shows owner. **Pattern to copy** for any future bound-to-player item.
+> *Economy & money (`.economy` package):*
+> - `EconomyBridge`: facade with two backends. `isAvailable()`, `getBalance(player)`, `adjustBalance(player, delta)`. Routes to EconomyInc when loaded, falls back to SUM's `ISumMoney` capability when absent. **All money ops go through this.**
+> - `ISumMoney` / `DefaultSumMoney` / `CapabilitySumMoney`: SUM-native balance capability attached to every player. NBT-persisted, synced via `PacketSyncSumMoney`.
+> - `SumMoneyEvents`: AttachCapabilities + login/dimension-change/death-respawn sync.
+> - `Bills` (in `.atm`): denomination ↔ Item lookup. Accepts both `economy:*` and `sum:*` bills for deposits. `billItem(denom)` returns the preferred bill (EconomyInc when loaded, SUM otherwise).
+> - `ItemSumBill`: 8 bill items, denominations $1..$500.
+> - `ItemSumPacket`: 8 packet items (one per denom). Each packet = 64 bills of that denom. Produced/consumed only by the bill changer.
+> - `ItemAccountAccess`: single class, two registry instances (`sum:phone`, `sum:debit_card`). NBT-binds to first right-clicker. Owner right-click opens `GuiSumAtm` via `Sum.proxy.openAccountAccessGui` (NOT `player.openGui` — that path is broken from items in 1.12.2). **Pattern to copy** for any future bound-to-player item that needs to open a client GuiScreen.
+> - `BlockBillChanger` + `TileEntityBillChanger`: 2-slot input/output with Bundle/Unbundle buttons. Output is `SlotFurnaceOutput` (take-only).
+> - `BlockBillsDisplay` + `TileEntityBillsDisplay` + `TESRBillsDisplay`: decorative tray; right-click bills/packet to insert, right-click empty to take. TESR renders 1-5 stacked rotating sheets above the tray based on count.
+> - `BillsLootInjector`: subscribed to `LootTableLoadEvent`, adds bills to 13 vanilla chest tables. Heavy weighting toward small denoms; $200/$500 never world-gen.
 >
-> *Blocks (in `.atm`, `.bank`, and `.shop` subpackages):*
+> *Blocks (in `.atm`, `.bank`, `.shop`, `.mailbox`, `.jobs`, `.trash`, `.roamer`):*
 > - `BlockAtmBase` → `BlockAtmKiosk` / `BlockAtmWall` / `BlockAtmDriveThru`: ATM block family, all open `GuiSumAtm`. **Don't create new ATM variants without asking — three is plenty.**
 > - `BlockBankCounter`: decorative 1×1 counter, no rotation, no GUI.
-> - `BlockSafeDepositBox`: wall-mounted block opening a per-(player, position) 3×3 inventory. Persistence via `SafeDepositSavedData` (per-dimension `WorldSavedData`). **NB:** `InventorySafeDeposit` has an `initialized` flag to prevent the constructor's pre-populate loop from wiping the backing list — replicate this pattern for any future inventory wrapper.
-> - `BlockVelvetRope`: multipart-blockstate decorative stanchion. Auto-connecting rope segments via fence-style getActualState. **Reference for any future fence-pattern blocks.**
-> - `BlockVaultDoor` + `TileEntityVaultDoor`: passcode-locked single-block door with auto-close. SHA-256 passcode hashing; cleartext never stored. Owner = first right-clicker (claim model).
-> - `BlockSumShop` + `TileEntityShop`: vending-machine player shop. Owner=first-right-clicker (claim model). 10-slot inventory: slot 0 is the sale-item template, slots 1–9 are stock. Stock matches template by item + meta + NBT (so an enchanted-sword shop works). Two GUIs (`ContainerShopOwner` for owner, `ContainerShopBuyer` for buyers); GUI is selected by the block via the matching `SumGuiHandler.GUI_SHOP_*` ID. Owner ops: edit amount/cost via +/- buttons, withdraw funds, toggle infinite-stock (admin only). Buy ops via `PacketShopBuy` server packet. **Pattern to copy** for any future TE-backed block with state sync (`getUpdateTag`/`onDataPacket` plus `world.notifyBlockUpdate` on every mutation).
+> - `BlockSafeDepositBox`: wall-mounted, per-(player, position) 3×3 inventory. **NB:** `InventorySafeDeposit` has an `initialized` flag to prevent the constructor's pre-populate loop from wiping the backing list — replicate this for any future inventory wrapper.
+> - `BlockVelvetRope`: multipart-blockstate decorative stanchion with auto-connecting rope segments. **Reference for fence-pattern blocks.**
+> - `BlockVaultDoor` + `TileEntityVaultDoor`: passcode-locked single-block door, auto-close. SHA-256 hash; cleartext never stored.
+> - `BlockSumShop` + `TileEntityShop`: vending-machine player shop. 10-slot (template + 3×3 stock). Stock matches template by item+meta+NBT. Two GUIs (owner / buyer). Admin infinite-stock toggle. **Pattern to copy** for any future TE-backed block with state sync (`getUpdateTag`/`onDataPacket` plus `world.notifyBlockUpdate` on every mutation).
+> - `BlockMailbox` + `TileEntityMailbox`: claim-on-first-right-click. 9-slot inbox; non-owners get a `DepositOnlySlot` (canTakeStack=false).
+> - `BlockJobBoard` + `JobBoardSavedData` + `GuiJobBoard`: server-wide listings, paginated browse GUI, posting via `/sum job post`.
+> - `BlockTrashCan`: ephemeral 9-slot inventory, content destroyed on close.
+> - `BlockStormShelterSign` + `TileEntityStormShelterSign`: **wall-mounted** plaque (4 facings). On placement and chunk-load, registers position via `RoamerShelterCache.recordSignedShelter` so storm-AI roamers prefer it.
+>
+> *Plots (`.plots` package):*
+> - `SumPlot` + `PlotStatus`: 3D-bbox claim with id, name, owner, price, status (FOR_SALE/OWNED/RESERVED/EXPIRED), trusted-builder set.
+> - `SumPlotsWorldSavedData`: per-dimension storage via `World.getPerWorldStorage()`. Has `getPlotsContaining(BlockPos)`, `getPlotsNear(center, radius)`, `getPlotsForSale()`, `overlapsAny()`.
+> - `SumPlotsChunkIndex`: chunkPos → List<plotId>, eagerly maintained on add/remove. Used by the protection handler for O(1) lookup.
+> - `ItemPlotWand`: **sneak+right-click = corner A, right-click = corner B**. Selection persists in NBT. (Earlier left-click variant had a 1.12.2 packet-suppression bug; sneak/no-sneak is bulletproof.)
+> - `PlotsProtectionHandler`: cancels BlockBreak/Place from non-owner-non-trusted-non-op; cancels mob-driven destruction inside owned plots; filters protected blocks out of explosions. `sum.plots.bypass` perm node (auto-grants to op-2+) lets ops build inside protected plots.
 >
 > *Networking, GUIs, registry:*
-> - `SumNetwork` (`.atm` package): single SimpleNetworkWrapper. Add new packets via `CHANNEL.registerMessage(...)` in `SumNetwork.init()` — don't create a second wrapper. Slots 0–3 are taken (atm transaction, money sync, shop owner action, shop buy); use 4 next.
-> - `SumGuiHandler` (`.atm` package): GUI dispatcher with `GUI_ATM=0`, `GUI_SAFE_DEPOSIT=1`, `GUI_SHOP_OWNER=2`, `GUI_SHOP_BUYER=3`. Add new GUI IDs here.
+> - `SumNetwork` (`.atm` package): single SimpleNetworkWrapper. Slots 0–5 are taken (ATM tx, money sync, shop owner action, shop buy, bill-changer action, job action); use 6 next.
+> - `SumGuiHandler` (`.atm` package): GUI dispatcher with `GUI_ATM=0`, `GUI_SAFE_DEPOSIT=1`, `GUI_SHOP_OWNER=2`, `GUI_SHOP_BUYER=3`, `GUI_BILL_CHANGER=4`, `GUI_TRASH_CAN=5`, `GUI_MAILBOX=6`, `GUI_JOB_BOARD=7`. Use 8 next.
 > - `SumTab.initTabElements()`: where new blocks/items are constructed in `Sum.preInit`. Add new entries here.
 > - `SumRegistry.registerBlock` / `registerItem`: called from constructors of every Block/Item.
+> - `SumProxy.openAccountAccessGui(player)`: client proxy hook for opening `GuiSumAtm` directly via `Minecraft.displayGuiScreen` from items. Use this instead of `player.openGui` for item-triggered GUIs.
 >
-> *NPCs:*
-> - `EntityRoamer` + `RoamerRole` enum: Roamer NPCs have a role tag (GENERIC, BANK_TELLER) that sets default greetings AND auto-applies a default name if the roamer doesn't already have one (so `setRole(BANK_TELLER)` makes the entity say "Bank Teller" above its head and unlocks the greeting AI, which only fires on named roamers). Add new roles by appending to `RoamerRole` enum with id, default name (or null), and greetings array. `/sum roamer role set <target> <role-id>` admin command.
+> *NPCs (`.roamer` package):*
+> - `EntityRoamer` + `RoamerRole` enum: GENERIC, BANK_TELLER. Role auto-applies default name if entity is unnamed (so the role is visible AND unlocks greetings, which gate on `hasCustomName()`). Add new roles via the enum.
+> - `RoamerShelterCache`: tracks `shelters` (organic-discovery) and `signedShelters` (sign-marked, separate set). `recordSignedShelter()` adds to both.
+> - `EntityAIRoamerStormShelter`: when roamer is already inside, calls `findPreferredSignedShelterInside` first to find a sign within 48 horizontal / 6 vertical that's reachable via a path tolerating up to 2 consecutive sky-exposed nodes. No claim check on signed shelters (designed to attract a crowd, not spread them out).
 >
-> *Commands:*
+> *Commands (`.command` package):*
 > - `/balance [player]` (perm 0 self / perm 2 admin): user-facing.
-> - `/sum econ <balance|add|set>` (perm 2): admin balance manipulation.
+> - `/sum help [page]` (anyone): paginated help, 7 pages.
+> - `/sum econ <balance|add|set>` (op): admin balance manipulation.
 > - `/sum vault <unlock|setcode|info|disown>`: vault-door interactions, ray-trace targeted.
-> - `/sum roamer role <set|get> <target> [role-id]`: Roamer role management.
-> - `/sum favorites ...`: from earlier work; pre-existing.
+> - `/sum roamer <greet|role> ...` (op): Roamer management.
+> - `/sum favorites ...` (op): pre-existing.
+> - `/sum migrate-economy [verify]` (op): EconomyInc → SUM player data migration.
+> - `/sum job <post|list|clear-mine>` (anyone): job-board listings.
+> - `/sum plots <create|delete|list|info|buy|sell|trust|untrust|transfer>` (mixed; create/delete are op).
+> - `/sum reloadconfig` (op).
 >
-> *Texture generators (Python + PIL, run any time without crash):*
+> *Texture generators (Python + PIL, idempotent):*
 > - `tools/atm_textures/generate.py` — ATM block textures
-> - `tools/bank_textures/generate.py` — bank lobby block textures (counter, safe deposit, vault door, velvet rope)
+> - `tools/bank_textures/generate.py` — bank lobby block textures
 > - `tools/bill_textures/generate.py` — 8 SUM bill item textures
-> - `tools/account_items_textures/generate.py` — phone + debit card item textures
-> - `tools/shop_textures/generate.py` — player-shop block textures (front, side, top)
+> - `tools/account_items_textures/generate.py` — phone + debit card
+> - `tools/shop_textures/generate.py` — player-shop block textures
+> - `tools/changer_textures/generate.py` — bill-changer block
+> - `tools/packet_textures/generate.py` — 8 packet items
+> - `tools/bills_display_textures/generate.py` — bills display tray
+> - `tools/trash_textures/generate.py` — trash can
+> - `tools/storm_shelter_sign_textures/generate.py` — storm sign
+> - `tools/contacts_textures/generate.py` — business card
+> - `tools/mailbox_textures/generate.py` — mailbox
+> - `tools/jobboard_textures/generate.py` — job board
+> - `tools/plotwand_textures/generate.py` — plot wand
 >
 > **Critical decisions already locked (don't re-litigate without explicit ask):**
-> - **Section C approach: full replacement** (Approach 3 from the research). SUM is on a path to absorb EconomyInc entirely. C1+C2+C3 done; C4–C9 are the rest.
-> - **Plots system: out of scope** (Section D research only). Don't start any plots code.
-> - **Vault-cracker minigame: out of scope.** PvP burglary doesn't fit the theme.
-> - **Credit card UX: ship both phone (modern, recommended) AND classic card item** in C4.
-> - **Vault door passcode UI: chat-based** (`/sum vault unlock <code>`) for v1. In-GUI text field is a polish improvement.
+> - **Section C: full replacement of EconomyInc** (Approach 3). SUM owns the economy; EconomyInc is optional compat.
+> - **Vault-cracker minigame: skipped permanently.** PvP burglary doesn't fit the theme.
+> - **Credit card UX: both phone (modern) AND classic card** ship as separate items.
+> - **Vault door passcode UI: chat-driven** (`/sum vault unlock <code>`); in-GUI text field is a polish improvement that didn't ship.
 > - **Safe deposit box: 3×3** single-chest equivalent, per-(player, position).
-> - **Bills coexistence:** when EconomyInc is loaded, ATM produces EconomyInc bills (compat); deposits accept both EconomyInc and SUM bills. When EconomyInc is absent, SUM owns everything.
+> - **Player shop: vending-machine aesthetic + slot stock + admin infinite-stock flag + NBT-exact item matching.** TESR for the in-glass floating item was deferred (buyer GUI shows the item).
+> - **Plot ownership: admin-only creation** for v1; players can buy + transfer + trust.
+> - **Plot pricing: flat dollar.** Per-block formulas are a polish.
+> - **Plot Y bounds: full column** by default (y=0..255). Custom 3D claims supported by direct construction but the wand UX is full-column.
+> - **Plot wand gesture: sneak+right-click for corner A, right-click for corner B** — left-click was tried and abandoned due to a 1.12.2 client-cancel-suppresses-server-packet bug.
+> - **Section D6/D7/D8 deferred.** Plots system is functional via chat; only pursue these if Alex green-lights.
+> - **Bills coexistence:** when EconomyInc is loaded, ATM produces EconomyInc bills (compat); deposits accept both. When EconomyInc is absent, SUM owns everything.
+> - **Storm-shelter sign behavior: signed shelters preferred for already-indoor roamers** within 48h/6v range, with a path-stays-inside check (tolerates 2 consecutive sky-exposed nodes for doorways/skylights). No claim limit on signed shelters — designed to attract a crowd.
 >
-> **Watchpoints that need playtest verification:**
-> - **Vault door open-state model uses `"elements": []`** (empty array). May render fine, may need a transparent stub quad — flag if you see purple/black missing-texture squares.
-> - **C1 standalone path** (with EconomyInc removed from the pack) is unverified end-to-end. The smoke test: remove EconomyInc → `/sum econ add 100` should still work, `/balance` should report $100, ATM should produce SUM bills.
-> - **C4 phone + debit card**: bind on first right-click, reject for non-owner, open ATM GUI for owner. Tooltip shows owner.
-> - **C5 player shop**: place block, claim by right-click, drop a stack into template slot, refill stock, set price/amount. Have a second player buy. Shop drops stock + funds-as-bills when broken. Admin-toggle infinite stock visible only to ops.
-> - **A3 bank teller role** auto-naming — `/sum roamer role set nearest bank_teller` on an unnamed roamer should set the entity's name to "Bank Teller" AND start firing the bank-teller greetings.
+> **Known fixed bugs (don't reintroduce):**
+> - `7c74d4e` Safe deposit box wiped items on reopen — fixed via `initialized` flag in `InventorySafeDeposit`.
+> - `59cf108` Velvet rope crashed on registry — fixed by adding `getStateFromMeta`/`getMetaFromState` overrides since the four directional bools aren't in metadata.
+> - `15192f2` All 8 SUM bill model JSONs had literal backslash-n. **Watch out** for any toolchain that double-escapes JSON heredocs.
+> - `c9a40e2` Roamer role had no visible effect — `setRole` now auto-names unnamed roamers, which both shows the role above the head and unlocks greetings.
+> - `03f715d` Phone/card 2nd right-click did nothing — `player.openGui` silently drops the OPEN_GUI packet when invoked from `Item.onItemRightClick` in 1.12.2. Use `Sum.proxy.openAccountAccessGui` (direct `displayGuiScreen`) instead.
+> - `25e1bf8` Plot wand reported "Corner B" on both clicks — `LeftClickBlock` event is unreliable in 1.12.2 (client cancel suppresses server packet). Switched to sneak+right-click for corner A.
+> - `6866ebc` Storm-shelter sign converted to wall-mounted; AI heuristic loosened (range 24→48, dropped claim check on signed shelters, path tolerance 0→2 consecutive sky-exposed nodes) so a crowd in an airport lobby actually converges on the bathroom sign.
 >
-> **Known fixed bugs (just for reference, don't reintroduce):**
-> - `7c74d4e` Safe deposit box wiped items on reopen — fixed via `initialized` flag in `InventorySafeDeposit` to gate write-back during constructor.
-> - `59cf108` Velvet rope crashed on registry — fixed by adding default `getStateFromMeta`/`getMetaFromState` overrides since the four directional bools aren't persisted in metadata (matches vanilla fence pattern).
-> - `15192f2` All 8 SUM bill model JSONs contained literal backslash-n characters instead of real newlines, so GSON rejected them and bills rendered as the missing-model purple/black grid. Rewrote each file with real newlines. **Watch for this** if anything in your toolchain ever serializes JSON via a heredoc or template that double-escapes.
-> - `c9a40e2` `/sum roamer role set <target> bank_teller` produced no visible difference because (a) the greeting AI only fires on named roamers and (b) the role tag had no display effect. `setRole` now auto-applies the role's default name when the entity is unnamed; greetings start firing immediately after.
-> - `03f715d` Phone/debit card opened the ATM GUI from `Block.onBlockActivated` (ATM blocks) but **not** from `Item.onItemRightClick` (the C4 items). Cause unclear — `player.openGui` silently dropped the open-window packet when invoked from item right-click in 1.12.2. Fix: bypass `player.openGui` for these items and call `Minecraft.getMinecraft().displayGuiScreen` directly via the client proxy. Pattern to use for any future GUI-opening item (`SumProxy.openAccountAccessGui` is the proxy hook).
->
-> **Watch out for:** Alex maintains a separate Weather 2 Remastered fork at `E:\gitRepos\LDW2` for weather/snow features — *not* this repo. The repo working tree should be clean at `2f6ebc2`; if you find unfamiliar uncommitted WIP, preserve it (`git restore --staged` anything not yours before committing).
+> **Watch out for:** Alex maintains a separate Weather 2 Remastered fork at `E:\gitRepos\LDW2` for weather/snow features — *not* this repo. The repo working tree should be clean at `6866ebc`; if you find unfamiliar uncommitted WIP, preserve it (`git restore --staged` anything not yours before committing).
 
 ---
 
@@ -142,48 +176,83 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | D7 | Optional rental flow + auto-balance-deduction | ☐ deferred | — |
 | D8 | EconomyInc plots migration command | ☐ deferred | — |
 
-Storm-shelter sign preference (`ae24693`) — not strictly part of D, but landed alongside it: roamers indoors during a storm now prefer a sign-marked shelter within the same building if reachable without leaving (path-walk check rejects sky-exposed routes).
+**Roamer / storm-shelter enhancements** — landed alongside Section D, not strictly part of it:
+
+| Change | Status | Commit |
+|---|---|---|
+| Storm-shelter signs preferred over auto-discovered shelters when roamer is already inside | ✅ shipped | `ae24693` |
+| Wall-mounted variant of the storm sign + AI heuristic loosened (range 48, no claim check, path tolerance 2) | ✅ shipped | `6866ebc` |
+| `/sum help` paginated command (7 pages, anyone can run) | ✅ shipped | `af0b3b6` |
+| Plot wand corner-A capture fix (sneak+right-click) | ✅ shipped | `25e1bf8` |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day), L (≥500 LOC, full day or more).
 
 ---
 
-## Testing status (as of HEAD `5fca248`)
+## Testing status (as of HEAD `6866ebc`)
 
-What Alex has playtested in-game:
+### Verified working in-game
 
-- [x] **A1**: ATM kiosk + wall + drive-thru blocks place, render, open `GuiSumAtm`. EconomyInc balance shows; withdraw produces EconomyInc bills; deposit consumes them. (Tested before this session.)
-- [x] **A2.1 bank counter**: places, renders correctly with marble top + walnut body.
+- [x] **A1 ATMs**: ATM kiosk + wall + drive-thru blocks place, render, open `GuiSumAtm`. EconomyInc balance shows; withdraw produces EconomyInc bills; deposit consumes them.
+- [x] **A2.1 bank counter**: places, renders correctly.
 - [x] **A2.2 safe deposit box**: persistence works across save/reload after the `7c74d4e` fix; multiple items in different slots stay put.
-- [x] **A2.4 velvet rope**: brass color reads as brass after `f3d63d1`; auto-connecting burgundy rope segments appear between adjacent stanchions.
-- [x] **C1 partial**: `/sum econ add 100` → `/balance` reports $100 and persists across save/reload. EconomyInc was loaded during this test, so the SUM-only path is still unverified.
-- [x] **C2 bug found**: bills rendered as the missing-texture purple/black grid. Cause: bill model JSONs were written with literal `\n` characters; fixed in `15192f2`.
-- [x] **A3 bug found**: role change had no visible effect — fixed in `c9a40e2` by auto-naming the entity.
+- [x] **A2.4 velvet rope**: brass color reads as brass; auto-connecting burgundy rope segments work.
+- [x] **C1 partial**: `/sum econ add 100` → `/balance` reports $100 and persists. EconomyInc was loaded during this test, so the SUM-only path is still unverified.
+- [x] **C2 bills (post-fix)**: render correctly after the JSON-newline fix in `15192f2`.
+- [x] **A3 bank teller role (post-fix)**: `/sum roamer role set nearest bank_teller` correctly auto-names the roamer "Bank Teller" and greetings fire after `c9a40e2`.
+- [x] **C4 phone + debit card (post-fix)**: bind on first right-click works; **second right-click opens the ATM GUI** after the proxy-based fix in `03f715d`.
+- [x] **C5 player shop**: working in solo testing per Alex's report.
+- [x] **C9 migrate-economy build**: command compiles + dispatches; full migration flow not yet end-to-end tested.
 
-What's **unverified** (may have bugs; flag any oddness):
+### Bugs found in playtest and fixed this session
 
-- [ ] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. **The empty `"elements": []` open-state model is the primary watchpoint** — could render as missing-texture squares on some renderers; will need a transparent stub quad if so.
-- [ ] **A3 bank teller (post-fix)**: `/sum roamer role set nearest bank_teller` should now name the roamer "Bank Teller" (visible) and start sending bank-teller greetings to nearby players.
-- [ ] **C1 standalone path**: `/sum econ add 100` and `/balance` with EconomyInc *removed* from the pack. This is the highest-value smoke test for the SUM money capability — if it works, SUM has a self-sufficient money system.
-- [ ] **C2 SUM bills (post-fix)**: visual rendering of all 8 textures with the JSON fix in place, tooltip names, ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
-- [ ] **C3 `/balance`** user-facing command from non-op player; admin `/balance <player>` with op.
-- [ ] **C4 phone + debit card (post-fix `03f715d`)**: spawn from creative tab, first right-click binds (chat: "Bound to <name>"), **second right-click opens the ATM GUI** (this was the part that wasn't working before; now driven by direct client-side `displayGuiScreen` rather than `player.openGui`), non-owner sees a rejection message. Tooltip shows "Owner: <name>".
-- [ ] **C5 player shop**: place + right-click claims (chat: "Shop claimed."); owner GUI shows template + 3x3 stock slots, +/- buttons set amount/price, Withdraw moves funds to balance. Op-only "Infinite: ON/OFF" toggle. Second player right-clicks → buyer GUI with item icon, x N for $X.XX, stock readout, balance, Buy button. Buyer with insufficient funds is rejected before deduction. Breaking the shop drops stock + funds as bills.
-- [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet in output. 1 packet + Unbundle → 64 bills in output. Output rejects mismatched stacks rather than overwriting. Works with both EconomyInc and SUM bills as input.
-- [ ] **C7 chest loot**: spawn (or `/locate`) a stronghold/mineshaft/jungle temple/desert temple/igloo/etc., open the chest. ~30% of chests should drop a bill (small denominations far more common than $100; $200/$500 never appear).
-- [ ] **C8 bills display**: place block, right-click with a bill or packet — the held items get added to the tray and the TESR renders a rotating stack above. Right-click empty-handed to take everything back. Layer count grows with stack count (1, 5, 16, 32, 64+ tiers).
-- [ ] **C9 migrate-economy**: with EconomyInc still loaded, run `/sum migrate-economy verify` — should print per-player balance + bill counts and totals without changing anything. Then `/sum migrate-economy` for real → balances move from EconomyInc to SUM, bills convert to `sum:` namespace. Stop server, remove EconomyInc, restart, confirm `/balance` reports the migrated value.
-- [ ] **TR trash can**: place block, right-click → 9-slot trash GUI. Drop items in, close GUI → items destroyed. Reopen → empty. Shift-click items back out before closing as the rescue path.
-- [ ] **ST storm-shelter sign**: place a sign inside a building, run a CSM storm alarm, watch nearest roamers head straight for the sign instead of doing the full hazard scan. Sign survives a server restart and re-registers on chunk load.
-- [ ] **SV sleep voting**: with two+ players online in the overworld, have one go to bed → "X/2 players sleeping (1 needed to skip)" announcement. Confirm night skip + clear weather. Try with `sleep_vote.enabled=false` in config to confirm it falls back to vanilla "everyone must sleep".
-- [ ] **BC business cards**: spawn a card from creative tab. Right-click air → personalized message + tooltip shows owner/dim/coords. Anvil-rename the card → title shows on tooltip. Right-click another player → they receive a copy.
-- [ ] **MX mailbox**: place block, right-click → "Mailbox claimed" + GUI opens. As another player, right-click → owner-tagged GUI opens, can deposit but can't take. Owner reopens → can take. Break box → all contents drop.
-- [ ] **JB job board**: `/sum job post 50 Need help building a roof` → confirms posting. Place a job board, right-click → see the listing. Switch to a different player, browse → see same listing, no Remove button. Original poster sees Remove button → click → listing disappears.
+- [x] **`15192f2`** — bill model JSONs had literal `\n` characters; rewrote with real newlines.
+- [x] **`c9a40e2`** — roamer role change had no visible effect; `setRole` now auto-names.
+- [x] **`03f715d`** — phone/card second right-click did nothing; bypassed broken `player.openGui` path.
+- [x] **`25e1bf8`** — plot wand reported "Corner B" on both clicks; switched to sneak+right-click for corner A.
+- [x] **`6866ebc`** — storm-shelter sign too restrictive (most roamers stayed in the lobby); widened range, dropped claim check, loosened path-stays-inside; also converted to wall-mounted.
 
-Pre-flight items still relevant for future work:
+### Unverified — needs in-game testing
+
+Highest priority (load-bearing features):
+
+- [ ] **`/sum help` (`af0b3b6`)**: paginated help, 7 pages. `/sum help` shows the index. `/sum help 2` through `/sum help 7` cover Bank/ATM, Roamer NPCs, Jobs/Mail, Plots, Items/blocks, Admin. Op-only entries inline-tagged `[op]`.
+- [ ] **C1 standalone path**: remove EconomyInc → `/sum econ add 100` should still work, `/balance` should report $100, ATM should produce SUM bills.
+- [ ] **C9 migrate-economy end-to-end**: `/sum migrate-economy verify` (dry run) → `/sum migrate-economy` for real → restart without EconomyInc → confirm balances + bills are intact.
+
+Plots system (D1–D5, all need real testing):
+
+- [ ] **Plot wand (post-fix `25e1bf8`)**: `/give @s sum:plot_wand` → sneak+right-click block A, right-click block B. Tooltip should show both corners, NOT both as "B".
+- [ ] **`/sum plots create <name> [price]`** (op): reads the held wand, creates a plot. `price > 0` → FOR_SALE; `price=0` or omitted → RESERVED. Refuses overlapping selections.
+- [ ] **`/sum plots list [near]`** + **`/sum plots info <id-prefix>`**: chat output shows plots in this dimension, optionally filtered to ~64 blocks of player.
+- [ ] **`/sum plots buy <id-prefix>`**: deducts the price via EconomyBridge, sets owner, status → OWNED. Refuses if not for sale, wrong dim, or insufficient funds.
+- [ ] **`/sum plots sell <id-prefix> <price>`**: re-lists at chosen price.
+- [ ] **`/sum plots trust|untrust|transfer <id> <player>`**: trust set survives transfer.
+- [ ] **Plot protection (D4)**: as a non-owner, try breaking/placing inside an owned plot → cancelled with "you can't build/break here". Op players bypass via `sum.plots.bypass` (auto-grants to op-2+). TNT inside a plot detonates but plot blocks survive. Creepers inside owned plots can't grief.
+
+Storm shelter sign (post-`6866ebc`):
+
+- [ ] **Wall placement**: place the sign on a wall (4 facings). Should mount flush, no longer a floor plaque.
+- [ ] **Multi-roamer convergence**: with the looser AI (range 48, no claim check, path tolerance 2), a designated bathroom sign in a large building should attract MULTIPLE roamers from the lobby during a storm — not just one.
+
+Section B (still unverified end-to-end):
+
+- [ ] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. **`"elements": []` open-state model is the watchpoint** — could render as missing-texture squares on some renderers.
+- [ ] **C2 SUM bills functional**: ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
+- [ ] **C3 `/balance`** from non-op; admin `/balance <player>` with op.
+- [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet. 1 packet + Unbundle → 64 bills. Mismatched output rejects.
+- [ ] **C7 chest loot**: open dungeon/stronghold/temple chests; some should drop bills (mostly small denoms).
+- [ ] **C8 bills display**: TESR renders 1-5 stacked rotating sheets above the tray as count grows. Right-click bills/packet to insert; right-click empty to take.
+- [ ] **TR trash can**: 9-slot ephemeral GUI; closing destroys; shift-click rescues before close.
+- [ ] **SV sleep voting**: 2+ players online, one sleeps → "1/2 players sleeping" announcement; threshold met → night skips + weather clears.
+- [ ] **BC business cards**: right-click air to personalize; right-click another player to give a copy. Anvil-rename for title.
+- [ ] **MX mailbox**: claim on first right-click; non-owner can deposit but not take; owner can do both. Break drops contents.
+- [ ] **JB job board**: `/sum job post 50 Need help` → posts. Place a job board, right-click → browse listings, paginated. Original poster sees Remove button; others don't.
+
+### Pre-flight (always green)
 
 - [x] `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build` succeeds on every commit on `main`.
-- [x] `economy-inc.jar` extracted to `%TEMP%\econ-inc` for reference; can be re-extracted via PowerShell `Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory(jarPath, destDir)` (note: `Expand-Archive` rejects `.jar` extensions).
+- [x] `economy-inc.jar` extracted to `%TEMP%\econ-inc` for reference.
 - [x] EconomyInc reflection signatures locked (see "Verified EconomyInc signatures" below).
 
 ---
@@ -637,9 +706,9 @@ Resolved 2026-05-07 via the AskUserQuestion interface:
 
 ---
 
-## Section D — Plots system (research / future spec)
+## Section D — Plots system (D1–D5 SHIPPED; D6/D7/D8 deferred)
 
-Status: **research only — not on the active roadmap.** Documented while EconomyInc's plots internals were fresh in case SUM wants to absorb it later. The land-claim concept is genuinely useful (it solves "how do I sell players a piece of map?" on roleplay servers), but it's a distinct domain from the bank/utility work in Sections A–C and big enough to warrant its own dedicated effort.
+Status: **Core plots system is shipped and live in code as of 2026-05-08.** The D1–D5 commits implement: data model + per-dimension persistence (`c930136`), wand + admin commands (`db55bf6`, with corner-A fix in `25e1bf8`), buy/sell (`20d6e16`), protection events (`fdf6393`), and trust/transfer (`5bd9474`). What follows is the **original research spec** kept for reference; it largely matches what shipped, but design decisions made during implementation are noted inline.
 
 ### What EconomyInc's plots system actually is
 
@@ -803,26 +872,52 @@ Phase-specific checklists go into the phase's own plan doc once that phase begin
 
 ---
 
-## Recommendation: where to start
+## Session-end summary (2026-05-08)
 
-Order, by my read of value-vs-effort and how the pieces interlock:
+This session shipped the rest of Sections C, B, and the core of D. Phase log in commit order:
 
-1. ✅ **A1 — Realistic ATM block kit.** Shipped 2026-05-07.
-2. ✅ **A2 — Bank lobby kit.** Shipped 2026-05-07 (counter, safe deposit, velvet rope, vault door).
-3. ✅ **A3 — Bank teller NPC.** Shipped 2026-05-07 as a Roamer role tag.
-4. ✅ **C1 — SUM money capability + facade.** Shipped 2026-05-07.
-5. ✅ **C2 — SUM bill items.** Shipped 2026-05-07; render fix `15192f2` 2026-05-08.
-6. ✅ **C3 — `/balance` user-facing command.** Shipped 2026-05-07.
-7. ✅ **C4 — Phone + debit card items.** Shipped 2026-05-08 as `a79f100` (with second-click-open fix in `03f715d`).
-8. ✅ **C5 — Player shop block.** Shipped 2026-05-08 as `efb8e47`. Vending-machine block, slot stock + admin infinite-stock flag, NBT-exact item matching. TESR for in-glass floating item deferred (buyer GUI shows the item).
-9. ✅ **C6 — Bill changer + packets.** Shipped 2026-05-08 as `9cbe648`. 64 bills ↔ 1 packet, eight denominations, accepts EconomyInc bills as input.
-10. ✅ **C7 — Bills loot inject.** Shipped 2026-05-08 as `9b43be2`. ~71% empty, weighted toward small denominations; $200/$500 don't world-gen.
-11. ✅ **C8 — Bills display block + TESR.** Shipped 2026-05-08 as `0df41a4`. Tray block holding one stack; TESR renders 1–5 layered sheets that rotate slowly above the tray.
-12. ✅ **C9 — `/sum migrate-economy`.** Shipped 2026-05-08 as `97c1a85`. Online-player balance + bill migration; verify mode for dry-run; `docs/ECONOMYINC_MIGRATION.md` documents the EconomyInc-removal procedure.
-13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for next.
-10. **C7 — Bills loot inject.** ~30 LOC. Free win once bills exist.
-11. **C8 — Decorative bills display block + TESR.** ~250 LOC.
-12. **C9 — `/sum migrate-economy` + EconomyInc removal docs.** Hardest because in-world EconomyInc blocks need conversion. Defer until everything else lands.
-13. **Section B sketches (MX/SV/TR/BC/JB/ST):** all on hold; pick whichever Alex asks for after Section C lands.
+| Commit | What | Section |
+|---|---|---|
+| `15192f2` | Bill model JSON fix (literal `\n` → real newlines) | C2 fix |
+| `a79f100` | C4 phone + debit card items | C |
+| `c9a40e2` | Roamer role auto-naming (greetings now visible) | A3 fix |
+| `efb8e47` | C5 player shop block (vending machine) | C |
+| `03f715d` | Phone/card 2nd-click GUI open fix (proxy path) | C4 fix |
+| `9cbe648` | C6 bill changer + 8 packet items | C |
+| `9b43be2` | C7 bills loot injector | C |
+| `0df41a4` | C8 decorative bills display + TESR | C |
+| `97c1a85` | C9 migrate-economy command + removal docs | C |
+| `f178d62` | TR trash can | B |
+| `568aa54` | ST storm-shelter sign (initial floor plaque) | B |
+| `a9f04b8` | SV sleep voting | B |
+| `ff3555b` | BC business cards | B |
+| `2c7d263` | MX mailbox | B |
+| `5fca248` | JB job board + listings | B |
+| `c930136` | D1 plot data model | D |
+| `db55bf6` | D2 plot wand + admin commands | D |
+| `20d6e16` | D3 plot buy/sell | D |
+| `fdf6393` | D4 plot protection events | D |
+| `5bd9474` | D5 plot trust/transfer | D |
+| `ae24693` | Storm-shelter sign preference (signed > organic when indoor) | enhancement |
+| `af0b3b6` | `/sum help` paginated, 7 pages | enhancement |
+| `25e1bf8` | Plot wand corner-A fix (sneak+right-click) | D2 fix |
+| `6866ebc` | Storm sign wall-mounted + AI loosened (range/claim/path tolerance) | enhancement |
 
-All of Section A, Section B, and Section C are shipped. SUM is feature-complete for everything that was on the originally-planned headline list. Section D plots remains research-only — that's the only major item left if Alex wants to keep extending the mod.
+## Where things stand
+
+- **All four roadmap sections shipped** for everything that was originally planned. SUM is a feature-complete server-utility + economy mod.
+- **D6/D7/D8 deferred**: plot-browser GUI, rental flow, EconomyInc-plot migration. None are blocking; chat-driven plot management works fine for v1.
+- **Most surface still needs in-game testing**. Verified-in-playtest items are listed in the "Testing status" section. Untested items are flagged with `[ ]`. Highest-priority untested: C1 standalone path (without EconomyInc loaded), `/sum help` pages, plot system end-to-end, storm-shelter sign multi-roamer convergence post-`6866ebc`.
+- **Working directory is clean at `6866ebc`**.
+
+## What's left to do (if Alex picks up later)
+
+Roughly in priority order:
+
+1. **Playtest the remaining unverified items.** Anything with `[ ]` in the Testing status checklist. Bug-fix commits from playtest reports are the highest-leverage work.
+2. **D6 plot-browser GUI** (optional): paginated GuiScreen showing FOR_SALE plots with click-to-buy. ~M effort, ~250 LOC. Mirrors `GuiJobBoard`. Skip if chat-driven `/sum plots list` is enough.
+3. **D7 rental flow** (optional): time-bounded ownership with auto-balance-deduction. ~M effort. Niche — only if a server actually needs it.
+4. **D8 EconomyInc-plots migration** (optional): only relevant if a pack with EconomyInc is being moved to SUM. ~S effort, similar shape to C9.
+5. **Polish passes**: real art for any of the placeholder textures; in-GUI passcode entry for vault doors; postal-worker Roamer role for MX; cash-register decorative block; etc.
+
+Section A through D core is done. The mod doesn't need anything else to be useful — what's left is polish.
