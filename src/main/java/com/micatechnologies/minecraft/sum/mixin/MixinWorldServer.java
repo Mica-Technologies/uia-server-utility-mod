@@ -1,4 +1,4 @@
-package com.micatechnologies.minecraft.sum.pauser.mixin;
+package com.micatechnologies.minecraft.sum.mixin;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
 import net.minecraft.server.MinecraftServer;

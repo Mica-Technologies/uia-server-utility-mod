@@ -53,6 +53,7 @@ Paste this verbatim to a future Claude Code session to pick up the merge work:
 | M5 | Auto Dropper | S | ✅ shipped | `72a47f2` |
 | M6 | World Border | S | ✅ shipped | `59a693e` |
 | M7 | Custom Signposts | M (revised up from S) | ☐ | — |
+| M8 | Moving Quickly (Mixin absorption) | XS | ✅ shipped | (this commit) |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1-2h), M (~300 LOC, half-day), L (≥500 LOC, full day+).
 
@@ -106,7 +107,7 @@ This is a modpack edit, not a SUM commit. Nothing to ship from this repo.
 **Verified behavior:** Mixin on `WorldServer.tick()` HEAD that cancels the entire tick when zero players online. Upstream's Mixin (`MixinWorldServer`) is one-line: `if (mcServer.getCurrentPlayerCount() <= 0) callback.cancel();`. This halts everything — time, weather, random ticks, mob spawning, scheduled block updates, TE ticks (so chunk-loaded farms freeze), entity ticks.
 
 **Implementation note (2026-05-09):** Originally shipped with a non-coremod gamerule approach (toggling `doDaylightCycle`/`doWeatherCycle` on player count transitions). That left chunk-loaded farms running, which diverged from the upstream behavior in a way Alex flagged. **Reworked to use the same Mixin approach as upstream** — SUM is now coremod-flavoured via MixinBooter:
-- `buildscript.properties`: `usesMixins=true`, `mixinsPackage=pauser.mixin`
+- `buildscript.properties`: `usesMixins=true`, `mixinsPackage=mixin`
 - `mixins.sum.json` registers `MixinWorldServer`
 - `addon.gradle` adds `MixinConfigs: mixins.sum.json` to MANIFEST so MixinBooter discovers the config
 - Old `ServerPauserHandler` deleted; the Mixin is the only mechanism. `pauser.enabled` config flag is checked inside the Mixin.
@@ -182,6 +183,24 @@ This unlocks future Mixin-based phases without further build-config work.
 
 ---
 
+## M8 — Moving Quickly (XS, Mixin absorption)
+
+**Replaces:** `moving-quickly.jar`
+**Source:** https://www.curseforge.com/minecraft/mc-mods/movingquickly (no public source); reference behavior confirmed against https://github.com/thiakil/GottaGoFast (sister coremod that does the same thing)
+**Verified behavior:** ASM-patches the hardcoded `100.0F` (player), `300.0F` (elytra), and `100.0D` (vehicle) thresholds in `NetHandlerPlayServer` so lag-induced position desyncs don't trigger the "moved too quickly" rubberband-back-to-last-good-position path.
+
+**SUM implementation:**
+- `MixinNetHandlerPlayServer` with three `@ModifyConstant` injections:
+  - `processPlayer` 100.0F (normal) and 300.0F (elytra) — both multiplied by config multiplier
+  - `processVehicleMove` 100.0D — multiplied by config multiplier
+- Gated by `movement.toleranceEnabled` (default true). When disabled, original returns through unchanged → vanilla behavior.
+- Config: `movement.toleranceMultiplier` (default 10.0, range 1.0-1000.0).
+- All three constants use the same multiplier so player ↔ elytra ↔ vehicle ratios stay vanilla.
+
+**Replaces** `moving-quickly.jar`; modpack jar can be removed after playtest.
+
+---
+
 ## M7 — Custom Signposts (M — revised up from S after closer scoping)
 
 **Replaces:** `custom-sign-posts.jar`
@@ -210,7 +229,7 @@ These were evaluated and rejected for the reasons noted. **Do not re-investigate
 
 | Mod | Effort | Reason |
 |---|---|---|
-| Moving Quickly | XS (now achievable) | ASM-patches `NetHandlerPlayServer` movement-distance constants. Vanilla 1.12.2 / Forge expose **no config knob** for this (verified — see https://forums.minecraftforge.net/topic/74474 quote: *"Coremod is the only way to do this"*). Originally rejected because SUM was not a coremod; **as of 2026-05-09 SUM is now a coremod (Mixin via MixinBooter)**, so absorbing this is just a Mixin on the relevant NetHandlerPlayServer methods. Not absorbed yet — flag if you want it. |
+| ~~Moving Quickly~~ | ~~XS~~ | ~~Originally rejected for coremod gap~~. **Now shipped — see M8 below.** |
 | The Beeper | XS | Decorative beeping computer blocks marketed as a prank tool. Doesn't fit SUM's server-utility / RP-economy charter. Out of scope. |
 | World Buoyancy | XS | (a) Wooden item stacks rise through inventory grid while submerged, (b) liquids can't be displaced by placing a block — only removed via container. Niche survival-realism, not server utility. Out of scope. |
 | GymCraft | M | Multi-block content pack (treadmill, weights, etc.) granting buffs. Too large to absorb cleanly even trimmed; original is abandoned by author. |
@@ -240,7 +259,7 @@ These were evaluated and rejected for the reasons noted. **Do not re-investigate
 - **Default-on** for cosmetic / QoL features (M1, M3, M4, M6, M7); **default-on with per-component toggles** for M2 (Dark Redstone) once unblocked; **default-on** for M5 (Auto Dropper).
 - **Loyalty Rewards: native config, not CraftTweaker.** SUM stays self-contained — no CraftTweaker dependency.
 - **Server Pauser: gamerule-toggle approach, not chunk-tick interception.** Lower risk.
-- **Moving Quickly: not absorbed (yet).** Originally rejected for coremod gap; SUM is now a coremod (since M3 rework), so absorbing it is achievable. Pending Alex's call.
+- **Moving Quickly: shipped as M8.** `@ModifyConstant` Mixins on `NetHandlerPlayServer.processPlayer` (100.0F + 300.0F) and `processVehicleMove` (100.0D), gated by `movement.toleranceEnabled` config flag, multiplier default 10×.
 - ~~**No new coremod for SUM.** If a phase requires ASM patching, reject the phase rather than make SUM a coremod.~~ Reversed 2026-05-09; SUM is now coremod-flavoured.
 
 ---

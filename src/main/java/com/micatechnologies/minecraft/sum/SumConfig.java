@@ -108,6 +108,26 @@ public class SumConfig {
         "120=money:50"
     };
 
+    private static final String CATEGORY_MOVEMENT = "movement";
+
+    private static final String FIELD_KEY_MOVEMENT_ENABLED = "toleranceEnabled";
+    private static final String FIELD_DESCRIPTION_MOVEMENT_ENABLED =
+        "When true, vanilla's hardcoded \"moved too quickly\" thresholds in NetHandlerPlayServer "
+            + "are multiplied by 'toleranceMultiplier'. With multiplier 10 (default), a player can "
+            + "be roughly sqrt(10) times farther from their last good position before being "
+            + "rubberband-snapped — enough to absorb most lag-induced false positives. With "
+            + "multiplier 1, behavior matches vanilla. Inspired by Moving Quickly (coremod by "
+            + "thiakil et al.); SUM patches the same constants via Mixin and gates by this flag.";
+    private static final boolean FIELD_DEFAULT_MOVEMENT_ENABLED = true;
+
+    private static final String FIELD_KEY_MOVEMENT_MULTIPLIER = "toleranceMultiplier";
+    private static final String FIELD_DESCRIPTION_MOVEMENT_MULTIPLIER =
+        "Factor applied to vanilla's 100.0 (player) / 100.0 (vehicle) / 300.0 (elytra) thresholds. "
+            + "Reasonable range: 1.0 (vanilla) to 100.0 (effectively disabled). Default 10.0.";
+    private static final double FIELD_DEFAULT_MOVEMENT_MULTIPLIER = 10.0;
+    private static final double FIELD_MIN_MOVEMENT_MULTIPLIER = 1.0;
+    private static final double FIELD_MAX_MOVEMENT_MULTIPLIER = 1000.0;
+
     private static final String CATEGORY_PAUSER = "pauser";
 
     private static final String FIELD_KEY_PAUSER_ENABLED = "enabled";
@@ -183,6 +203,9 @@ public class SumConfig {
 
     private static boolean pauserEnabled;
 
+    private static boolean movementToleranceEnabled;
+    private static double movementToleranceMultiplier;
+
     private static boolean loyaltyEnabled;
     private static List<LoyaltyMilestone> loyaltyMilestones = Collections.emptyList();
 
@@ -256,6 +279,13 @@ public class SumConfig {
         pauserEnabled = config.getBoolean(
             FIELD_KEY_PAUSER_ENABLED, CATEGORY_PAUSER,
             FIELD_DEFAULT_PAUSER_ENABLED, FIELD_DESCRIPTION_PAUSER_ENABLED);
+
+        movementToleranceEnabled = config.getBoolean(
+            FIELD_KEY_MOVEMENT_ENABLED, CATEGORY_MOVEMENT,
+            FIELD_DEFAULT_MOVEMENT_ENABLED, FIELD_DESCRIPTION_MOVEMENT_ENABLED);
+        movementToleranceMultiplier = config.get(CATEGORY_MOVEMENT, FIELD_KEY_MOVEMENT_MULTIPLIER,
+            FIELD_DEFAULT_MOVEMENT_MULTIPLIER, FIELD_DESCRIPTION_MOVEMENT_MULTIPLIER,
+            FIELD_MIN_MOVEMENT_MULTIPLIER, FIELD_MAX_MOVEMENT_MULTIPLIER).getDouble();
 
         loyaltyEnabled = config.getBoolean(
             FIELD_KEY_LOYALTY_ENABLED, CATEGORY_LOYALTY,
@@ -431,6 +461,14 @@ public class SumConfig {
 
     public static boolean isPauserEnabled() {
         return pauserEnabled;
+    }
+
+    public static boolean isMovementToleranceEnabled() {
+        return movementToleranceEnabled;
+    }
+
+    public static double getMovementToleranceMultiplier() {
+        return movementToleranceMultiplier;
     }
 
     public static boolean isBeachesAffectedBlock(Block block) {
