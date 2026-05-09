@@ -6,12 +6,14 @@ import java.util.List;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockLiquid;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.entity.player.FillBucketEvent;
 import net.minecraftforge.event.world.BlockEvent;
@@ -26,11 +28,15 @@ public class BeachesHandler {
     private final List<ScheduledFlood> scheduledFloods = new ArrayList<>();
 
     @SubscribeEvent
-    public void onBlockHarvested(BlockEvent.HarvestDropsEvent event) {
+    public void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (event.isCanceled()) {
+            return;
+        }
         if (!SumConfig.isBeachesEnabled()) {
             return;
         }
-        if (event.getHarvester() == null || event.getHarvester() instanceof FakePlayer) {
+        EntityPlayer player = event.getPlayer();
+        if (player == null || player instanceof FakePlayer) {
             return;
         }
         Block broken = event.getState().getBlock();
@@ -38,12 +44,27 @@ public class BeachesHandler {
             return;
         }
         World world = event.getWorld();
-        BlockPos pos = event.getPos();
+        if (!(world instanceof WorldServer)) {
+            return;
+        }
+        BlockPos pos = event.getPos().toImmutable();
         if (!hasAdjacentWaterSource(world, pos)) {
             return;
         }
-        world.setBlockState(pos, Blocks.FLOWING_WATER.getDefaultState(), 11);
-        scheduleFlood(world, pos, 0);
+        // BreakEvent fires before vanilla removes the block. Defer the water placement to
+        // the next server tick so the break completes first; otherwise our setBlockState
+        // gets clobbered by vanilla turning the block to air right after our handler returns.
+        // Switching from HarvestDropsEvent (survival-only) to BreakEvent (creative + survival)
+        // means we cover both gamemodes.
+        final WorldServer ws = (WorldServer) world;
+        ws.addScheduledTask(() -> {
+            Block here = ws.getBlockState(pos).getBlock();
+            if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
+                return;
+            }
+            ws.setBlockState(pos, Blocks.FLOWING_WATER.getDefaultState(), 11);
+            scheduleFlood(ws, pos, 0);
+        });
     }
 
     @SubscribeEvent
