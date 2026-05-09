@@ -17,6 +17,7 @@ import com.micatechnologies.minecraft.sum.loyalty.LoyaltyHandler;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.plots.PlotsProtectionHandler;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
+import com.micatechnologies.minecraft.sum.signpost.TileEntitySignpost;
 import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.TileEntityStormShelterSign;
@@ -86,6 +87,8 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "mailbox"));
         GameRegistry.registerTileEntity(TileEntityAutoDropper.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "auto_dropper"));
+        GameRegistry.registerTileEntity(TileEntitySignpost.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "signpost"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

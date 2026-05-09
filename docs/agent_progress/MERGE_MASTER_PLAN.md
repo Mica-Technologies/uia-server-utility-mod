@@ -1,6 +1,6 @@
 # SUM merge master plan — absorbing simple mods from Alto
 
-Status: **6 of 7 phases shipped (M1, M2, M3, M4, M5, M6).** M7 Custom Signposts is the only remaining phase. Last updated 2026-05-09 against HEAD `59a693e`.
+Status: **All planned phases shipped (M1-M8).** M7 Custom Signposts shipped as a v1 (chat-driven editor, angle-only mode); upstream's in-GUI editor and target-XZ-coords mode are deferred polish. Last updated 2026-05-09.
 
 This doc is the execution plan for absorbing 7 small server-utility mods from the Alto modpack into SUM, mirroring the EconomyInc → SUM pattern. Each phase replaces one third-party jar with native SUM code so that jar can be pulled from `manifest.json`.
 
@@ -52,8 +52,8 @@ Paste this verbatim to a future Claude Code session to pick up the merge work:
 | M4 | Loyalty Rewards | S | ✅ shipped | `e1150e6` |
 | M5 | Auto Dropper | S | ✅ shipped | `72a47f2` |
 | M6 | World Border | S | ✅ shipped | `59a693e` |
-| M7 | Custom Signposts | M (revised up from S) | ☐ | — |
-| M8 | Moving Quickly (Mixin absorption) | XS | ✅ shipped | (this commit) |
+| M7 | Custom Signposts | M (revised up from S) | ✅ shipped (v1 — chat editor, no GUI) | (this commit) |
+| M8 | Moving Quickly (Mixin absorption) | XS | ✅ shipped | `d33312e` |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1-2h), M (~300 LOC, half-day), L (≥500 LOC, full day+).
 
@@ -201,13 +201,25 @@ This unlocks future Mixin-based phases without further build-config work.
 
 ---
 
-## M7 — Custom Signposts (M — revised up from S after closer scoping)
+## M7 — Custom Signposts (M; v1 shipped without GUI)
 
 **Replaces:** `custom-sign-posts.jar`
 **Source:** https://www.curseforge.com/minecraft/mc-mods/custom-signposts (no public repo; CurseForge-only)
-**Verified behavior:** Directional signpost block with **up to 7 arms** per block. Each arm has its own GUI configuration: angle in degrees OR a target XZ coord (the arm auto-rotates to point at it). NOT street-name signs — pointer/wayfinding.
+**Verified behavior:** Directional signpost block with up to 7 arms per block. Each arm has its own GUI configuration: angle in degrees OR a target XZ coord (the arm auto-rotates to point at it). NOT street-name signs — pointer/wayfinding.
 
-**Effort note (2026-05-09):** Initial estimate was S (~100 LOC). Closer scoping puts it at ~300-500 LOC across 6-8 new files: Block, TE, multi-arm edit GUI, container plumbing, network packet, TESR for in-world rendering, texture generation, lang/registration wiring. Reclassified to M.
+**SUM v1 implementation (shipped 2026-05-09):**
+- `BlockSignpost` — placeable wooden post (4×16×4 bbox inside a normal block cell), inherits vanilla `log_oak` texture for the visual.
+- `TileEntitySignpost` — list of up to `MAX_ARMS=7` `SignpostArm`s, NBT-persisted, synced to clients via `getUpdateTag`/`onDataPacket`.
+- `SignpostArm` — `{label, angleDegrees}`. Compass convention: 0=N, 90=E, 180=S, 270=W.
+- `TESRSignpost` — renders each arm's label as floating text at its compass angle, stacked vertically up the post by arm index. Text reads outward along the arm direction.
+- `/sum signpost add <angle> <label>` / `remove <index>` / `edit <index> <angle> <label>` / `clear` / `list` — chat-driven editor; uses ray-trace targeting like the vault commands.
+- Right-click the post to dump arm list to chat.
+
+**v1 deferred (worth considering later):**
+- In-world GUI editor (would claim `SumGuiHandler` id 8 + `SumNetwork` slot 6).
+- Target-XZ-coords mode where the arm auto-rotates to point at fixed coordinates as the player moves around.
+- Custom textures (currently reuses vanilla `log_oak`).
+- Per-arm rendered "plank" geometry under the text label.
 
 - [ ] New package `com.micatechnologies.minecraft.sum.signpost`
 - [ ] `BlockSignpost` (post block) + `TileEntitySignpost` (stores up to 7 arms; each arm has `text`, `angleDegrees`, optional `targetX/Z`)

@@ -14,6 +14,8 @@ import com.micatechnologies.minecraft.sum.plots.SumPlot;
 import com.micatechnologies.minecraft.sum.plots.SumPlotsWorldSavedData;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RoamerRole;
+import com.micatechnologies.minecraft.sum.signpost.SignpostArm;
+import com.micatechnologies.minecraft.sum.signpost.TileEntitySignpost;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -48,7 +50,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <help|reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots>";
+        return "/sum <help|reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots|signpost>";
     }
 
     @Override
@@ -114,6 +116,9 @@ public class CommandSum extends CommandBase {
                 break;
             case "plots":
                 handlePlots(sender, args);
+                break;
+            case "signpost":
+                handleSignpost(sender, args);
                 break;
             case "help":
                 handleHelp(sender, args);
@@ -522,6 +527,191 @@ public class CommandSum extends CommandBase {
             return null;
         }
         return (TileEntityVaultDoor) te;
+    }
+
+    // --- /sum signpost subcommands ---
+
+    private void handleSignpost(ICommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum signpost <add|remove|edit|clear|list> [args...]");
+            return;
+        }
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Signpost commands must be run by a player.");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        switch (args[1].toLowerCase()) {
+            case "add":
+                handleSignpostAdd(player, args);
+                break;
+            case "remove":
+                handleSignpostRemove(player, args);
+                break;
+            case "edit":
+                handleSignpostEdit(player, args);
+                break;
+            case "clear":
+                handleSignpostClear(player, args);
+                break;
+            case "list":
+                handleSignpostList(player);
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED,
+                    "Unknown signpost subcommand. Usage: /sum signpost <add|remove|edit|clear|list>");
+                break;
+        }
+    }
+
+    private void handleSignpostAdd(EntityPlayerMP player, String[] args) {
+        if (args.length < 4) {
+            sendMessage(player, TextFormatting.RED,
+                "Usage: /sum signpost add <angle> <label...>");
+            return;
+        }
+        TileEntitySignpost signpost = getTargetedSignpost(player);
+        if (signpost == null) {
+            return;
+        }
+        Float angle = parseAngle(player, args[2]);
+        if (angle == null) {
+            return;
+        }
+        if (signpost.getArms().size() >= TileEntitySignpost.MAX_ARMS) {
+            sendMessage(player, TextFormatting.RED,
+                "Signpost is full (" + TileEntitySignpost.MAX_ARMS + " arms max). Remove one first.");
+            return;
+        }
+        String label = joinFromIndex(args, 3);
+        if (signpost.addArm(new SignpostArm(label, angle))) {
+            sendMessage(player, TextFormatting.GREEN,
+                "Added arm: " + label + " @ " + String.format("%.0f", angle) + "°");
+        }
+    }
+
+    private void handleSignpostRemove(EntityPlayerMP player, String[] args) {
+        if (args.length < 3) {
+            sendMessage(player, TextFormatting.RED, "Usage: /sum signpost remove <index>");
+            return;
+        }
+        TileEntitySignpost signpost = getTargetedSignpost(player);
+        if (signpost == null) {
+            return;
+        }
+        Integer index = parseIndex(player, args[2], signpost.getArms().size());
+        if (index == null) {
+            return;
+        }
+        if (signpost.removeArm(index)) {
+            sendMessage(player, TextFormatting.GREEN, "Removed arm " + index + ".");
+        }
+    }
+
+    private void handleSignpostEdit(EntityPlayerMP player, String[] args) {
+        if (args.length < 5) {
+            sendMessage(player, TextFormatting.RED,
+                "Usage: /sum signpost edit <index> <angle> <label...>");
+            return;
+        }
+        TileEntitySignpost signpost = getTargetedSignpost(player);
+        if (signpost == null) {
+            return;
+        }
+        Integer index = parseIndex(player, args[2], signpost.getArms().size());
+        if (index == null) {
+            return;
+        }
+        Float angle = parseAngle(player, args[3]);
+        if (angle == null) {
+            return;
+        }
+        String label = joinFromIndex(args, 4);
+        if (signpost.updateArm(index, label, angle)) {
+            sendMessage(player, TextFormatting.GREEN,
+                "Updated arm " + index + ": " + label + " @ " + String.format("%.0f", angle) + "°");
+        }
+    }
+
+    private void handleSignpostClear(EntityPlayerMP player, String[] args) {
+        TileEntitySignpost signpost = getTargetedSignpost(player);
+        if (signpost == null) {
+            return;
+        }
+        if (signpost.getArms().isEmpty()) {
+            sendMessage(player, TextFormatting.YELLOW, "Signpost already has no arms.");
+            return;
+        }
+        if (args.length < 3 || !"yes".equalsIgnoreCase(args[2])) {
+            sendMessage(player, TextFormatting.YELLOW,
+                "This will remove " + signpost.getArms().size()
+                    + " arms. Confirm with: /sum signpost clear yes");
+            return;
+        }
+        signpost.clearArms();
+        sendMessage(player, TextFormatting.GREEN, "Signpost arms cleared.");
+    }
+
+    private void handleSignpostList(EntityPlayerMP player) {
+        TileEntitySignpost signpost = getTargetedSignpost(player);
+        if (signpost == null) {
+            return;
+        }
+        if (signpost.getArms().isEmpty()) {
+            sendMessage(player, TextFormatting.GRAY, "Signpost has no arms.");
+            return;
+        }
+        sendMessage(player, TextFormatting.GOLD,
+            "Signpost (" + signpost.getArms().size() + "/" + TileEntitySignpost.MAX_ARMS + " arms):");
+        int i = 0;
+        for (SignpostArm arm : signpost.getArms()) {
+            sendMessage(player, TextFormatting.WHITE,
+                "  " + i + ". " + (arm.getLabel().isEmpty() ? "(no label)" : arm.getLabel())
+                    + " @ " + String.format("%.0f", arm.getAngleDegrees()) + "°");
+            i++;
+        }
+    }
+
+    private TileEntitySignpost getTargetedSignpost(EntityPlayer player) {
+        RayTraceResult result = player.rayTrace(5.0, 1.0F);
+        if (result == null || result.typeOfHit != RayTraceResult.Type.BLOCK) {
+            sendMessage(player, TextFormatting.RED, "Look at a signpost first (within 5 blocks).");
+            return null;
+        }
+        TileEntity te = player.world.getTileEntity(result.getBlockPos());
+        if (!(te instanceof TileEntitySignpost)) {
+            sendMessage(player, TextFormatting.RED, "That's not a signpost.");
+            return null;
+        }
+        return (TileEntitySignpost) te;
+    }
+
+    private Float parseAngle(ICommandSender sender, String raw) {
+        try {
+            return Float.parseFloat(raw);
+        } catch (NumberFormatException e) {
+            sendMessage(sender, TextFormatting.RED,
+                "Angle must be a number in degrees (0=N, 90=E, 180=S, 270=W).");
+            return null;
+        }
+    }
+
+    private Integer parseIndex(ICommandSender sender, String raw, int upperBoundExclusive) {
+        int index;
+        try {
+            index = Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            sendMessage(sender, TextFormatting.RED, "Arm index must be an integer.");
+            return null;
+        }
+        if (index < 0 || index >= upperBoundExclusive) {
+            sendMessage(sender, TextFormatting.RED,
+                "Arm index " + index + " out of range. Use 0 through "
+                    + (upperBoundExclusive - 1) + ".");
+            return null;
+        }
+        return index;
     }
 
     private static String joinFromIndex(String[] args, int from) {
@@ -1347,6 +1537,12 @@ public class CommandSum extends CommandBase {
             h("Trash can", "Right-click for ephemeral 9-slot inventory. Closing the GUI destroys contents."),
             h("Storm-shelter sign", "Roamers seek this during storm alarms; preferred over auto-discovered shelters."),
             h("Business card", "Right-click air to personalize; right-click another player to give them a copy."),
+            h("Auto dropper", "Drops items continuously unless redstone-powered. Inverse of vanilla; no scatter."),
+            h("Signpost", "Wayfinding post; right-click to view arms. Use /sum signpost add <angle> <label> to add."),
+            h("/sum signpost add <angle> <label>", "Add a labeled arm pointing at a compass angle (0=N, 90=E, 180=S, 270=W)."),
+            h("/sum signpost remove <index>", "Remove arm at index from the signpost you're looking at."),
+            h("/sum signpost edit <index> <angle> <label>", "Replace an arm's angle and label."),
+            h("/sum signpost clear", "Remove all arms (with 'yes' confirmation)."),
         }),
         new HelpPage("Admin", new HelpEntry[] {
             h("/sum reloadconfig", "[op] Re-read sum.cfg without a server restart."),
