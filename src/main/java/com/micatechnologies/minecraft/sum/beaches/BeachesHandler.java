@@ -80,37 +80,19 @@ public class BeachesHandler {
             return;
         }
         debugTo(player, "match at " + describePos(pos)
-            + " (sea level=" + world.getSeaLevel() + ", spread requires Y="
-            + (world.getSeaLevel() - 1) + ") — scheduling water placement");
+            + " (sea level=" + world.getSeaLevel() + ", spread Y="
+            + (world.getSeaLevel() - 1) + ") — queued for next tick");
         // Mark this position as pending so subsequent breaks in the SAME tick (e.g. a
-        // creative-mode line dig) see it as "adjacent water" even though our deferred
-        // task hasn't actually placed the source yet.
+        // creative-mode line dig) see it as "adjacent water" even though we haven't
+        // placed the source yet.
         pendingWaterPlacements.add(pos);
-        // BreakEvent fires before vanilla removes the block. Defer the water placement to
-        // the next server tick so the break completes first; otherwise our setBlockState
-        // gets clobbered by vanilla turning the block to air right after our handler returns.
-        // Switching from HarvestDropsEvent (survival-only) to BreakEvent (creative + survival)
-        // means we cover both gamemodes.
-        final WorldServer ws = (WorldServer) world;
-        ws.addScheduledTask(() -> {
-            try {
-                Block here = ws.getBlockState(pos).getBlock();
-                if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
-                    debugTo(player, "deferred-task skip: block at " + describePos(pos) + " is now '"
-                        + (here.getRegistryName() == null ? "?" : here.getRegistryName().toString())
-                        + "' (something replaced the broken block)");
-                    return;
-                }
-                ws.setBlockState(pos, Blocks.WATER.getDefaultState(), 11);
-                debugTo(player, "placed water source at " + describePos(pos)
-                    + ", scheduling flood (will spread "
-                    + (pos.getY() == ws.getSeaLevel() - 1 ? "yes — sea-level match" : "no — wrong Y")
-                    + ")");
-                scheduleFlood(ws, pos, 0);
-            } finally {
-                pendingWaterPlacements.remove(pos);
-            }
-        });
+        // Queue for processing in WorldTickEvent.END — that's the only reliable hook for
+        // "fire after vanilla finishes the current tick." WorldServer.addScheduledTask
+        // runs the runnable INLINE when called from the main thread (which we are, since
+        // BreakEvent fires on the main thread), so the task would execute before vanilla
+        // even removes the broken block. WorldTickEvent.END fires once per world tick,
+        // strictly after all packet/world processing for that tick has completed.
+        scheduledFloods.add(new ScheduledFlood((WorldServer) world, pos, 0, player));
     }
 
     private static String describePos(BlockPos pos) {
@@ -142,7 +124,8 @@ public class BeachesHandler {
         if (event.getEmptyBucket().getItem() != Items.BUCKET) {
             return;
         }
-        if (event.getEntityPlayer() == null || event.getEntityPlayer() instanceof FakePlayer) {
+        EntityPlayer player = event.getEntityPlayer();
+        if (player == null || player instanceof FakePlayer) {
             return;
         }
         RayTraceResult target = event.getTarget();
@@ -153,62 +136,72 @@ public class BeachesHandler {
         if (targetPos == null) {
             return;
         }
-        if (!hasAdjacentWaterSource(event.getWorld(), targetPos)) {
+        World world = event.getWorld();
+        if (!(world instanceof WorldServer)) {
             return;
         }
-        event.getWorld().setBlockState(targetPos, Blocks.WATER.getDefaultState(), 11);
-        scheduleFlood(event.getWorld(), targetPos, 0);
+        if (!hasAdjacentWaterSource(world, targetPos)) {
+            return;
+        }
+        BlockPos immutable = targetPos.toImmutable();
+        pendingWaterPlacements.add(immutable);
+        scheduledFloods.add(new ScheduledFlood((WorldServer) world, immutable, 0, player));
     }
 
     @SubscribeEvent
     public void onWorldTick(TickEvent.WorldTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
+        if (event.phase != TickEvent.Phase.END || event.world.isRemote) {
             return;
         }
         for (int i = scheduledFloods.size() - 1; i >= 0; i--) {
             ScheduledFlood entry = scheduledFloods.get(i);
-            entry.ticksWaited++;
-            if (entry.ticksWaited >= FLOOD_TICKS_BETWEEN_STEPS) {
-                populateWater(entry.world, entry.pos, entry.depth);
+            if (entry.world != event.world) {
+                continue;
+            }
+            int delay = entry.delayTicks();
+            if (entry.ticksWaited < delay) {
+                entry.ticksWaited++;
+                continue;
+            }
+            // Ready to attempt placement.
+            boolean placed = tryPlaceAndRecurse(entry);
+            if (placed || --entry.retriesLeft <= 0) {
+                pendingWaterPlacements.remove(entry.pos);
                 scheduledFloods.remove(i);
             }
+            // else: leave in queue, retry next tick.
         }
     }
 
-    private void scheduleFlood(World world, BlockPos pos, int depth) {
-        if (SumConfig.isBeachesAnimatedFlooding()) {
-            scheduledFloods.add(new ScheduledFlood(world, pos.toImmutable(), depth));
-        } else {
-            populateWater(world, pos, depth);
-        }
-    }
-
-    private void populateWater(World world, BlockPos pos, int depth) {
+    private boolean tryPlaceAndRecurse(ScheduledFlood entry) {
+        WorldServer world = entry.world;
+        BlockPos pos = entry.pos;
         Block here = world.getBlockState(pos).getBlock();
         if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
-            return;
+            debugTo(entry.debugPlayer, "tick-defer retry: block at " + describePos(pos) + " is '"
+                + (here.getRegistryName() == null ? "?" : here.getRegistryName().toString())
+                + "' (waiting for break to complete)");
+            return false;
         }
         world.setBlockState(pos, Blocks.WATER.getDefaultState(), 11);
-        if (depth > MAX_FLOOD_DEPTH || pos.getY() != world.getSeaLevel() - 1) {
-            return;
+        debugTo(entry.debugPlayer, "placed water source at " + describePos(pos)
+            + " (depth=" + entry.depth + ")");
+        if (entry.depth >= MAX_FLOOD_DEPTH || pos.getY() != world.getSeaLevel() - 1) {
+            return true;
         }
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (EnumFacing facing : EnumFacing.Plane.HORIZONTAL) {
             cursor.setPos(pos).move(facing);
             IBlockState neighbor = world.getBlockState(cursor);
             Block neighborBlock = neighbor.getBlock();
-            if (neighborBlock == Blocks.AIR) {
-                scheduleFlood(world, cursor.toImmutable(), depth + 1);
-                return;
-            }
-            // Any flowing water (any level) is a transient stream that should be promoted
-            // to a source by our recursion. Real WATER source blocks are skipped (already
-            // what we want).
-            if (neighborBlock == Blocks.FLOWING_WATER) {
-                scheduleFlood(world, cursor.toImmutable(), depth + 1);
-                return;
+            if (neighborBlock == Blocks.AIR || neighborBlock == Blocks.FLOWING_WATER) {
+                BlockPos next = cursor.toImmutable();
+                pendingWaterPlacements.add(next);
+                scheduledFloods.add(new ScheduledFlood(world, next, entry.depth + 1, entry.debugPlayer));
+                return true;
             }
         }
+        return true;
     }
 
     private boolean hasAdjacentWaterSource(World world, BlockPos pos) {
@@ -231,15 +224,31 @@ public class BeachesHandler {
     }
 
     private static final class ScheduledFlood {
-        final World world;
+        final WorldServer world;
         final BlockPos pos;
         final int depth;
+        final EntityPlayer debugPlayer;
         int ticksWaited;
+        /** Number of attempts allowed after the initial-delay window — in case the block
+         *  break hasn't completed yet by WorldTickEvent.END (depending on Forge/MC packet
+         *  processing order). 5 retries is generous and avoids a brittle hard-coded
+         *  one-shot. */
+        int retriesLeft = 5;
 
-        ScheduledFlood(World world, BlockPos pos, int depth) {
+        ScheduledFlood(WorldServer world, BlockPos pos, int depth, EntityPlayer debugPlayer) {
             this.world = world;
             this.pos = pos;
             this.depth = depth;
+            this.debugPlayer = debugPlayer;
+        }
+
+        /** Initial placement (depth 0) fires on the next world tick end (delay 1).
+         *  Recursion (depth > 0) uses the animation interval if enabled, else next tick. */
+        int delayTicks() {
+            if (depth == 0) {
+                return 1;
+            }
+            return SumConfig.isBeachesAnimatedFlooding() ? FLOOD_TICKS_BETWEEN_STEPS : 1;
         }
     }
 }
