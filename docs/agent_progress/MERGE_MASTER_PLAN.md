@@ -1,6 +1,6 @@
 # SUM merge master plan — absorbing simple mods from Alto
 
-Status: **Not started.** Revised 2026-05-09 against HEAD `1b114e2`.
+Status: **6 of 7 phases shipped (M1, M2, M3, M4, M5, M6).** M7 Custom Signposts is the only remaining phase. Last updated 2026-05-09 against HEAD `59a693e`.
 
 This doc is the execution plan for absorbing 7 small server-utility mods from the Alto modpack into SUM, mirroring the EconomyInc → SUM pattern. Each phase replaces one third-party jar with native SUM code so that jar can be pulled from `manifest.json`.
 
@@ -46,13 +46,13 @@ Paste this verbatim to a future Claude Code session to pick up the merge work:
 
 | # | Mod | Effort | Status | Commit |
 |---|---|---|---|---|
-| M1 | Pretty Beaches | XS | ☐ | — |
+| M1 | Pretty Beaches | XS | ✅ shipped | `023da78` |
 | M2 | Dark Redstone | — | ✅ RESOLVED via UT config flip — no SUM code | n/a |
-| M3 | Server Pauser | S | ☐ | — |
-| M4 | Loyalty Rewards | S | ☐ | — |
-| M5 | Auto Dropper | S | ☐ | — |
-| M6 | World Border | S | ☐ | — |
-| M7 | Custom Signposts | S | ☐ | — |
+| M3 | Server Pauser | S | ✅ shipped | `22f1106` |
+| M4 | Loyalty Rewards | S | ✅ shipped | `e1150e6` |
+| M5 | Auto Dropper | S | ✅ shipped | `72a47f2` |
+| M6 | World Border | S | ✅ shipped | `59a693e` |
+| M7 | Custom Signposts | M (revised up from S) | ☐ | — |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1-2h), M (~300 LOC, half-day), L (≥500 LOC, full day+).
 
@@ -174,11 +174,13 @@ This is a modpack edit, not a SUM commit. Nothing to ship from this repo.
 
 ---
 
-## M7 — Custom Signposts (S)
+## M7 — Custom Signposts (M — revised up from S after closer scoping)
 
 **Replaces:** `custom-sign-posts.jar`
-**Source:** https://www.curseforge.com/minecraft/mc-mods/custom-signposts
+**Source:** https://www.curseforge.com/minecraft/mc-mods/custom-signposts (no public repo; CurseForge-only)
 **Verified behavior:** Directional signpost block with **up to 7 arms** per block. Each arm has its own GUI configuration: angle in degrees OR a target XZ coord (the arm auto-rotates to point at it). NOT street-name signs — pointer/wayfinding.
+
+**Effort note (2026-05-09):** Initial estimate was S (~100 LOC). Closer scoping puts it at ~300-500 LOC across 6-8 new files: Block, TE, multi-arm edit GUI, container plumbing, network packet, TESR for in-world rendering, texture generation, lang/registration wiring. Reclassified to M.
 
 - [ ] New package `com.micatechnologies.minecraft.sum.signpost`
 - [ ] `BlockSignpost` (post block) + `TileEntitySignpost` (stores up to 7 arms; each arm has `text`, `angleDegrees`, optional `targetX/Z`)
