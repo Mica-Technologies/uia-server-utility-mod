@@ -3,6 +3,7 @@ package com.micatechnologies.minecraft.sum;
 import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
+import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
 import com.micatechnologies.minecraft.sum.command.CommandBalance;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.economy.BillsLootInjector;
@@ -62,6 +63,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new BillsLootInjector());
         MinecraftForge.EVENT_BUS.register(new SleepVoteHandler());
         MinecraftForge.EVENT_BUS.register(new PlotsProtectionHandler());
+        MinecraftForge.EVENT_BUS.register(new BeachesHandler());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();

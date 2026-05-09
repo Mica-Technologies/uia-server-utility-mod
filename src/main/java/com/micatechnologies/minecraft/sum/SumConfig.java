@@ -51,6 +51,35 @@ public class SumConfig {
         "minecraft:concrete=1.25"
     };
 
+    private static final String CATEGORY_BEACHES = "beaches";
+
+    private static final String FIELD_KEY_BEACHES_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_BEACHES_ENABLED =
+        "When true, breaking a configured 'affectedBlock' adjacent to a water source replaces the broken block with "
+            + "water and animates flooding the surrounding column at sea level. Inspired by Pretty Beaches "
+            + "(BlayTheNinth, MIT).";
+    private static final boolean FIELD_DEFAULT_BEACHES_ENABLED = true;
+
+    private static final String FIELD_KEY_BEACHES_AFFECTED_BLOCKS = "affectedBlocks";
+    private static final String FIELD_DESCRIPTION_BEACHES_AFFECTED_BLOCKS =
+        "List of block registry names whose breakage near water triggers the flooding behavior. "
+            + "Use \"*\" to affect every block.";
+    private static final String[] FIELD_DEFAULT_BEACHES_AFFECTED_BLOCKS = {
+        "minecraft:sand"
+    };
+
+    private static final String FIELD_KEY_BEACHES_ANIMATED = "animatedFlooding";
+    private static final String FIELD_DESCRIPTION_BEACHES_ANIMATED =
+        "When true, flooding spreads one step every " + 10 + " ticks (animated). When false, the entire column "
+            + "fills instantly on break.";
+    private static final boolean FIELD_DEFAULT_BEACHES_ANIMATED = true;
+
+    private static final String FIELD_KEY_BEACHES_INFINITE_BUCKET = "infiniteBucketWater";
+    private static final String FIELD_DESCRIPTION_BEACHES_INFINITE_BUCKET =
+        "When true, filling a bucket at a flowing-water tile adjacent to a source restores the source instead "
+            + "of leaving an empty pocket. Off by default to preserve vanilla bucket behavior.";
+    private static final boolean FIELD_DEFAULT_BEACHES_INFINITE_BUCKET = false;
+
     private static final String CATEGORY_SLEEP_VOTE = "sleep_vote";
 
     private static final String FIELD_KEY_SLEEP_VOTE_ENABLED = "enabled";
@@ -77,6 +106,12 @@ public class SumConfig {
     private static boolean favoritesStarOverlay;
     private static boolean sleepVoteEnabled;
     private static int sleepVoteThresholdPercent;
+
+    private static boolean beachesEnabled;
+    private static boolean beachesAnimatedFlooding;
+    private static boolean beachesInfiniteBucketWater;
+    private static Set<String> beachesAffectedBlockNames;
+    private static boolean beachesAffectsAllBlocks;
 
     private static Configuration config;
 
@@ -124,6 +159,21 @@ public class SumConfig {
             FIELD_DEFAULT_SLEEP_VOTE_THRESHOLD, 1, 100,
             FIELD_DESCRIPTION_SLEEP_VOTE_THRESHOLD);
 
+        beachesEnabled = config.getBoolean(
+            FIELD_KEY_BEACHES_ENABLED, CATEGORY_BEACHES,
+            FIELD_DEFAULT_BEACHES_ENABLED, FIELD_DESCRIPTION_BEACHES_ENABLED);
+        beachesAnimatedFlooding = config.getBoolean(
+            FIELD_KEY_BEACHES_ANIMATED, CATEGORY_BEACHES,
+            FIELD_DEFAULT_BEACHES_ANIMATED, FIELD_DESCRIPTION_BEACHES_ANIMATED);
+        beachesInfiniteBucketWater = config.getBoolean(
+            FIELD_KEY_BEACHES_INFINITE_BUCKET, CATEGORY_BEACHES,
+            FIELD_DEFAULT_BEACHES_INFINITE_BUCKET, FIELD_DESCRIPTION_BEACHES_INFINITE_BUCKET);
+        String[] beachesAffectedEntries = config.getStringList(
+            FIELD_KEY_BEACHES_AFFECTED_BLOCKS, CATEGORY_BEACHES,
+            FIELD_DEFAULT_BEACHES_AFFECTED_BLOCKS, FIELD_DESCRIPTION_BEACHES_AFFECTED_BLOCKS);
+        beachesAffectedBlockNames = new HashSet<>(Arrays.asList(beachesAffectedEntries));
+        beachesAffectsAllBlocks = beachesAffectedBlockNames.contains("*");
+
         if (config.hasChanged()) {
             config.save();
         }
@@ -131,6 +181,29 @@ public class SumConfig {
 
     public static boolean isSleepVoteEnabled() {
         return sleepVoteEnabled;
+    }
+
+    public static boolean isBeachesEnabled() {
+        return beachesEnabled;
+    }
+
+    public static boolean isBeachesAnimatedFlooding() {
+        return beachesAnimatedFlooding;
+    }
+
+    public static boolean isBeachesInfiniteBucketWater() {
+        return beachesInfiniteBucketWater;
+    }
+
+    public static boolean isBeachesAffectedBlock(Block block) {
+        if (block == null || beachesAffectedBlockNames == null) {
+            return false;
+        }
+        if (beachesAffectsAllBlocks) {
+            return true;
+        }
+        net.minecraft.util.ResourceLocation registryName = block.getRegistryName();
+        return registryName != null && beachesAffectedBlockNames.contains(registryName.toString());
     }
 
     public static int getSleepVoteThresholdPercent() {
