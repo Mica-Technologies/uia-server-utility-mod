@@ -6,6 +6,64 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mica-Technologies/uia-server-utility-mod/latest/total?style=for-the-badge&label=Downloads)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Mica-Technologies/uia-server-utility-mod/total?style=for-the-badge&label=Downloads%20(All))
 
+## Features
+
+### Economy
+
+- SUM-native player balance capability (`ISumMoney`) with NBT persistence and login/respawn sync.
+- Eight bill items ($1, $2, $5, $10, $20, $50, $100, $200, $500) plus matching packet items (each packet = 64 bills of one denomination).
+- ATM block family — kiosk, wall-mounted, and drive-thru variants.
+- Bank counter, safe deposit box (per-player 3×3 inventory), passcode-locked vault door, decorative velvet rope stanchions.
+- Bill changer (bundle/unbundle bills into packets) and decorative bills display tray (TESR-rendered).
+- Player-shop block (vending-machine style, NBT-exact item matching, optional admin infinite-stock flag).
+- Bills appear naturally in 13 vanilla chest loot tables (small denominations weighted heavily).
+- `/balance` (self) and `/sum econ <balance|add|set>` (admin) commands.
+- EconomyInc compatibility bridge plus `/sum migrate-economy` to move balances + bill items off EconomyInc.
+
+### Server-utility blocks
+
+- Trash can with ephemeral 9-slot inventory (contents destroyed on close).
+- Wall-mounted storm-shelter sign that registers itself with the Roamer storm-AI's preferred-shelter cache.
+- Sleep voting — configurable percentage of online players asleep ends the night.
+- Business cards (NBT-bound profile exchange item).
+- Mailbox + postal system (claim-on-first-right-click, 9-slot inbox with deposit-only slots for non-owners).
+- Job board (server-wide listings, paginated browse GUI, `/sum job post` to add).
+
+### Plots / land claims
+
+- 3D bounding-box claims with per-dimension persistence and chunk-indexed fast lookup.
+- Plot wand — sneak+right-click for corner A, right-click for corner B; selection persists in NBT.
+- `/sum plots <create|delete|list|info|buy|sell|trust|untrust|transfer>` commands.
+- Protection handler cancels block break/place from non-owners, mob-driven destruction, and filters owned blocks out of explosions.
+- Op bypass via `sum.plots.bypass` permission node (auto-granted at op-2+).
+
+### NPCs
+
+- Roamer wandering passive entity with role enum (GENERIC, BANK_TELLER) and theme-aware greetings.
+- Storm-shelter AI prefers signed shelters (within 48h / 6v range) when already indoors.
+
+### World / movement
+
+- Roadrunner — per-block speed multipliers configured via string-array (`block=multiplier`).
+- Pretty Beaches — breaking sand (or other configured blocks) adjacent to water replaces it with water and animates flooding the column at sea level, eliminating ugly partial-flow artifacts.
+
+### Player UX
+
+- Creative-tab favorites with optional gold-star overlay on favorited slots.
+- `/sum help` paginated command listing.
+
+## Inspirations
+
+SUM has absorbed or been informed by the following upstream mods. License is noted so contributors know whether code may be paraphrased or only behaviorally referenced:
+
+| Upstream mod | License | How SUM uses it |
+|---|---|---|
+| [EconomyInc](https://www.curseforge.com/minecraft/mc-mods/economy-inc) | upstream license unspecified — treated as ARR | Replaced. SUM's economy started as a runtime-compat layer (`EconomyBridge`) and now ships its own currency, bill items, ATMs, shops, and migration command. SUM-native code was clean-roomed, not copied. |
+| [Pretty Beaches](https://modrinth.com/mod/pretty-beaches) by BlayTheNinth | MIT | Inspired the `beaches` feature — sand-near-water flooding behavior. MIT permitted close paraphrase of the algorithm; SUM's `BeachesHandler` follows the same approach (HarvestDropsEvent + scheduled-tick flood) with SUM-style structure. |
+| [Universal Tweaks](https://github.com/ACGaming/UniversalTweaks) by ACGaming | LGPL-3.0 | Reference only — no code absorbed. SUM examined UT's source to confirm UT's `B:"No Redstone Lighting"` toggle already covers the Dark Redstone use case, so SUM does not duplicate it. |
+
+Other mods are evaluated periodically — see `docs/agent_progress/MERGE_MASTER_PLAN.md` for the current absorption queue.
+
 ## Developer Information
 
 ### IDE
