@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.border.BorderEntry;
 import com.micatechnologies.minecraft.sum.loyalty.LoyaltyMilestone;
 import java.io.File;
 import java.util.ArrayList;
@@ -54,6 +55,24 @@ public class SumConfig {
             + "Example: minecraft:concrete=1.8";
     private static final String[] FIELD_DEFAULT_ROADRUNNER_SPEED_BLOCKS = {
         "minecraft:concrete=1.25"
+    };
+
+    private static final String CATEGORY_BORDER = "border";
+
+    private static final String FIELD_KEY_BORDER_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_BORDER_ENABLED =
+        "When true, players crossing the configured per-dimension borders are bounced back inside or "
+            + "wrapped to the opposite axis depending on the entry's mode.";
+    private static final boolean FIELD_DEFAULT_BORDER_ENABLED = true;
+
+    private static final String FIELD_KEY_BORDER_BORDERS = "borders";
+    private static final String FIELD_DESCRIPTION_BORDER_BORDERS =
+        "Per-dimension borders. Each entry is '<dimId>=<radius>:<mode>'. radius is a square half-width "
+            + "in blocks (radius 10000 = 20000-block-wide square centered on origin). mode is 'bounce' "
+            + "(player gets pushed back inside) or 'loop' (Pac-Man-style wrap to opposite side). "
+            + "Empty list disables all borders.";
+    private static final String[] FIELD_DEFAULT_BORDER_BORDERS = {
+        "0=10000:bounce"
     };
 
     private static final String CATEGORY_AUTO_DROPPER = "autodropper";
@@ -182,6 +201,9 @@ public class SumConfig {
     private static boolean autoDropperEnabled;
     private static int autoDropperTickInterval;
 
+    private static boolean borderEnabled;
+    private static Map<Integer, BorderEntry> borderEntries = Collections.emptyMap();
+
     private static Configuration config;
 
     static void init(File configFile) {
@@ -269,6 +291,14 @@ public class SumConfig {
             FIELD_DEFAULT_AUTO_DROPPER_INTERVAL, 1, 1200,
             FIELD_DESCRIPTION_AUTO_DROPPER_INTERVAL);
 
+        borderEnabled = config.getBoolean(
+            FIELD_KEY_BORDER_ENABLED, CATEGORY_BORDER,
+            FIELD_DEFAULT_BORDER_ENABLED, FIELD_DESCRIPTION_BORDER_ENABLED);
+        String[] borderEntryStrings = config.getStringList(
+            FIELD_KEY_BORDER_BORDERS, CATEGORY_BORDER,
+            FIELD_DEFAULT_BORDER_BORDERS, FIELD_DESCRIPTION_BORDER_BORDERS);
+        borderEntries = parseBorderEntries(borderEntryStrings);
+
         if (config.hasChanged()) {
             config.save();
         }
@@ -288,6 +318,68 @@ public class SumConfig {
 
     public static boolean isBeachesInfiniteBucketWater() {
         return beachesInfiniteBucketWater;
+    }
+
+    public static boolean isBorderEnabled() {
+        return borderEnabled;
+    }
+
+    public static BorderEntry getBorderForDim(int dimId) {
+        return borderEntries.get(dimId);
+    }
+
+    private static Map<Integer, BorderEntry> parseBorderEntries(String[] entries) {
+        Map<Integer, BorderEntry> result = new HashMap<>();
+        for (String raw : entries) {
+            String entry = raw.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+            int eq = entry.indexOf('=');
+            if (eq <= 0) {
+                Sum.LOGGER.warn("[border] invalid entry '{}': expected '<dimId>=<radius>:<mode>'", entry);
+                continue;
+            }
+            int dimId;
+            try {
+                dimId = Integer.parseInt(entry.substring(0, eq).trim());
+            } catch (NumberFormatException e) {
+                Sum.LOGGER.warn("[border] invalid entry '{}': dimId is not an integer", entry);
+                continue;
+            }
+            String body = entry.substring(eq + 1).trim();
+            int colon = body.indexOf(':');
+            if (colon <= 0) {
+                Sum.LOGGER.warn("[border] invalid entry '{}': expected '<radius>:<mode>'", entry);
+                continue;
+            }
+            double radius;
+            try {
+                radius = Double.parseDouble(body.substring(0, colon).trim());
+            } catch (NumberFormatException e) {
+                Sum.LOGGER.warn("[border] invalid entry '{}': radius is not a number", entry);
+                continue;
+            }
+            if (radius <= 0) {
+                Sum.LOGGER.warn("[border] invalid entry '{}': radius must be positive", entry);
+                continue;
+            }
+            String modeRaw = body.substring(colon + 1).trim().toUpperCase();
+            BorderEntry.Mode mode;
+            try {
+                mode = BorderEntry.Mode.valueOf(modeRaw);
+            } catch (IllegalArgumentException e) {
+                Sum.LOGGER.warn("[border] invalid entry '{}': unknown mode '{}' (expected bounce or loop)",
+                    entry, modeRaw);
+                continue;
+            }
+            if (result.containsKey(dimId)) {
+                Sum.LOGGER.warn("[border] duplicate border for dim {}; keeping the first entry", dimId);
+                continue;
+            }
+            result.put(dimId, new BorderEntry(dimId, radius, mode));
+        }
+        return Collections.unmodifiableMap(result);
     }
 
     public static boolean isAutoDropperEnabled() {

@@ -48,6 +48,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 - Roadrunner — per-block speed multipliers configured via string-array (`block=multiplier`).
 - Pretty Beaches — breaking sand (or other configured blocks) adjacent to water replaces it with water and animates flooding the column at sea level, eliminating ugly partial-flow artifacts.
 - Server Pauser — pauses `doDaylightCycle` / `doWeatherCycle` gamerules when no players are online, resumes on first login. Lighter than full tick cancellation; chunk-loaded TEs still process.
+- World border — per-dimension square borders with bounce-back or Pac-Man-style loop modes; configurable per dim via `<dimId>=<radius>:<mode>` strings.
 
 ### Player UX
 
@@ -66,6 +67,7 @@ SUM has absorbed or been informed by the following upstream mods. License is not
 | [Server Pauser](https://modrinth.com/mod/serverpauser) by Smileycorp | LGPL-2.1 | Inspired the `pauser` feature — pauses world progression when no players are online. Upstream is a Mixin coremod that cancels the entire world tick; SUM uses a non-coremod gamerule approach (toggles `doDaylightCycle`/`doWeatherCycle`) to stay out of the coremod business. Behaviorally lighter — chunk-loaded farms still tick. |
 | [Loyalty Rewards](https://modrinth.com/mod/loyalty-rewards) by Mrbysco | MIT | Inspired the `loyalty` feature — playtime-milestone rewards. Upstream's 1.12.2 source isn't in the repo (earliest branch is 1.15) so reference was architectural only. SUM replaces the upstream CraftTweaker dependency with native string-array config, persists per-player fired-milestone state in `PlayerPersisted` NBT, and routes money rewards through `EconomyBridge` so they work on either backend. |
 | [Auto Dropper](https://modrinth.com/mod/auto-dropper) by Ruuubi | unknown — no public source | Inspired the `auto_dropper` block — drops continuously unless redstone-powered, items land without scatter. No public source available; SUM-native code is clean-room based on the project page description. Extends `BlockDropper` for vanilla GUI/inventory, overrides `neighborChanged` to disable vanilla's pulse-trigger, and adds an `ITickable` TE. |
+| [World Border](https://github.com/Serilum/World-Border) by Serilum / Natamus | All Rights Reserved | Inspired the `border` feature — per-dim configurable borders with bounce or loop modes. License is restrictive so SUM does not reference upstream code; clean-room implementation works from a `PlayerTickEvent`, supports per-dim radius + mode, and throttles bounce/loop chat notifications to once every 3 seconds per player. |
 | [Universal Tweaks](https://github.com/ACGaming/UniversalTweaks) by ACGaming | LGPL-3.0 | Reference only — no code absorbed. SUM examined UT's source to confirm UT's `B:"No Redstone Lighting"` toggle already covers the Dark Redstone use case, so SUM does not duplicate it. |
 
 Other mods are evaluated periodically — see `docs/agent_progress/MERGE_MASTER_PLAN.md` for the current absorption queue.

@@ -4,6 +4,7 @@ import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
+import com.micatechnologies.minecraft.sum.border.BorderHandler;
 import com.micatechnologies.minecraft.sum.dropper.TileEntityAutoDropper;
 import com.micatechnologies.minecraft.sum.command.CommandBalance;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
@@ -71,6 +72,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new BeachesHandler());
         MinecraftForge.EVENT_BUS.register(serverPauserHandler);
         MinecraftForge.EVENT_BUS.register(new LoyaltyHandler());
+        MinecraftForge.EVENT_BUS.register(new BorderHandler());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();
