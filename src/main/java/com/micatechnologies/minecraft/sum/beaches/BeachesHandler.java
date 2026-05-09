@@ -2,7 +2,9 @@ package com.micatechnologies.minecraft.sum.beaches;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockLiquid;
 import net.minecraft.block.state.IBlockState;
@@ -30,6 +32,13 @@ public class BeachesHandler {
     public static volatile boolean debug = false;
 
     private final List<ScheduledFlood> scheduledFloods = new ArrayList<>();
+
+    /** Positions where we've scheduled a water placement but haven't applied it yet.
+     *  Treated as "adjacent water source" by {@link #hasAdjacentWaterSource} so that
+     *  rapid creative-mode breaks of multiple blocks in a row (where each subsequent
+     *  break is adjacent only to the just-broken air block) all chain correctly. Both
+     *  reads and writes happen on the server thread, so a plain HashSet is fine. */
+    private final Set<BlockPos> pendingWaterPlacements = new HashSet<>();
 
     private static void debugTo(EntityPlayer player, String msg) {
         if (debug && player != null) {
@@ -73,6 +82,10 @@ public class BeachesHandler {
         debugTo(player, "match at " + describePos(pos)
             + " (sea level=" + world.getSeaLevel() + ", spread requires Y="
             + (world.getSeaLevel() - 1) + ") — scheduling water placement");
+        // Mark this position as pending so subsequent breaks in the SAME tick (e.g. a
+        // creative-mode line dig) see it as "adjacent water" even though our deferred
+        // task hasn't actually placed the source yet.
+        pendingWaterPlacements.add(pos);
         // BreakEvent fires before vanilla removes the block. Defer the water placement to
         // the next server tick so the break completes first; otherwise our setBlockState
         // gets clobbered by vanilla turning the block to air right after our handler returns.
@@ -80,19 +93,23 @@ public class BeachesHandler {
         // means we cover both gamemodes.
         final WorldServer ws = (WorldServer) world;
         ws.addScheduledTask(() -> {
-            Block here = ws.getBlockState(pos).getBlock();
-            if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
-                debugTo(player, "deferred-task skip: block at " + describePos(pos) + " is now '"
-                    + (here.getRegistryName() == null ? "?" : here.getRegistryName().toString())
-                    + "' (something replaced the broken block)");
-                return;
+            try {
+                Block here = ws.getBlockState(pos).getBlock();
+                if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
+                    debugTo(player, "deferred-task skip: block at " + describePos(pos) + " is now '"
+                        + (here.getRegistryName() == null ? "?" : here.getRegistryName().toString())
+                        + "' (something replaced the broken block)");
+                    return;
+                }
+                ws.setBlockState(pos, Blocks.WATER.getDefaultState(), 11);
+                debugTo(player, "placed water source at " + describePos(pos)
+                    + ", scheduling flood (will spread "
+                    + (pos.getY() == ws.getSeaLevel() - 1 ? "yes — sea-level match" : "no — wrong Y")
+                    + ")");
+                scheduleFlood(ws, pos, 0);
+            } finally {
+                pendingWaterPlacements.remove(pos);
             }
-            ws.setBlockState(pos, Blocks.WATER.getDefaultState(), 11);
-            debugTo(player, "placed water source at " + describePos(pos)
-                + ", scheduling flood (will spread "
-                + (pos.getY() == ws.getSeaLevel() - 1 ? "yes — sea-level match" : "no — wrong Y")
-                + ")");
-            scheduleFlood(ws, pos, 0);
         });
     }
 
@@ -194,7 +211,7 @@ public class BeachesHandler {
         }
     }
 
-    private static boolean hasAdjacentWaterSource(World world, BlockPos pos) {
+    private boolean hasAdjacentWaterSource(World world, BlockPos pos) {
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (EnumFacing facing : EnumFacing.Plane.HORIZONTAL) {
             cursor.setPos(pos).move(facing);
@@ -204,6 +221,9 @@ public class BeachesHandler {
                 return true;
             }
             if (block == Blocks.FLOWING_WATER && state.getValue(BlockLiquid.LEVEL) == 0) {
+                return true;
+            }
+            if (pendingWaterPlacements.contains(cursor.toImmutable())) {
                 return true;
             }
         }
