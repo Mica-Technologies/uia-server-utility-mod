@@ -87,8 +87,8 @@ public class BeachesHandler {
                     + "' (something replaced the broken block)");
                 return;
             }
-            ws.setBlockState(pos, Blocks.FLOWING_WATER.getDefaultState(), 11);
-            debugTo(player, "placed flowing water at " + describePos(pos)
+            ws.setBlockState(pos, Blocks.WATER.getDefaultState(), 11);
+            debugTo(player, "placed water source at " + describePos(pos)
                 + ", scheduling flood (will spread "
                 + (pos.getY() == ws.getSeaLevel() - 1 ? "yes — sea-level match" : "no — wrong Y")
                 + ")");
@@ -139,7 +139,7 @@ public class BeachesHandler {
         if (!hasAdjacentWaterSource(event.getWorld(), targetPos)) {
             return;
         }
-        event.getWorld().setBlockState(targetPos, Blocks.FLOWING_WATER.getDefaultState(), 11);
+        event.getWorld().setBlockState(targetPos, Blocks.WATER.getDefaultState(), 11);
         scheduleFlood(event.getWorld(), targetPos, 0);
     }
 
@@ -171,7 +171,7 @@ public class BeachesHandler {
         if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
             return;
         }
-        world.setBlockState(pos, Blocks.FLOWING_WATER.getDefaultState(), 11);
+        world.setBlockState(pos, Blocks.WATER.getDefaultState(), 11);
         if (depth > MAX_FLOOD_DEPTH || pos.getY() != world.getSeaLevel() - 1) {
             return;
         }
@@ -181,15 +181,15 @@ public class BeachesHandler {
             IBlockState neighbor = world.getBlockState(cursor);
             Block neighborBlock = neighbor.getBlock();
             if (neighborBlock == Blocks.AIR) {
-                scheduleFlood(world, cursor, depth + 1);
+                scheduleFlood(world, cursor.toImmutable(), depth + 1);
                 return;
             }
+            // Any flowing water (any level) is a transient stream that should be promoted
+            // to a source by our recursion. Real WATER source blocks are skipped (already
+            // what we want).
             if (neighborBlock == Blocks.FLOWING_WATER) {
-                int level = neighbor.getValue(BlockLiquid.LEVEL);
-                if (level > 0 && level < 11) {
-                    scheduleFlood(world, cursor, depth + 1);
-                    return;
-                }
+                scheduleFlood(world, cursor.toImmutable(), depth + 1);
+                return;
             }
         }
     }
