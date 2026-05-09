@@ -52,6 +52,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 
 - Creative-tab favorites with optional gold-star overlay on favorited slots.
 - `/sum help` paginated command listing.
+- Loyalty rewards — playtime-milestone bonuses (money via `EconomyBridge` or arbitrary console commands with `{player}` substitution); persists fired milestones per-player so each fires once.
 
 ## Inspirations
 
@@ -62,6 +63,7 @@ SUM has absorbed or been informed by the following upstream mods. License is not
 | [EconomyInc](https://www.curseforge.com/minecraft/mc-mods/economy-inc) | upstream license unspecified — treated as ARR | Replaced. SUM's economy started as a runtime-compat layer (`EconomyBridge`) and now ships its own currency, bill items, ATMs, shops, and migration command. SUM-native code was clean-roomed, not copied. |
 | [Pretty Beaches](https://modrinth.com/mod/pretty-beaches) by BlayTheNinth | MIT | Inspired the `beaches` feature — sand-near-water flooding behavior. MIT permitted close paraphrase of the algorithm; SUM's `BeachesHandler` follows the same approach (HarvestDropsEvent + scheduled-tick flood) with SUM-style structure. |
 | [Server Pauser](https://modrinth.com/mod/serverpauser) by Smileycorp | LGPL-2.1 | Inspired the `pauser` feature — pauses world progression when no players are online. Upstream is a Mixin coremod that cancels the entire world tick; SUM uses a non-coremod gamerule approach (toggles `doDaylightCycle`/`doWeatherCycle`) to stay out of the coremod business. Behaviorally lighter — chunk-loaded farms still tick. |
+| [Loyalty Rewards](https://modrinth.com/mod/loyalty-rewards) by Mrbysco | MIT | Inspired the `loyalty` feature — playtime-milestone rewards. Upstream's 1.12.2 source isn't in the repo (earliest branch is 1.15) so reference was architectural only. SUM replaces the upstream CraftTweaker dependency with native string-array config, persists per-player fired-milestone state in `PlayerPersisted` NBT, and routes money rewards through `EconomyBridge` so they work on either backend. |
 | [Universal Tweaks](https://github.com/ACGaming/UniversalTweaks) by ACGaming | LGPL-3.0 | Reference only — no code absorbed. SUM examined UT's source to confirm UT's `B:"No Redstone Lighting"` toggle already covers the Dark Redstone use case, so SUM does not duplicate it. |
 
 Other mods are evaluated periodically — see `docs/agent_progress/MERGE_MASTER_PLAN.md` for the current absorption queue.

@@ -1,9 +1,14 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.loyalty.LoyaltyMilestone;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.block.Block;
@@ -49,6 +54,25 @@ public class SumConfig {
             + "Example: minecraft:concrete=1.8";
     private static final String[] FIELD_DEFAULT_ROADRUNNER_SPEED_BLOCKS = {
         "minecraft:concrete=1.25"
+    };
+
+    private static final String CATEGORY_LOYALTY = "loyalty";
+
+    private static final String FIELD_KEY_LOYALTY_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_LOYALTY_ENABLED =
+        "When true, players receive configured rewards after crossing playtime milestones. "
+            + "Milestones fire once per player; tracking is persisted in the player's NBT data.";
+    private static final boolean FIELD_DEFAULT_LOYALTY_ENABLED = true;
+
+    private static final String FIELD_KEY_LOYALTY_MILESTONES = "milestones";
+    private static final String FIELD_DESCRIPTION_LOYALTY_MILESTONES =
+        "List of playtime milestones in the format '<minutes>=<type>:<value>'. Two reward types: "
+            + "'money:<amount>' deposits via the active economy backend (SUM or EconomyInc); "
+            + "'command:<command>' runs the command as the server console with {player} replaced "
+            + "by the player's name. Example entries: 30=money:10, 60=command:give {player} minecraft:diamond 1.";
+    private static final String[] FIELD_DEFAULT_LOYALTY_MILESTONES = {
+        "30=money:10",
+        "120=money:50"
     };
 
     private static final String CATEGORY_PAUSER = "pauser";
@@ -138,6 +162,9 @@ public class SumConfig {
     private static boolean pauserPauseDaylight;
     private static boolean pauserPauseWeather;
 
+    private static boolean loyaltyEnabled;
+    private static List<LoyaltyMilestone> loyaltyMilestones = Collections.emptyList();
+
     private static Configuration config;
 
     static void init(File configFile) {
@@ -209,6 +236,14 @@ public class SumConfig {
             FIELD_KEY_PAUSER_PAUSE_WEATHER, CATEGORY_PAUSER,
             FIELD_DEFAULT_PAUSER_PAUSE_WEATHER, FIELD_DESCRIPTION_PAUSER_PAUSE_WEATHER);
 
+        loyaltyEnabled = config.getBoolean(
+            FIELD_KEY_LOYALTY_ENABLED, CATEGORY_LOYALTY,
+            FIELD_DEFAULT_LOYALTY_ENABLED, FIELD_DESCRIPTION_LOYALTY_ENABLED);
+        String[] milestoneEntries = config.getStringList(
+            FIELD_KEY_LOYALTY_MILESTONES, CATEGORY_LOYALTY,
+            FIELD_DEFAULT_LOYALTY_MILESTONES, FIELD_DESCRIPTION_LOYALTY_MILESTONES);
+        loyaltyMilestones = parseLoyaltyMilestones(milestoneEntries);
+
         if (config.hasChanged()) {
             config.save();
         }
@@ -228,6 +263,63 @@ public class SumConfig {
 
     public static boolean isBeachesInfiniteBucketWater() {
         return beachesInfiniteBucketWater;
+    }
+
+    public static boolean isLoyaltyEnabled() {
+        return loyaltyEnabled;
+    }
+
+    public static Collection<LoyaltyMilestone> getLoyaltyMilestones() {
+        return loyaltyMilestones;
+    }
+
+    private static List<LoyaltyMilestone> parseLoyaltyMilestones(String[] entries) {
+        List<LoyaltyMilestone> result = new ArrayList<>();
+        Set<Integer> seenMinutes = new HashSet<>();
+        for (String raw : entries) {
+            String entry = raw.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+            int eq = entry.indexOf('=');
+            if (eq <= 0) {
+                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': expected '<minutes>=<type>:<value>'", entry);
+                continue;
+            }
+            int minutes;
+            try {
+                minutes = Integer.parseInt(entry.substring(0, eq).trim());
+            } catch (NumberFormatException e) {
+                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': minutes is not an integer", entry);
+                continue;
+            }
+            if (minutes <= 0) {
+                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': minutes must be positive", entry);
+                continue;
+            }
+            String body = entry.substring(eq + 1).trim();
+            int colon = body.indexOf(':');
+            if (colon <= 0) {
+                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': expected '<type>:<value>'", entry);
+                continue;
+            }
+            String typeRaw = body.substring(0, colon).trim().toUpperCase();
+            String value = body.substring(colon + 1).trim();
+            LoyaltyMilestone.Type type;
+            try {
+                type = LoyaltyMilestone.Type.valueOf(typeRaw);
+            } catch (IllegalArgumentException e) {
+                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': unknown type '{}' (expected money or command)",
+                    entry, typeRaw);
+                continue;
+            }
+            if (!seenMinutes.add(minutes)) {
+                Sum.LOGGER.warn("[loyalty] duplicate milestone for {}min; keeping the first entry", minutes);
+                continue;
+            }
+            result.add(new LoyaltyMilestone(minutes, type, value));
+        }
+        return Collections.unmodifiableList(result);
     }
 
     public static boolean isPauserEnabled() {

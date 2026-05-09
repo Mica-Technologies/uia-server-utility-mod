@@ -11,6 +11,7 @@ import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
+import com.micatechnologies.minecraft.sum.loyalty.LoyaltyHandler;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.pauser.ServerPauserHandler;
 import com.micatechnologies.minecraft.sum.plots.PlotsProtectionHandler;
@@ -68,6 +69,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new PlotsProtectionHandler());
         MinecraftForge.EVENT_BUS.register(new BeachesHandler());
         MinecraftForge.EVENT_BUS.register(serverPauserHandler);
+        MinecraftForge.EVENT_BUS.register(new LoyaltyHandler());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();
