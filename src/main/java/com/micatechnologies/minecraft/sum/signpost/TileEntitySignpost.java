@@ -60,6 +60,17 @@ public class TileEntitySignpost extends TileEntity {
         sync();
     }
 
+    public void replaceArms(List<SignpostArm> newArms) {
+        arms.clear();
+        if (newArms != null) {
+            int n = Math.min(newArms.size(), MAX_ARMS);
+            for (int i = 0; i < n; i++) {
+                arms.add(newArms.get(i));
+            }
+        }
+        sync();
+    }
+
     private void sync() {
         markDirty();
         if (world != null && !world.isRemote) {

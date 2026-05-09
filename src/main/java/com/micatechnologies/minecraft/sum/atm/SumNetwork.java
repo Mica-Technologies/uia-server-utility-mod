@@ -6,6 +6,7 @@ import com.micatechnologies.minecraft.sum.economy.PacketSyncSumMoney;
 import com.micatechnologies.minecraft.sum.jobs.PacketJobAction;
 import com.micatechnologies.minecraft.sum.shop.PacketShopBuy;
 import com.micatechnologies.minecraft.sum.shop.PacketShopOwnerAction;
+import com.micatechnologies.minecraft.sum.signpost.PacketSignpostUpdate;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.relauncher.Side;
@@ -39,6 +40,8 @@ public final class SumNetwork {
             PacketBillChangerAction.class, 4, Side.SERVER);
         CHANNEL.registerMessage(PacketJobAction.Handler.class,
             PacketJobAction.class, 5, Side.SERVER);
+        CHANNEL.registerMessage(PacketSignpostUpdate.Handler.class,
+            PacketSignpostUpdate.class, 6, Side.SERVER);
         initialized = true;
     }
 }

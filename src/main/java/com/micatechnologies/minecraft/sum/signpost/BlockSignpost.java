@@ -1,8 +1,10 @@
 package com.micatechnologies.minecraft.sum.signpost;
 
+import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
+import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import javax.annotation.Nullable;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
@@ -94,12 +96,20 @@ public class BlockSignpost extends Block {
             return false;
         }
         TileEntitySignpost signpost = (TileEntitySignpost) te;
+        if (player.isSneaking()) {
+            dumpArmsToChat(player, signpost);
+            return true;
+        }
+        player.openGui(Sum.instance, SumGuiHandler.GUI_SIGNPOST, world,
+            pos.getX(), pos.getY(), pos.getZ());
+        return true;
+    }
+
+    private static void dumpArmsToChat(EntityPlayer player, TileEntitySignpost signpost) {
         if (signpost.getArms().isEmpty()) {
             player.sendMessage(new TextComponentString(TextFormatting.GRAY
-                + "Empty signpost. Use "
-                + TextFormatting.WHITE + "/sum signpost add <angle> <label>"
-                + TextFormatting.GRAY + " while looking at the post."));
-            return true;
+                + "Empty signpost. Right-click (no sneak) to open the editor."));
+            return;
         }
         player.sendMessage(new TextComponentString(TextFormatting.GOLD
             + "Signpost (" + signpost.getArms().size() + "/" + TileEntitySignpost.MAX_ARMS + " arms):"));
@@ -111,6 +121,5 @@ public class BlockSignpost extends Block {
                     + TextFormatting.GRAY + " @ " + String.format("%.0f", arm.getAngleDegrees()) + "°"));
             i++;
         }
-        return true;
     }
 }

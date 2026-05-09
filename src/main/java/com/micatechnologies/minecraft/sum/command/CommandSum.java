@@ -1538,7 +1538,7 @@ public class CommandSum extends CommandBase {
             h("Storm-shelter sign", "Roamers seek this during storm alarms; preferred over auto-discovered shelters."),
             h("Business card", "Right-click air to personalize; right-click another player to give them a copy."),
             h("Auto dropper", "Drops items continuously unless redstone-powered. Inverse of vanilla; no scatter."),
-            h("Signpost", "Wayfinding post; right-click to view arms. Use /sum signpost add <angle> <label> to add."),
+            h("Signpost", "Wayfinding post; right-click to open the arm editor GUI. Sneak+right-click for a chat dump."),
             h("/sum signpost add <angle> <label>", "Add a labeled arm pointing at a compass angle (0=N, 90=E, 180=S, 270=W)."),
             h("/sum signpost remove <index>", "Remove arm at index from the signpost you're looking at."),
             h("/sum signpost edit <index> <angle> <label>", "Replace an arm's angle and label."),

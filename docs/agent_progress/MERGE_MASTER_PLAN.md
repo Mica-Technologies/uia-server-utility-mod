@@ -52,7 +52,7 @@ Paste this verbatim to a future Claude Code session to pick up the merge work:
 | M4 | Loyalty Rewards | S | ✅ shipped | `e1150e6` |
 | M5 | Auto Dropper | S | ✅ shipped | `72a47f2` |
 | M6 | World Border | S | ✅ shipped | `59a693e` |
-| M7 | Custom Signposts | M (revised up from S) | ✅ shipped (v1 — chat editor, no GUI) | (this commit) |
+| M7 | Custom Signposts | M | ✅ shipped (block + TE + TESR + chat editor + GUI editor) | (M7 v1 + GUI follow-up) |
 | M8 | Moving Quickly (Mixin absorption) | XS | ✅ shipped | `d33312e` |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1-2h), M (~300 LOC, half-day), L (≥500 LOC, full day+).
@@ -215,8 +215,10 @@ This unlocks future Mixin-based phases without further build-config work.
 - `/sum signpost add <angle> <label>` / `remove <index>` / `edit <index> <angle> <label>` / `clear` / `list` — chat-driven editor; uses ray-trace targeting like the vault commands.
 - Right-click the post to dump arm list to chat.
 
-**v1 deferred (worth considering later):**
-- In-world GUI editor (would claim `SumGuiHandler` id 8 + `SumNetwork` slot 6).
+**v1 deferred items shipped after initial M7 commit:**
+- ✅ In-world GUI editor — claims `SumGuiHandler.GUI_SIGNPOST = 8` and `SumNetwork` slot 6 (`PacketSignpostUpdate`). Right-click opens; sneak+right-click falls back to chat dump. Save sends the full arm list to the server, which validates reach (≤8 blocks) before applying.
+
+**Still deferred:**
 - Target-XZ-coords mode where the arm auto-rotates to point at fixed coordinates as the player moves around.
 - Custom textures (currently reuses vanilla `log_oak`).
 - Per-arm rendered "plank" geometry under the text label.

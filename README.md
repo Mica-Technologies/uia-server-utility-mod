@@ -23,7 +23,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 ### Server-utility blocks
 
 - Auto dropper — vanilla dropper inventory/UI but ticks on its own and dispenses without item scatter; halts when redstone-powered (inverse of vanilla).
-- Wayfinding signpost — wooden post block holding up to 7 labeled arms at configurable compass angles. TESR renders each arm's text in-world along its direction. Edit via `/sum signpost <add|remove|edit|clear>`; right-click the post to list arms.
+- Wayfinding signpost — wooden post block holding up to 7 labeled arms at configurable compass angles. TESR renders each arm's text in-world along its direction. Right-click the post to open the GUI editor (Add/Remove/Save inline); sneak+right-click for a chat list. Chat commands also work: `/sum signpost <add|remove|edit|clear|list>`.
 - Trash can with ephemeral 9-slot inventory (contents destroyed on close).
 - Wall-mounted storm-shelter sign that registers itself with the Roamer storm-AI's preferred-shelter cache.
 - Sleep voting — configurable percentage of online players asleep ends the night.
