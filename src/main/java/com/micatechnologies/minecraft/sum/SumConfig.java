@@ -112,22 +112,12 @@ public class SumConfig {
 
     private static final String FIELD_KEY_PAUSER_ENABLED = "enabled";
     private static final String FIELD_DESCRIPTION_PAUSER_ENABLED =
-        "When true, the day/weather cycles pause when zero players are online and resume when the first "
-            + "player logs in. SUM owns the configured gamerules while this feature is enabled — manual "
-            + "/gamerule changes will be reverted at the next pause/unpause transition. Inspired by "
-            + "Server Pauser (Smileycorp, LGPL-2.1); SUM uses a non-coremod gamerule approach instead "
-            + "of cancelling world ticks, so chunk-loaded farms and scheduled block updates still run.";
+        "When true, every WorldServer tick is cancelled while zero players are online — halting time, "
+            + "weather, mob spawning, scheduled block updates, TileEntity ticks (so chunk-loaded farms "
+            + "freeze), and entity ticks. Resumes immediately when the first player logs in. Inspired "
+            + "by Server Pauser (Smileycorp, LGPL-2.1); SUM uses a Mixin on WorldServer.tick(), gated "
+            + "by this flag.";
     private static final boolean FIELD_DEFAULT_PAUSER_ENABLED = true;
-
-    private static final String FIELD_KEY_PAUSER_PAUSE_DAYLIGHT = "pauseDaylight";
-    private static final String FIELD_DESCRIPTION_PAUSER_PAUSE_DAYLIGHT =
-        "Pause the doDaylightCycle gamerule when no players are online.";
-    private static final boolean FIELD_DEFAULT_PAUSER_PAUSE_DAYLIGHT = true;
-
-    private static final String FIELD_KEY_PAUSER_PAUSE_WEATHER = "pauseWeather";
-    private static final String FIELD_DESCRIPTION_PAUSER_PAUSE_WEATHER =
-        "Pause the doWeatherCycle gamerule when no players are online.";
-    private static final boolean FIELD_DEFAULT_PAUSER_PAUSE_WEATHER = true;
 
     private static final String CATEGORY_BEACHES = "beaches";
 
@@ -192,8 +182,6 @@ public class SumConfig {
     private static boolean beachesAffectsAllBlocks;
 
     private static boolean pauserEnabled;
-    private static boolean pauserPauseDaylight;
-    private static boolean pauserPauseWeather;
 
     private static boolean loyaltyEnabled;
     private static List<LoyaltyMilestone> loyaltyMilestones = Collections.emptyList();
@@ -268,12 +256,6 @@ public class SumConfig {
         pauserEnabled = config.getBoolean(
             FIELD_KEY_PAUSER_ENABLED, CATEGORY_PAUSER,
             FIELD_DEFAULT_PAUSER_ENABLED, FIELD_DESCRIPTION_PAUSER_ENABLED);
-        pauserPauseDaylight = config.getBoolean(
-            FIELD_KEY_PAUSER_PAUSE_DAYLIGHT, CATEGORY_PAUSER,
-            FIELD_DEFAULT_PAUSER_PAUSE_DAYLIGHT, FIELD_DESCRIPTION_PAUSER_PAUSE_DAYLIGHT);
-        pauserPauseWeather = config.getBoolean(
-            FIELD_KEY_PAUSER_PAUSE_WEATHER, CATEGORY_PAUSER,
-            FIELD_DEFAULT_PAUSER_PAUSE_WEATHER, FIELD_DESCRIPTION_PAUSER_PAUSE_WEATHER);
 
         loyaltyEnabled = config.getBoolean(
             FIELD_KEY_LOYALTY_ENABLED, CATEGORY_LOYALTY,
@@ -449,14 +431,6 @@ public class SumConfig {
 
     public static boolean isPauserEnabled() {
         return pauserEnabled;
-    }
-
-    public static boolean isPauserPauseDaylight() {
-        return pauserPauseDaylight;
-    }
-
-    public static boolean isPauserPauseWeather() {
-        return pauserPauseWeather;
     }
 
     public static boolean isBeachesAffectedBlock(Block block) {

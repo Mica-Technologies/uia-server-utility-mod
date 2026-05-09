@@ -25,6 +25,20 @@ task printMinecraftVersion {
     }
 }
 
+// Mixin config discovery: add the MixinConfigs MANIFEST attribute so MixinBooter
+// loads our config even when it doesn't auto-scan for filename patterns. The
+// GTNH buildscript's getManifestAttributes() doesn't add this by default; we
+// append it here so it survives buildscript updates.
+if (project.hasProperty('usesMixins') && usesMixins.toBoolean()) {
+    afterEvaluate {
+        tasks.named('jar').configure {
+            manifest {
+                attributes 'MixinConfigs': "mixins.${project.modId}.json"
+            }
+        }
+    }
+}
+
 // ARM macOS (Apple Silicon) support for runClient17/runClient21:
 // MC 1.12.2 bundles JNA 4.4.0 and java-objc-bridge 1.0.0, both x86_64-only.
 // Override with arm64-compatible versions via java17PatchDependencies

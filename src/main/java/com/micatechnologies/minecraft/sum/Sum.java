@@ -15,7 +15,6 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.loyalty.LoyaltyHandler;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
-import com.micatechnologies.minecraft.sum.pauser.ServerPauserHandler;
 import com.micatechnologies.minecraft.sum.plots.PlotsProtectionHandler;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
@@ -57,8 +56,6 @@ public class Sum {
 
     private static int entityId = 0;
 
-    private final ServerPauserHandler serverPauserHandler = new ServerPauserHandler();
-
     @EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         SumConfig.init(event.getSuggestedConfigurationFile());
@@ -70,7 +67,6 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new SleepVoteHandler());
         MinecraftForge.EVENT_BUS.register(new PlotsProtectionHandler());
         MinecraftForge.EVENT_BUS.register(new BeachesHandler());
-        MinecraftForge.EVENT_BUS.register(serverPauserHandler);
         MinecraftForge.EVENT_BUS.register(new LoyaltyHandler());
         MinecraftForge.EVENT_BUS.register(new BorderHandler());
         proxy.preInit(event);
@@ -133,6 +129,5 @@ public class Sum {
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandSum());
         event.registerServerCommand(new CommandBalance());
-        serverPauserHandler.onServerStarting(event);
     }
 }

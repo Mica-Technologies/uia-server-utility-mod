@@ -99,11 +99,19 @@ This is a modpack edit, not a SUM commit. Nothing to ship from this repo.
 
 ---
 
-## M3 — Server Pauser (S)
+## M3 — Server Pauser (S; coremod approach)
 
 **Replaces:** `serverpauser.jar`
-**Source:** https://modrinth.com/mod/serverpauser
-**Verified behavior:** Pauses world ticking when zero players are logged in — explicitly halts time-of-day progression and time-based events. (Project page does NOT explicitly enumerate weather or chunk-tick behavior; treat those as untested unless you read the source.)
+**Source:** https://modrinth.com/mod/serverpauser (verified behavior); upstream source at `example-source/server-pauser/` (LGPL-2.1)
+**Verified behavior:** Mixin on `WorldServer.tick()` HEAD that cancels the entire tick when zero players online. Upstream's Mixin (`MixinWorldServer`) is one-line: `if (mcServer.getCurrentPlayerCount() <= 0) callback.cancel();`. This halts everything — time, weather, random ticks, mob spawning, scheduled block updates, TE ticks (so chunk-loaded farms freeze), entity ticks.
+
+**Implementation note (2026-05-09):** Originally shipped with a non-coremod gamerule approach (toggling `doDaylightCycle`/`doWeatherCycle` on player count transitions). That left chunk-loaded farms running, which diverged from the upstream behavior in a way Alex flagged. **Reworked to use the same Mixin approach as upstream** — SUM is now coremod-flavoured via MixinBooter:
+- `buildscript.properties`: `usesMixins=true`, `mixinsPackage=pauser.mixin`
+- `mixins.sum.json` registers `MixinWorldServer`
+- `addon.gradle` adds `MixinConfigs: mixins.sum.json` to MANIFEST so MixinBooter discovers the config
+- Old `ServerPauserHandler` deleted; the Mixin is the only mechanism. `pauser.enabled` config flag is checked inside the Mixin.
+
+This unlocks future Mixin-based phases without further build-config work.
 
 - [ ] New package `com.micatechnologies.minecraft.sum.pauser`
 - [ ] `ServerPauserHandler`: `@SubscribeEvent` on `TickEvent.WorldTickEvent` (START phase). If `world.getMinecraftServer().getPlayerList().getCurrentPlayerCount() == 0`, increment that world's `worldInfo` total time without advancing the time-of-day, OR cancel scheduled ticks for the dim. Cleanest: store original `gameRule doDaylightCycle` value, force-set `false` while empty, restore on first login
@@ -202,7 +210,7 @@ These were evaluated and rejected for the reasons noted. **Do not re-investigate
 
 | Mod | Effort | Reason |
 |---|---|---|
-| Moving Quickly | M (would require coremod) | ASM-patches `NetHandlerPlayServer` movement-distance constants. Vanilla 1.12.2 / Forge expose **no config knob** for this (verified — see https://forums.minecraftforge.net/topic/74474 quote: *"Coremod is the only way to do this"*). SUM is not a coremod and shouldn't become one for this. **Keep `moving-quickly.jar` in the modpack as-is.** |
+| Moving Quickly | XS (now achievable) | ASM-patches `NetHandlerPlayServer` movement-distance constants. Vanilla 1.12.2 / Forge expose **no config knob** for this (verified — see https://forums.minecraftforge.net/topic/74474 quote: *"Coremod is the only way to do this"*). Originally rejected because SUM was not a coremod; **as of 2026-05-09 SUM is now a coremod (Mixin via MixinBooter)**, so absorbing this is just a Mixin on the relevant NetHandlerPlayServer methods. Not absorbed yet — flag if you want it. |
 | The Beeper | XS | Decorative beeping computer blocks marketed as a prank tool. Doesn't fit SUM's server-utility / RP-economy charter. Out of scope. |
 | World Buoyancy | XS | (a) Wooden item stacks rise through inventory grid while submerged, (b) liquids can't be displaced by placing a block — only removed via container. Niche survival-realism, not server utility. Out of scope. |
 | GymCraft | M | Multi-block content pack (treadmill, weights, etc.) granting buffs. Too large to absorb cleanly even trimmed; original is abandoned by author. |
@@ -232,8 +240,8 @@ These were evaluated and rejected for the reasons noted. **Do not re-investigate
 - **Default-on** for cosmetic / QoL features (M1, M3, M4, M6, M7); **default-on with per-component toggles** for M2 (Dark Redstone) once unblocked; **default-on** for M5 (Auto Dropper).
 - **Loyalty Rewards: native config, not CraftTweaker.** SUM stays self-contained — no CraftTweaker dependency.
 - **Server Pauser: gamerule-toggle approach, not chunk-tick interception.** Lower risk.
-- **Moving Quickly: not absorbed.** Coremod gap; keep upstream jar in the pack.
-- **No new coremod for SUM.** If a phase requires ASM patching, reject the phase rather than make SUM a coremod.
+- **Moving Quickly: not absorbed (yet).** Originally rejected for coremod gap; SUM is now a coremod (since M3 rework), so absorbing it is achievable. Pending Alex's call.
+- ~~**No new coremod for SUM.** If a phase requires ASM patching, reject the phase rather than make SUM a coremod.~~ Reversed 2026-05-09; SUM is now coremod-flavoured.
 
 ---
 
@@ -245,7 +253,7 @@ These were evaluated and rejected for the reasons noted. **Do not re-investigate
 - **TileEntity tick perf:** M5 (Auto Dropper) iterates per-TE on tick. Gate by interval; the Alto pack runs heavy.
 - **Texture generators are idempotent** — running twice must not produce different output. Match the existing `tools/*_textures/generate.py` style.
 - **Don't touch LDW2.** Weather/snow features go in `E:\gitRepos\LDW2`, not here.
-- **Don't make SUM a coremod.** If a phase needs ASM, reject the phase.
+- ~~**Don't make SUM a coremod.** If a phase needs ASM, reject the phase.~~ Reversed 2026-05-09 during M3 rework: SUM is now a coremod-flavoured mod via MixinBooter. New phases CAN use Mixin where it's the right tool, but should still default to vanilla Forge events when those suffice.
 
 ---
 
