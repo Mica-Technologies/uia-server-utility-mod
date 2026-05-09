@@ -3,6 +3,7 @@ package com.micatechnologies.minecraft.sum.command;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
+import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
@@ -50,7 +51,7 @@ public class CommandSum extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/sum <help|reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots|signpost>";
+        return "/sum <help|reloadconfig|addroamerblock|rmroamerblock|roamer|favorites|econ|vault|migrate-economy|job|plots|signpost|sealevel|beaches>";
     }
 
     @Override
@@ -119,6 +120,12 @@ public class CommandSum extends CommandBase {
                 break;
             case "signpost":
                 handleSignpost(sender, args);
+                break;
+            case "sealevel":
+                handleSealevel(sender);
+                break;
+            case "beaches":
+                handleBeaches(sender, args);
                 break;
             case "help":
                 handleHelp(sender, args);
@@ -527,6 +534,45 @@ public class CommandSum extends CommandBase {
             return null;
         }
         return (TileEntityVaultDoor) te;
+    }
+
+    // --- /sum sealevel & /sum beaches debug — testing helpers ---
+
+    private void handleSealevel(ICommandSender sender) {
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Sealevel command must be run by a player.");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        World world = player.world;
+        int seaLevel = world.getSeaLevel();
+        int playerY = (int) Math.floor(player.posY);
+        int targetY = seaLevel - 1;
+        sendMessage(sender, TextFormatting.GOLD, "Dim " + player.dimension + " sea level: " + seaLevel);
+        sendMessage(sender, TextFormatting.GOLD,
+            "Pretty Beaches spreads at Y=" + targetY + " (sea level - 1).");
+        sendMessage(sender, TextFormatting.WHITE,
+            "Your feet are at Y=" + playerY + " (head at " + (playerY + 1) + ").");
+        if (playerY == targetY) {
+            sendMessage(sender, TextFormatting.GREEN,
+                "You're standing on Y=" + targetY + ". Break sand at this Y next to water to test.");
+        } else {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "Move to Y=" + targetY + " to be at sea-level - 1. Currently "
+                    + (playerY > targetY ? "above" : "below") + " by "
+                    + Math.abs(playerY - targetY) + ".");
+        }
+    }
+
+    private void handleBeaches(ICommandSender sender, String[] args) {
+        if (args.length < 2 || !"debug".equalsIgnoreCase(args[1])) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum beaches debug");
+            return;
+        }
+        BeachesHandler.debug = !BeachesHandler.debug;
+        sendMessage(sender, TextFormatting.GOLD,
+            "Beaches debug logging: " + (BeachesHandler.debug ? "ON" : "OFF")
+                + ". Break a block to see per-decision chat output.");
     }
 
     // --- /sum signpost subcommands ---

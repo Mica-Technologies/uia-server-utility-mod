@@ -25,32 +25,54 @@ public class BeachesHandler {
     private static final int FLOOD_TICKS_BETWEEN_STEPS = 10;
     private static final int MAX_FLOOD_DEPTH = 6;
 
+    /** When true, the handler chat-logs its per-break decisions to the breaking player.
+     *  Toggled via {@code /sum beaches debug}. Transient — resets to false on server restart. */
+    public static volatile boolean debug = false;
+
     private final List<ScheduledFlood> scheduledFloods = new ArrayList<>();
+
+    private static void debugTo(EntityPlayer player, String msg) {
+        if (debug && player != null) {
+            player.sendMessage(new net.minecraft.util.text.TextComponentString(
+                net.minecraft.util.text.TextFormatting.GRAY + "[beaches] " + msg));
+        }
+    }
 
     @SubscribeEvent
     public void onBlockBreak(BlockEvent.BreakEvent event) {
+        EntityPlayer player = event.getPlayer();
         if (event.isCanceled()) {
+            debugTo(player, "skip: BreakEvent already canceled");
             return;
         }
         if (!SumConfig.isBeachesEnabled()) {
+            debugTo(player, "skip: feature disabled in config (beaches.enabled=false)");
             return;
         }
-        EntityPlayer player = event.getPlayer();
         if (player == null || player instanceof FakePlayer) {
+            debugTo(player, "skip: no real player (null or FakePlayer)");
             return;
         }
         Block broken = event.getState().getBlock();
         if (!SumConfig.isBeachesAffectedBlock(broken)) {
+            String name = broken.getRegistryName() == null ? "?" : broken.getRegistryName().toString();
+            debugTo(player, "skip: '" + name + "' not in affectedBlocks list");
             return;
         }
         World world = event.getWorld();
         if (!(world instanceof WorldServer)) {
+            debugTo(player, "skip: world is not a WorldServer (client-side?)");
             return;
         }
         BlockPos pos = event.getPos().toImmutable();
         if (!hasAdjacentWaterSource(world, pos)) {
+            debugTo(player, "skip: no adjacent water source at " + describePos(pos)
+                + " — neighbors: " + describeNeighbors(world, pos));
             return;
         }
+        debugTo(player, "match at " + describePos(pos)
+            + " (sea level=" + world.getSeaLevel() + ", spread requires Y="
+            + (world.getSeaLevel() - 1) + ") — scheduling water placement");
         // BreakEvent fires before vanilla removes the block. Defer the water placement to
         // the next server tick so the break completes first; otherwise our setBlockState
         // gets clobbered by vanilla turning the block to air right after our handler returns.
@@ -60,11 +82,39 @@ public class BeachesHandler {
         ws.addScheduledTask(() -> {
             Block here = ws.getBlockState(pos).getBlock();
             if (here != Blocks.AIR && here != Blocks.FLOWING_WATER && here != Blocks.WATER) {
+                debugTo(player, "deferred-task skip: block at " + describePos(pos) + " is now '"
+                    + (here.getRegistryName() == null ? "?" : here.getRegistryName().toString())
+                    + "' (something replaced the broken block)");
                 return;
             }
             ws.setBlockState(pos, Blocks.FLOWING_WATER.getDefaultState(), 11);
+            debugTo(player, "placed flowing water at " + describePos(pos)
+                + ", scheduling flood (will spread "
+                + (pos.getY() == ws.getSeaLevel() - 1 ? "yes — sea-level match" : "no — wrong Y")
+                + ")");
             scheduleFlood(ws, pos, 0);
         });
+    }
+
+    private static String describePos(BlockPos pos) {
+        return "(" + pos.getX() + "," + pos.getY() + "," + pos.getZ() + ")";
+    }
+
+    private static String describeNeighbors(World world, BlockPos pos) {
+        StringBuilder sb = new StringBuilder();
+        for (EnumFacing facing : EnumFacing.Plane.HORIZONTAL) {
+            BlockPos p = pos.offset(facing);
+            IBlockState st = world.getBlockState(p);
+            String name = st.getBlock().getRegistryName() == null
+                ? "?" : st.getBlock().getRegistryName().toString();
+            String extra = "";
+            if (st.getBlock() == Blocks.FLOWING_WATER) {
+                extra = "(level=" + st.getValue(BlockLiquid.LEVEL) + ")";
+            }
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(facing.getName()).append("=").append(name).append(extra);
+        }
+        return sb.toString();
     }
 
     @SubscribeEvent
