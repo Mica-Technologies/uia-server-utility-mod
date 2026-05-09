@@ -8,6 +8,7 @@ import com.micatechnologies.minecraft.sum.bank.BlockSafeDepositBox;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.BlockVelvetRope;
 import com.micatechnologies.minecraft.sum.contacts.ItemBusinessCard;
+import com.micatechnologies.minecraft.sum.dropper.BlockAutoDropper;
 import com.micatechnologies.minecraft.sum.economy.BlockBillChanger;
 import com.micatechnologies.minecraft.sum.economy.BlockBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
@@ -55,6 +56,7 @@ public class SumTab {
     public static BlockMailbox mailbox;
     public static BlockJobBoard jobBoard;
     public static ItemPlotWand plotWand;
+    public static BlockAutoDropper autoDropper;
 
     /** Denominations the SUM bill set ships in dollars. Iterated in this order during
      *  registration so the creative tab orders bills low-to-high. */
@@ -89,5 +91,6 @@ public class SumTab {
         mailbox = new BlockMailbox();
         jobBoard = new BlockJobBoard();
         plotWand = new ItemPlotWand();
+        autoDropper = new BlockAutoDropper();
     }
 }

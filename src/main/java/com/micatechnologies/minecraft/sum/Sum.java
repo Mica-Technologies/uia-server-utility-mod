@@ -4,6 +4,7 @@ import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
+import com.micatechnologies.minecraft.sum.dropper.TileEntityAutoDropper;
 import com.micatechnologies.minecraft.sum.command.CommandBalance;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.economy.BillsLootInjector;
@@ -85,6 +86,8 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "storm_shelter_sign"));
         GameRegistry.registerTileEntity(TileEntityMailbox.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "mailbox"));
+        GameRegistry.registerTileEntity(TileEntityAutoDropper.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "auto_dropper"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

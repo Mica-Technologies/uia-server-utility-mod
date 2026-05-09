@@ -56,6 +56,20 @@ public class SumConfig {
         "minecraft:concrete=1.25"
     };
 
+    private static final String CATEGORY_AUTO_DROPPER = "autodropper";
+
+    private static final String FIELD_KEY_AUTO_DROPPER_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_AUTO_DROPPER_ENABLED =
+        "Whether placed Auto Dropper blocks tick automatically. Set false to disable the feature globally "
+            + "without removing existing blocks.";
+    private static final boolean FIELD_DEFAULT_AUTO_DROPPER_ENABLED = true;
+
+    private static final String FIELD_KEY_AUTO_DROPPER_INTERVAL = "tickInterval";
+    private static final String FIELD_DESCRIPTION_AUTO_DROPPER_INTERVAL =
+        "Number of server ticks between auto-dispense attempts. 20 ticks = 1 second. Lower values "
+            + "dispense more aggressively at higher CPU cost.";
+    private static final int FIELD_DEFAULT_AUTO_DROPPER_INTERVAL = 8;
+
     private static final String CATEGORY_LOYALTY = "loyalty";
 
     private static final String FIELD_KEY_LOYALTY_ENABLED = "enabled";
@@ -165,6 +179,9 @@ public class SumConfig {
     private static boolean loyaltyEnabled;
     private static List<LoyaltyMilestone> loyaltyMilestones = Collections.emptyList();
 
+    private static boolean autoDropperEnabled;
+    private static int autoDropperTickInterval;
+
     private static Configuration config;
 
     static void init(File configFile) {
@@ -244,6 +261,14 @@ public class SumConfig {
             FIELD_DEFAULT_LOYALTY_MILESTONES, FIELD_DESCRIPTION_LOYALTY_MILESTONES);
         loyaltyMilestones = parseLoyaltyMilestones(milestoneEntries);
 
+        autoDropperEnabled = config.getBoolean(
+            FIELD_KEY_AUTO_DROPPER_ENABLED, CATEGORY_AUTO_DROPPER,
+            FIELD_DEFAULT_AUTO_DROPPER_ENABLED, FIELD_DESCRIPTION_AUTO_DROPPER_ENABLED);
+        autoDropperTickInterval = config.getInt(
+            FIELD_KEY_AUTO_DROPPER_INTERVAL, CATEGORY_AUTO_DROPPER,
+            FIELD_DEFAULT_AUTO_DROPPER_INTERVAL, 1, 1200,
+            FIELD_DESCRIPTION_AUTO_DROPPER_INTERVAL);
+
         if (config.hasChanged()) {
             config.save();
         }
@@ -263,6 +288,14 @@ public class SumConfig {
 
     public static boolean isBeachesInfiniteBucketWater() {
         return beachesInfiniteBucketWater;
+    }
+
+    public static boolean isAutoDropperEnabled() {
+        return autoDropperEnabled;
+    }
+
+    public static int getAutoDropperTickInterval() {
+        return autoDropperTickInterval;
     }
 
     public static boolean isLoyaltyEnabled() {

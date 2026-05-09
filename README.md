@@ -22,6 +22,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 
 ### Server-utility blocks
 
+- Auto dropper — vanilla dropper inventory/UI but ticks on its own and dispenses without item scatter; halts when redstone-powered (inverse of vanilla).
 - Trash can with ephemeral 9-slot inventory (contents destroyed on close).
 - Wall-mounted storm-shelter sign that registers itself with the Roamer storm-AI's preferred-shelter cache.
 - Sleep voting — configurable percentage of online players asleep ends the night.
@@ -64,6 +65,7 @@ SUM has absorbed or been informed by the following upstream mods. License is not
 | [Pretty Beaches](https://modrinth.com/mod/pretty-beaches) by BlayTheNinth | MIT | Inspired the `beaches` feature — sand-near-water flooding behavior. MIT permitted close paraphrase of the algorithm; SUM's `BeachesHandler` follows the same approach (HarvestDropsEvent + scheduled-tick flood) with SUM-style structure. |
 | [Server Pauser](https://modrinth.com/mod/serverpauser) by Smileycorp | LGPL-2.1 | Inspired the `pauser` feature — pauses world progression when no players are online. Upstream is a Mixin coremod that cancels the entire world tick; SUM uses a non-coremod gamerule approach (toggles `doDaylightCycle`/`doWeatherCycle`) to stay out of the coremod business. Behaviorally lighter — chunk-loaded farms still tick. |
 | [Loyalty Rewards](https://modrinth.com/mod/loyalty-rewards) by Mrbysco | MIT | Inspired the `loyalty` feature — playtime-milestone rewards. Upstream's 1.12.2 source isn't in the repo (earliest branch is 1.15) so reference was architectural only. SUM replaces the upstream CraftTweaker dependency with native string-array config, persists per-player fired-milestone state in `PlayerPersisted` NBT, and routes money rewards through `EconomyBridge` so they work on either backend. |
+| [Auto Dropper](https://modrinth.com/mod/auto-dropper) by Ruuubi | unknown — no public source | Inspired the `auto_dropper` block — drops continuously unless redstone-powered, items land without scatter. No public source available; SUM-native code is clean-room based on the project page description. Extends `BlockDropper` for vanilla GUI/inventory, overrides `neighborChanged` to disable vanilla's pulse-trigger, and adds an `ITickable` TE. |
 | [Universal Tweaks](https://github.com/ACGaming/UniversalTweaks) by ACGaming | LGPL-3.0 | Reference only — no code absorbed. SUM examined UT's source to confirm UT's `B:"No Redstone Lighting"` toggle already covers the Dark Redstone use case, so SUM does not duplicate it. |
 
 Other mods are evaluated periodically — see `docs/agent_progress/MERGE_MASTER_PLAN.md` for the current absorption queue.
