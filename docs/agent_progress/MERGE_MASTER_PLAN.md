@@ -52,7 +52,7 @@ Paste this verbatim to a future Claude Code session to pick up the merge work:
 | M4 | Loyalty Rewards | S | ✅ shipped | `e1150e6` |
 | M5 | Auto Dropper | S | ✅ shipped | `72a47f2` |
 | M6 | World Border | S | ✅ shipped | `59a693e` |
-| M7 | Custom Signposts | M | ✅ shipped (block + TE + TESR + chat editor + GUI editor) | `c424079` v1 (chat editor), `507390d` GUI editor follow-up |
+| M7 | Custom Signposts | M | 🔁 moved to CSM after playtest — see `E:\gitRepos\minecraft-city-super-mod\assets\docs\agent_progress\CUSTOM_SIGNPOSTS_PLAN.md` | `c424079` (v1) + `507390d` (GUI) shipped, then stripped from SUM |
 | M8 | Moving Quickly (Mixin absorption) | XS | ✅ shipped | `d33312e` |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1-2h), M (~300 LOC, half-day), L (≥500 LOC, full day+).
@@ -385,20 +385,9 @@ Use small radii for fast testing. Edit `S:borders` in `sum.cfg`.
 
 ### M7 — Custom Signposts
 
-- [ ] **Place + persist** — Place signpost in creative. Save+exit. Return. Signpost still there.
-- [ ] **GUI opens** — Right-click → GUI opens with empty arm list ("No arms yet — click '+ Add arm'").
-- [ ] **Add arm via GUI** — Click "+ Add arm" → row appears. Type label "Spawn", angle "0". Click Save. GUI closes.
-- [ ] **TESR rendering** — After save, look at signpost from outside → label "Spawn" renders pointing North (since 0 = N). Verify the text is readable from a few blocks away.
-- [ ] **All cardinals** — Add arms 0/90/180/270 with labels N/E/S/W. Each points the correct direction (text reads outward along the arm).
-- [ ] **Diagonal angle** — Add arm at 45° → text points NE.
-- [ ] **Max 7 arms** — Add 7 arms total → "+ Add arm" button disables. Cannot add 8th.
-- [ ] **Edit existing arm** — Reopen GUI, change a label and angle, Save → arm updates.
-- [ ] **Remove arm** — Click X button on a row → row disappears. Save → arm removed; TESR no longer renders that arm.
-- [ ] **Cancel** — Open GUI, edit a field, click Cancel → no changes persisted.
-- [ ] **Sneak+right-click** — Sneak+right-click signpost → arm list dumped to chat (no GUI opens).
-- [ ] **Chat commands** — `/sum signpost list` → chat dump. `/sum signpost add 90 East` → adds arm. `/sum signpost remove 0` → removes first. `/sum signpost edit 0 180 NewLabel` → updates first. `/sum signpost clear yes` → wipes (with confirm).
-- [ ] **Persistence** — Configure 3 arms, save+exit, return → arms still there with correct labels/angles.
-- [ ] **Reach validation (server-side packet)** — Hard to test client-side; skip unless concerned.
+🔁 **Moved to CSM.** SUM prototype shipped (commits `c424079` block+TE+chat editor + `507390d` GUI editor) and Alex playtested it, but it needed substantial refinement and the feature fits CSM's wayfinding charter better. Stripped from SUM. See `E:\gitRepos\minecraft-city-super-mod\assets\docs\agent_progress\CUSTOM_SIGNPOSTS_PLAN.md` for the v2 implementation plan.
+
+- [—] All M7 testing items deferred — feature no longer in SUM. Will be re-tested when CSM port lands.
 
 ### M8 — Moving Quickly
 
@@ -422,7 +411,7 @@ This feature is "doesn't fire under normal conditions" — hard to validate with
 
 ## Done-with-everything criteria
 
-- [ ] All M1, M3, M4, M5, M6, M7, M8 testing checklists above marked complete
+- [ ] All M1, M3, M4, M5, M6, M8 testing checklists above marked complete (M7 moved to CSM)
 - [ ] M2 (Dark Redstone) UT-config flip applied and verified
 - [ ] Upstream jars removed from `manifest.json`: `pretty-beaches.jar`, `serverpauser.jar`, `loyalty-rewards.jar`, `auto-dropper.jar`, `world-border.jar`, `custom-sign-posts.jar`, `moving-quickly.jar`, `dark-redstone.jar`
 - [ ] `FEATURE_ROADMAP.md` Section M table updated with shipped commits (or this doc supersedes that section)

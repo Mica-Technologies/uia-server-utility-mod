@@ -17,9 +17,6 @@ import com.micatechnologies.minecraft.sum.shop.ContainerShopOwner;
 import com.micatechnologies.minecraft.sum.shop.GuiShopBuyer;
 import com.micatechnologies.minecraft.sum.shop.GuiShopOwner;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
-import com.micatechnologies.minecraft.sum.signpost.ContainerSignpost;
-import com.micatechnologies.minecraft.sum.signpost.GuiSignpost;
-import com.micatechnologies.minecraft.sum.signpost.TileEntitySignpost;
 import com.micatechnologies.minecraft.sum.trash.ContainerTrashCan;
 import com.micatechnologies.minecraft.sum.trash.GuiTrashCan;
 import net.minecraft.inventory.InventoryBasic;
@@ -47,7 +44,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_TRASH_CAN = 5;
     public static final int GUI_MAILBOX = 6;
     public static final int GUI_JOB_BOARD = 7;
-    public static final int GUI_SIGNPOST = 8;
+    // GUI id 8 is reserved (was Signpost — moved to CSM, see CSM CUSTOM_SIGNPOSTS_PLAN.md).
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -79,12 +76,6 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_MAILBOX) {
             TileEntityMailbox mb = lookupMailbox(world, x, y, z);
             return mb == null ? null : new ContainerMailbox(mb, player);
-        }
-        if (id == GUI_SIGNPOST) {
-            // Signposts have no inventory; the Container exists only for openGui plumbing.
-            // Arm changes flow through PacketSignpostUpdate, which independently re-resolves
-            // the TileEntity at the targeted BlockPos and validates reach.
-            return new ContainerSignpost();
         }
         // ATM is GuiScreen-only (no inventory slots), so no Container is needed server-side.
         return null;
@@ -128,14 +119,6 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_JOB_BOARD) {
             return new GuiJobBoard(player,
                 JobBoardSavedData.get(world).getActive(System.currentTimeMillis()));
-        }
-        if (id == GUI_SIGNPOST) {
-            BlockPos pos = new BlockPos(x, y, z);
-            TileEntity te = world.getTileEntity(pos);
-            if (!(te instanceof TileEntitySignpost)) {
-                return null;
-            }
-            return new GuiSignpost(pos, ((TileEntitySignpost) te).getArms());
         }
         return null;
     }
