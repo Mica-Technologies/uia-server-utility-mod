@@ -1,6 +1,26 @@
 # SUM merge master plan — absorbing simple mods from Alto
 
-Status: **All planned phases shipped (M1-M8). Now in solo playtest verification.** Iterations beyond initial M-phase commits: M1 Pretty Beaches went through 6 fixes (BreakEvent / WATER source / pending-placements / WorldTickEvent deferral / debug commands / realisticErosion option) before working correctly; M7 Custom Signposts grew the in-world GUI editor as a follow-up. M2 Dark Redstone is modpack-side only (UT config flip). Last updated 2026-05-09 against HEAD `c3b23ca`.
+Status: **Code shipped for M1, M3-M6, M8. M7 moved to CSM (see CSM CUSTOM_SIGNPOSTS_PLAN.md). M2 is modpack-side only (UT config flip).** Solo playtest verification in progress. Last updated 2026-05-09 against HEAD `e397301`.
+
+### Testing scoreboard (solo verification on dev client)
+
+| Phase | Code status | Solo test status |
+|---|---|---|
+| M1 Pretty Beaches | ✅ shipped (after 6 fixes) | ✅ all 10 items verified |
+| M2 Dark Redstone | n/a — UT config flip | ⏳ pending — modpack-side, do later |
+| M3 Server Pauser | ✅ shipped (Mixin) | ⏳ deferred — needs dedicated server (SP testing meaningless because integrated server only runs while in-world) |
+| M4 Loyalty Rewards | ✅ shipped (added session track during testing) | ✅ all 9 items verified (lifetime + session) |
+| M5 Auto Dropper | ✅ shipped | ✅ all 9 items verified |
+| M6 World Border | ✅ shipped | ✅ all 6 items verified |
+| M7 Custom Signposts | 🔁 stripped from SUM | n/a — re-test will happen on CSM port |
+| M8 Moving Quickly | ✅ shipped (Mixin) | ⏳ pending — 3 sanity tests, plus a note that real validation needs production lag |
+
+### Pending work after solo testing wraps
+
+- M2: flip `B:"No Redstone Lighting"=true` in `Universal-Tweaks---Tweaks.cfg` (Alto modpack), restart, verify wires/torches don't glow, pull `dark-redstone.jar`.
+- M3: dedicated server validation. Run `./gradlew runServer`, connect, set time, disconnect, wait, reconnect, confirm time didn't advance. Repeat for weather/furnace.
+- M8: solo sanity tests (~5 min). Real "doesn't rubberband under lag" validation requires Alto production deployment.
+- Once all tests green: pull seven upstream jars from `manifest.json`, bump `packVersion`. List in "Done-with-everything criteria" at bottom.
 
 This doc is the execution plan for absorbing 7 small server-utility mods from the Alto modpack into SUM, mirroring the EconomyInc → SUM pattern. Each phase replaces one third-party jar with native SUM code so that jar can be pulled from `manifest.json`.
 
