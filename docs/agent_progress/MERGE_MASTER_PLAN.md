@@ -362,15 +362,15 @@ Two tracks: `milestones` (lifetime, fires once ever per player) and `sessionMile
 
 ### M5 — Auto Dropper
 
-- [ ] **Basic dispense** — Place auto dropper. Right-click to open vanilla dropper GUI. Add a stack of dirt. Watch — items drop one every 8 ticks (~0.4 sec) in front of the dropper.
-- [ ] **No scatter** — Items land at the same X/Z (block center in front), not spread around like a vanilla dropper would.
-- [ ] **Redstone halts** — Place a lever next to it, lever ON → drops stop. Lever OFF → drops resume.
-- [ ] **Insert into chest** — Chest in front of the dropper. Items pushed into the chest, not dropped as entities.
-- [ ] **Empty dropper no-op** — Empty dropper → no entities spawned, no log spam.
-- [ ] **Break drops contents** — Break the auto dropper with items inside → drops the auto dropper item AND any contents.
-- [ ] **Persistence** — Save+exit, return → dropper still ticks correctly with same contents.
-- [ ] **Config interval** — Set `I:tickInterval=200` (10 sec), reload → drops every 10 sec.
-- [ ] **Disabled** — `B:enabled=false`, reload → existing droppers stop ticking.
+- [x] **Basic dispense** — Place auto dropper. Right-click to open vanilla dropper GUI. Add a stack of dirt. Items drop every 8 ticks (~0.4 sec) in front of the dropper. *(verified 2026-05-09)*
+- [x] **No scatter** — Items land at the same X/Z (block center in front), not spread around. *(verified 2026-05-09)*
+- [x] **Redstone halts** — Lever ON → drops stop. Lever OFF → resume. *(verified 2026-05-09)*
+- [x] **Insert into chest** — Chest in front of dropper → items pushed into chest, not dropped as entities. *(verified 2026-05-09)*
+- [x] **Empty dropper no-op** — Empty dropper → no entities spawned, no log spam. *(verified 2026-05-09)*
+- [x] **Break drops contents** — Break with items inside → drops dropper + contents. *(verified 2026-05-09)*
+- [x] **Persistence** — Save+exit, return → dropper still ticks. *(verified 2026-05-09)*
+- [x] **Config interval** — `I:tickInterval=200`, reload → drops every 10 sec. *(verified 2026-05-09)*
+- [x] **Disabled** — `B:enabled=false`, reload → drops stop. *(verified 2026-05-09)*
 
 ### M6 — World Border
 
