@@ -1,6 +1,6 @@
 # SUM merge master plan — absorbing simple mods from Alto
 
-Status: **All planned phases shipped (M1-M8).** M7 Custom Signposts shipped as a v1 (chat-driven editor, angle-only mode); upstream's in-GUI editor and target-XZ-coords mode are deferred polish. Last updated 2026-05-09.
+Status: **All planned phases shipped (M1-M8). Now in solo playtest verification.** Iterations beyond initial M-phase commits: M1 Pretty Beaches went through 6 fixes (BreakEvent / WATER source / pending-placements / WorldTickEvent deferral / debug commands / realisticErosion option) before working correctly; M7 Custom Signposts grew the in-world GUI editor as a follow-up. M2 Dark Redstone is modpack-side only (UT config flip). Last updated 2026-05-09 against HEAD `c3b23ca`.
 
 This doc is the execution plan for absorbing 7 small server-utility mods from the Alto modpack into SUM, mirroring the EconomyInc → SUM pattern. Each phase replaces one third-party jar with native SUM code so that jar can be pulled from `manifest.json`.
 
@@ -44,15 +44,15 @@ Paste this verbatim to a future Claude Code session to pick up the merge work:
 
 ## Phase table
 
-| # | Mod | Effort | Status | Commit |
+| # | Mod | Effort | Status | Commits |
 |---|---|---|---|---|
-| M1 | Pretty Beaches | XS | ✅ shipped | `023da78` |
+| M1 | Pretty Beaches | XS (initial) → S (with iterations) | ✅ shipped + verified | `023da78` initial; iterations: `b29e937` BreakEvent, `1f9f0f1` debug commands, `a1670da` WATER source, `bc9b274` pending placements, `77d4d47` WorldTickEvent fix, `c3b23ca` realisticErosion |
 | M2 | Dark Redstone | — | ✅ RESOLVED via UT config flip — no SUM code | n/a |
-| M3 | Server Pauser | S | ✅ shipped | `22f1106` |
+| M3 | Server Pauser | S→S(Mixin) | ✅ shipped | `22f1106` initial gamerule, `fb291b7` Mixin rework |
 | M4 | Loyalty Rewards | S | ✅ shipped | `e1150e6` |
 | M5 | Auto Dropper | S | ✅ shipped | `72a47f2` |
 | M6 | World Border | S | ✅ shipped | `59a693e` |
-| M7 | Custom Signposts | M | ✅ shipped (block + TE + TESR + chat editor + GUI editor) | (M7 v1 + GUI follow-up) |
+| M7 | Custom Signposts | M | ✅ shipped (block + TE + TESR + chat editor + GUI editor) | `c424079` v1 (chat editor), `507390d` GUI editor follow-up |
 | M8 | Moving Quickly (Mixin absorption) | XS | ✅ shipped | `d33312e` |
 
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1-2h), M (~300 LOC, half-day), L (≥500 LOC, full day+).
@@ -308,9 +308,113 @@ These project pages were fetched on 2026-05-09 to verify mod behavior. Re-fetch 
 
 ---
 
+## Testing — single-player solo verification
+
+All testing happens on Alex's solo dev client (`./gradlew runClient`). No multiplayer tests possible — where a phase's behavior would normally need a second player, the solo workaround is noted in the test step.
+
+**Universal setup before testing any phase:**
+1. Build with `./gradlew build`, copy the reobf'd jar to your test instance, OR launch via `./gradlew runClient`.
+2. Edit `run/config/sum.cfg` for any per-phase config tweaks listed below; `/sum reloadconfig` after edits.
+3. `/sum help` lists all subcommands; pages 1–7 cover existing features, plus the new `/sum signpost`, `/sum sealevel`, `/sum beaches debug`.
+
+### M1 — Pretty Beaches
+
+- [x] **Basic flooding** — Find a beach with ocean water. Stand at sea level (use `/sum sealevel` to confirm Y). Break a sand block adjacent to ocean → block becomes water source within ~1 tick. *(verified 2026-05-09)*
+- [x] **Multi-block line in creative** — Break a 2+ block wide cutout near ocean → all blocks fill with water sources, no descending stream artifacts. *(verified 2026-05-09)*
+- [x] **Realistic erosion** — Set `B:realisticErosion=true` in `sum.cfg`, `/sum reloadconfig`. Break dirt/grass adjacent to water → fills with water source. *(verified 2026-05-09)*
+- [ ] **Realistic erosion full set** — With `realisticErosion=true`, individually verify each block type fills: gravel, clay, mycelium, soul sand (in nether), snow block, snow layer.
+- [ ] **Negative — feature disabled** — `B:enabled=false`, reload, break sand at beach → vanilla behavior only (no water source created at break position).
+- [ ] **Negative — far from water** — Break sand >1 block from any water → no flooding.
+- [ ] **Negative — wrong block, default config** — `realisticErosion=false`, break dirt next to water → no flooding (only sand triggers).
+- [ ] **Negative — stone with realistic on** — `realisticErosion=true`, break stone next to water → does NOT fill (stone not in curated set).
+- [ ] **Wrong Y** — Break sand at Y=63 (above sea level) → initial source placed but cascade doesn't spread.
+- [ ] **Debug toggle** — `/sum beaches debug` ON → break sand → see `[beaches] match at...` chat. Toggle off → no chat.
+
+### M3 — Server Pauser
+
+The trick for solo testing is "exit to title screen" = "no players online" for SP worlds.
+
+- [ ] **Time pauses** — Note in-game time. Exit to title. Wait 60+ real seconds. Return. Time should be within a few in-game seconds of where you left it (not advanced 60+).
+- [ ] **Weather pauses** — `/weather rain`. Exit to title. Wait. Return. Rain still in progress at roughly the same point.
+- [ ] **TileEntity pauses (the killer test)** — Place a furnace, light it with coal+raw food. Furnace progress bar starts. Exit to title halfway through. Wait 60 seconds. Return. Smelt progress should be near where you left it, NOT completed.
+- [ ] **Resume on login** — After verifying the above, confirm time/weather/furnace resume normally on next login.
+- [ ] **Disabled** — `B:enabled=false`, reload, exit, wait, return → time advances normally (vanilla behavior).
+
+### M4 — Loyalty Rewards
+
+Use short milestones for testing — edit `S:milestones` in `sum.cfg`.
+
+- [ ] **Money reward** — Set `1=money:5`. Reload. Play 1 minute. Should see chat notification + balance += $5. Verify `/balance`.
+- [ ] **Command reward** — Add `2=command:give {player} minecraft:diamond 1`. Play 2 minutes. Receive diamond + chat.
+- [ ] **One-shot per player** — After hitting 1-min milestone, exit world, return. Continue playing past 1 min. Should NOT receive $5 again.
+- [ ] **Multiple milestones same session** — Both 1-min and 2-min milestones fire once each.
+- [ ] **Persistence across save** — Play to milestone, save+exit, edit config to add a new milestone (e.g. `3=money:25`), reload world, continue. Old milestones don't refire; new one fires when threshold hit.
+- [ ] **Disabled** — `B:enabled=false`, reload, play past milestone → no reward.
+
+### M5 — Auto Dropper
+
+- [ ] **Basic dispense** — Place auto dropper. Right-click to open vanilla dropper GUI. Add a stack of dirt. Watch — items drop one every 8 ticks (~0.4 sec) in front of the dropper.
+- [ ] **No scatter** — Items land at the same X/Z (block center in front), not spread around like a vanilla dropper would.
+- [ ] **Redstone halts** — Place a lever next to it, lever ON → drops stop. Lever OFF → drops resume.
+- [ ] **Insert into chest** — Chest in front of the dropper. Items pushed into the chest, not dropped as entities.
+- [ ] **Empty dropper no-op** — Empty dropper → no entities spawned, no log spam.
+- [ ] **Break drops contents** — Break the auto dropper with items inside → drops the auto dropper item AND any contents.
+- [ ] **Persistence** — Save+exit, return → dropper still ticks correctly with same contents.
+- [ ] **Config interval** — Set `I:tickInterval=200` (10 sec), reload → drops every 10 sec.
+- [ ] **Disabled** — `B:enabled=false`, reload → existing droppers stop ticking.
+
+### M6 — World Border
+
+Use small radii for fast testing. Edit `S:borders` in `sum.cfg`.
+
+- [ ] **Bounce** — Set `0=50:bounce`. Reload. Walk past X=50 → teleported back to ~X=49 with red chat warning.
+- [ ] **Loop** — Set `0=50:loop`. Reload. Walk past X=50 → teleported to X=-49.
+- [ ] **Per-dim independence** — Add `-1=20:bounce`. Go to nether (`/give @s ender_pearl` + dimension travel). Walk to X=20 → bounce. Overworld border still 50.
+- [ ] **Notification throttle** — Hold forward into bounce border → chat warning fires once, then quiet for 3 seconds.
+- [ ] **Disabled** — `B:enabled=false`, reload → walk past former border, no bounce.
+- [ ] **Empty list** — `S:borders <  >` → no border anywhere.
+
+### M7 — Custom Signposts
+
+- [ ] **Place + persist** — Place signpost in creative. Save+exit. Return. Signpost still there.
+- [ ] **GUI opens** — Right-click → GUI opens with empty arm list ("No arms yet — click '+ Add arm'").
+- [ ] **Add arm via GUI** — Click "+ Add arm" → row appears. Type label "Spawn", angle "0". Click Save. GUI closes.
+- [ ] **TESR rendering** — After save, look at signpost from outside → label "Spawn" renders pointing North (since 0 = N). Verify the text is readable from a few blocks away.
+- [ ] **All cardinals** — Add arms 0/90/180/270 with labels N/E/S/W. Each points the correct direction (text reads outward along the arm).
+- [ ] **Diagonal angle** — Add arm at 45° → text points NE.
+- [ ] **Max 7 arms** — Add 7 arms total → "+ Add arm" button disables. Cannot add 8th.
+- [ ] **Edit existing arm** — Reopen GUI, change a label and angle, Save → arm updates.
+- [ ] **Remove arm** — Click X button on a row → row disappears. Save → arm removed; TESR no longer renders that arm.
+- [ ] **Cancel** — Open GUI, edit a field, click Cancel → no changes persisted.
+- [ ] **Sneak+right-click** — Sneak+right-click signpost → arm list dumped to chat (no GUI opens).
+- [ ] **Chat commands** — `/sum signpost list` → chat dump. `/sum signpost add 90 East` → adds arm. `/sum signpost remove 0` → removes first. `/sum signpost edit 0 180 NewLabel` → updates first. `/sum signpost clear yes` → wipes (with confirm).
+- [ ] **Persistence** — Configure 3 arms, save+exit, return → arms still there with correct labels/angles.
+- [ ] **Reach validation (server-side packet)** — Hard to test client-side; skip unless concerned.
+
+### M8 — Moving Quickly
+
+This feature is "doesn't fire under normal conditions" — hard to validate without simulating lag. Sanity tests only.
+
+- [ ] **Sanity (default 10× multiplier)** — Play normally, including elytra flight if available, sprinting, vehicle movement (boat/minecart). No "you moved too quickly" log spam in your client log.
+- [ ] **Disabled** — `B:toleranceEnabled=false`, reload. Vanilla 1.12.2 thresholds restored. Play normally. Should still work fine on a stable connection.
+- [ ] **High multiplier** — Set `D:toleranceMultiplier=100.0`, reload. Play normally — no behavior change visible to player. (This test verifies the config value reads correctly; the behavior delta only manifests under heavy lag, which isn't simulatable solo.)
+- [ ] **Note:** Real validation of "doesn't rubberband under lag" needs production playtesting on Alto where actual network lag occurs. Solo test is a smoke test only.
+
+### M2 — Dark Redstone (modpack-side, no SUM code)
+
+- [ ] In Alto's `Universal-Tweaks---Tweaks.cfg`, flip `B:"No Redstone Lighting"=false` to `=true`.
+- [ ] Restart the dev client.
+- [ ] Place a redstone wire and power it. Wire should not emit block light.
+- [ ] Place a redstone torch. Should not emit block light.
+- [ ] Pull `dark-redstone.jar` from the modpack's `manifest.json`.
+- [ ] Confirm wires/torches still don't glow.
+
+---
+
 ## Done-with-everything criteria
 
-- All M1, M3, M4, M5, M6, M7 shipped, playtested, and their upstream jars removed from `manifest.json`
-- M2 (Dark Redstone) — **resolved via UT config flip** (no SUM code; modpack edit only)
-- `FEATURE_ROADMAP.md` Section M (or equivalent) table updated with shipped commits
-- One follow-up commit bumping `manifest.json` `packVersion` once the merge wave is done
+- [ ] All M1, M3, M4, M5, M6, M7, M8 testing checklists above marked complete
+- [ ] M2 (Dark Redstone) UT-config flip applied and verified
+- [ ] Upstream jars removed from `manifest.json`: `pretty-beaches.jar`, `serverpauser.jar`, `loyalty-rewards.jar`, `auto-dropper.jar`, `world-border.jar`, `custom-sign-posts.jar`, `moving-quickly.jar`, `dark-redstone.jar`
+- [ ] `FEATURE_ROADMAP.md` Section M table updated with shipped commits (or this doc supersedes that section)
+- [ ] Follow-up commit bumping `manifest.json` `packVersion` once the merge wave is done
