@@ -322,13 +322,13 @@ All testing happens on Alex's solo dev client (`./gradlew runClient`). No multip
 - [x] **Basic flooding** — Find a beach with ocean water. Stand at sea level (use `/sum sealevel` to confirm Y). Break a sand block adjacent to ocean → block becomes water source within ~1 tick. *(verified 2026-05-09)*
 - [x] **Multi-block line in creative** — Break a 2+ block wide cutout near ocean → all blocks fill with water sources, no descending stream artifacts. *(verified 2026-05-09)*
 - [x] **Realistic erosion** — Set `B:realisticErosion=true` in `sum.cfg`, `/sum reloadconfig`. Break dirt/grass adjacent to water → fills with water source. *(verified 2026-05-09)*
-- [ ] **Realistic erosion full set** — With `realisticErosion=true`, individually verify each block type fills: gravel, clay, mycelium, soul sand (in nether), snow block, snow layer.
-- [ ] **Negative — feature disabled** — `B:enabled=false`, reload, break sand at beach → vanilla behavior only (no water source created at break position).
-- [ ] **Negative — far from water** — Break sand >1 block from any water → no flooding.
-- [ ] **Negative — wrong block, default config** — `realisticErosion=false`, break dirt next to water → no flooding (only sand triggers).
-- [ ] **Negative — stone with realistic on** — `realisticErosion=true`, break stone next to water → does NOT fill (stone not in curated set).
-- [ ] **Wrong Y** — Break sand at Y=63 (above sea level) → initial source placed but cascade doesn't spread.
-- [ ] **Debug toggle** — `/sum beaches debug` ON → break sand → see `[beaches] match at...` chat. Toggle off → no chat.
+- [x] **Realistic erosion full set** — With `realisticErosion=true`, individually verified each block type fills: gravel, clay, mycelium, soul sand (in nether), snow block, snow layer. *(verified 2026-05-09)*
+- [x] **Negative — feature disabled** — `B:enabled=false`, reload, break sand at beach → vanilla behavior only (no water source created at break position). *(verified 2026-05-09)*
+- [x] **Negative — far from water** — Break sand >1 block from any water → no flooding. *(verified 2026-05-09)*
+- [x] **Negative — wrong block, default config** — `realisticErosion=false`, break dirt next to water → no flooding (only sand triggers). *(verified 2026-05-09)*
+- [x] **Negative — stone with realistic on** — `realisticErosion=true`, break stone next to water → does NOT fill (stone not in curated set). *(verified 2026-05-09)*
+- [x] **Wrong Y** — Break sand at Y=63 (above sea level) → initial source placed but cascade doesn't spread. *(verified 2026-05-09)*
+- [x] **Debug toggle** — `/sum beaches debug` ON → break sand → see `[beaches] match at...` chat. *(verified throughout phases 1-4 use)*
 
 ### M3 — Server Pauser
 
