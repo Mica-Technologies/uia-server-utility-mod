@@ -355,10 +355,10 @@ Two tracks: `milestones` (lifetime, fires once ever per player) and `sessionMile
 
 **Session track** (`S:sessionMilestones`):
 
-- [ ] **Fresh session start** — Add `1=money:5` to `sessionMilestones` (NOT lifetime). Reload. Exit to title, re-enter (forces session reset). Verify chat fires after ~1 minute of THIS session, not immediately on login.
-- [ ] **Session resets on relogin** — After hitting the 1-min session reward, exit to title, re-enter. Wait another minute → reward fires AGAIN (one per session, not one ever). Balance should rise by $5 per session.
-- [ ] **Multiple session milestones** — Add `1=money:5` AND `2=command:give {player} minecraft:diamond 1`. Restart session. Both fire at their respective minutes.
-- [ ] **Session and lifetime independent** — Have an entry in both arrays (e.g. `1=money:5` in lifetime AND `2=money:10` in session). After lifetime fires once, only session re-fires across relogs.
+- [x] **Fresh session start** — Add `1=money:5` to `sessionMilestones` (NOT lifetime). Reload. Exit to title, re-enter (forces session reset). Chat fires after ~1 minute of THIS session, not immediately on login. *(verified 2026-05-09)*
+- [x] **Session resets on relogin** — After hitting the 1-min session reward, exit to title, re-enter. Wait another minute → reward fires AGAIN. *(verified 2026-05-09)*
+- [x] **Multiple session milestones** — Both 1-min money and 2-min command milestones fire at their respective minutes. *(verified 2026-05-09)*
+- [x] **Session and lifetime independent** — With entries in both arrays, lifetime fires once permanently; session refires each session. *(verified 2026-05-09)*
 
 ### M5 — Auto Dropper
 
