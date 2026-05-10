@@ -376,12 +376,12 @@ Two tracks: `milestones` (lifetime, fires once ever per player) and `sessionMile
 
 Use small radii for fast testing. Edit `S:borders` in `sum.cfg`.
 
-- [ ] **Bounce** — Set `0=50:bounce`. Reload. Walk past X=50 → teleported back to ~X=49 with red chat warning.
-- [ ] **Loop** — Set `0=50:loop`. Reload. Walk past X=50 → teleported to X=-49.
-- [ ] **Per-dim independence** — Add `-1=20:bounce`. Go to nether (`/give @s ender_pearl` + dimension travel). Walk to X=20 → bounce. Overworld border still 50.
-- [ ] **Notification throttle** — Hold forward into bounce border → chat warning fires once, then quiet for 3 seconds.
-- [ ] **Disabled** — `B:enabled=false`, reload → walk past former border, no bounce.
-- [ ] **Empty list** — `S:borders <  >` → no border anywhere.
+- [x] **Bounce** — Set `0=50:bounce`. Walk past X=50 → teleported back with red chat warning. *(verified 2026-05-09)*
+- [x] **Loop** — Set `0=50:loop`. Walk past X=50 → teleported to X≈-49. *(verified 2026-05-09)*
+- [x] **Per-dim independence** — `-1=20:bounce` plus `0=50:bounce` → nether border at 20, overworld border at 50, independent. *(verified 2026-05-09)*
+- [x] **Notification throttle** — Hold forward into bounce border → chat warning fires once, then quiet for ~3 seconds. *(verified 2026-05-09)*
+- [x] **Disabled** — `B:enabled=false`, reload → no bounce. *(verified 2026-05-09)*
+- [x] **Empty list** — `S:borders <  >` → no border anywhere. *(verified 2026-05-09)*
 
 ### M7 — Custom Signposts
 
