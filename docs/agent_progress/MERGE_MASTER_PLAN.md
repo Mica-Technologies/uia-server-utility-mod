@@ -343,14 +343,22 @@ All testing happens on Alex's solo dev client (`./gradlew runClient`). No multip
 
 ### M4 — Loyalty Rewards
 
-Use short milestones for testing — edit `S:milestones` in `sum.cfg`.
+Two tracks: `milestones` (lifetime, fires once ever per player) and `sessionMilestones` (per-session, resets on each login). For solo testing, use short milestones in either array.
 
-- [ ] **Money reward** — Set `1=money:5`. Reload. Play 1 minute. Should see chat notification + balance += $5. Verify `/balance`.
-- [ ] **Command reward** — Add `2=command:give {player} minecraft:diamond 1`. Play 2 minutes. Receive diamond + chat.
-- [ ] **One-shot per player** — After hitting 1-min milestone, exit world, return. Continue playing past 1 min. Should NOT receive $5 again.
-- [ ] **Multiple milestones same session** — Both 1-min and 2-min milestones fire once each.
-- [ ] **Persistence across save** — Play to milestone, save+exit, edit config to add a new milestone (e.g. `3=money:25`), reload world, continue. Old milestones don't refire; new one fires when threshold hit.
-- [ ] **Disabled** — `B:enabled=false`, reload, play past milestone → no reward.
+**Lifetime track** (`S:milestones`):
+
+- [x] **Lifetime money reward** — Set `1=money:5` in `milestones`. Reload. Play 1 minute. Chat notification + balance += $5. *(verified phase 1, 2026-05-09)*
+- [x] **Lifetime command reward** — Add `2=command:give {player} minecraft:diamond 1`. Play to 2 min. Diamond + chat. *(verified phase 1)*
+- [x] **Lifetime persistence/one-shot** — Already-fired milestones don't refire after exit/relog. *(verified phases 2-3)*
+- [x] **Disabled flag** — `B:enabled=false`, reload → no rewards. *(verified phase 3)*
+- [—] **NOTE: lifetime track fires immediately on login if accumulated playtime ≥ threshold.** This is by-design for "thanks for X total hours" rewards; use `sessionMilestones` for per-session bonuses.
+
+**Session track** (`S:sessionMilestones`):
+
+- [ ] **Fresh session start** — Add `1=money:5` to `sessionMilestones` (NOT lifetime). Reload. Exit to title, re-enter (forces session reset). Verify chat fires after ~1 minute of THIS session, not immediately on login.
+- [ ] **Session resets on relogin** — After hitting the 1-min session reward, exit to title, re-enter. Wait another minute → reward fires AGAIN (one per session, not one ever). Balance should rise by $5 per session.
+- [ ] **Multiple session milestones** — Add `1=money:5` AND `2=command:give {player} minecraft:diamond 1`. Restart session. Both fire at their respective minutes.
+- [ ] **Session and lifetime independent** — Have an entry in both arrays (e.g. `1=money:5` in lifetime AND `2=money:10` in session). After lifetime fires once, only session re-fires across relogs.
 
 ### M5 — Auto Dropper
 

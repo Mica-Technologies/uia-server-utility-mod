@@ -4,6 +4,11 @@ import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;
@@ -14,8 +19,25 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedInEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent.PlayerLoggedOutEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
+/**
+ * Loyalty rewards. Two reward tracks:
+ *
+ * <ul>
+ *   <li><b>Lifetime</b> — milestones in {@link SumConfig#getLoyaltyMilestones()}. Tick counter
+ *       and fired-list persist in player NBT under {@code PERSISTED_NBT_TAG}. Each milestone
+ *       fires once ever for a given player. Adding a low-threshold milestone to a player who
+ *       has accumulated playtime fires it on next tick (intentional for "thanks for X hours
+ *       total" rewards).</li>
+ *   <li><b>Session</b> — milestones in {@link SumConfig#getLoyaltySessionMilestones()}. Tick
+ *       counter and fired-list live in memory only, keyed by player UUID. Reset on every
+ *       {@link PlayerLoggedInEvent}; cleared on logout. Each milestone fires once per session
+ *       per player. Use this for recurring per-session rewards.</li>
+ * </ul>
+ */
 public class LoyaltyHandler {
 
     private static final String NBT_ROOT = "sum_loyalty";
@@ -23,6 +45,26 @@ public class LoyaltyHandler {
     private static final String NBT_FIRED = "fired";
 
     private static final int CHECK_INTERVAL_TICKS = 100;
+
+    /** Per-player session state. Reset on {@link PlayerLoggedInEvent}, cleared on logout.
+     *  Both reads and writes are on the server thread (PlayerTickEvent / login / logout all
+     *  fire on the main thread), so no synchronization needed. */
+    private final Map<UUID, SessionState> sessions = new HashMap<>();
+
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerLoggedInEvent event) {
+        if (event.player instanceof EntityPlayerMP) {
+            // Fresh session every login — overwrites any stale entry from a previous session.
+            sessions.put(event.player.getUniqueID(), new SessionState());
+        }
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedOut(PlayerLoggedOutEvent event) {
+        if (event.player instanceof EntityPlayerMP) {
+            sessions.remove(event.player.getUniqueID());
+        }
+    }
 
     @SubscribeEvent
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
@@ -36,23 +78,33 @@ public class LoyaltyHandler {
         if (!(player instanceof EntityPlayerMP) || player.world.isRemote) {
             return;
         }
+
+        // --- Lifetime track (NBT-persisted) ---
         NBTTagCompound persisted = persisted(player);
         NBTTagCompound state = persisted.hasKey(NBT_ROOT, Constants.NBT.TAG_COMPOUND)
             ? persisted.getCompoundTag(NBT_ROOT)
             : new NBTTagCompound();
 
-        int ticks = state.getInteger(NBT_TICKS) + 1;
-        state.setInteger(NBT_TICKS, ticks);
+        int lifetimeTicks = state.getInteger(NBT_TICKS) + 1;
+        state.setInteger(NBT_TICKS, lifetimeTicks);
 
-        if (ticks % CHECK_INTERVAL_TICKS == 0) {
-            checkMilestones(player, state, ticks);
+        if (lifetimeTicks % CHECK_INTERVAL_TICKS == 0) {
+            checkLifetimeMilestones(player, state, lifetimeTicks);
         }
 
         persisted.setTag(NBT_ROOT, state);
         player.getEntityData().setTag(EntityPlayer.PERSISTED_NBT_TAG, persisted);
+
+        // --- Session track (in-memory) ---
+        SessionState session = sessions.computeIfAbsent(
+            player.getUniqueID(), uuid -> new SessionState());
+        session.ticks++;
+        if (session.ticks % CHECK_INTERVAL_TICKS == 0) {
+            checkSessionMilestones(player, session);
+        }
     }
 
-    private void checkMilestones(EntityPlayer player, NBTTagCompound state, int ticks) {
+    private void checkLifetimeMilestones(EntityPlayer player, NBTTagCompound state, int ticks) {
         Collection<LoyaltyMilestone> milestones = SumConfig.getLoyaltyMilestones();
         if (milestones.isEmpty()) {
             return;
@@ -66,7 +118,7 @@ public class LoyaltyHandler {
             if (containsInt(fired, milestone.getMinutes())) {
                 continue;
             }
-            if (fireReward(player, milestone)) {
+            if (fireReward(player, milestone, /*sessionTrack=*/false)) {
                 fired.appendTag(new NBTTagInt(milestone.getMinutes()));
                 changed = true;
             }
@@ -76,18 +128,36 @@ public class LoyaltyHandler {
         }
     }
 
-    private boolean fireReward(EntityPlayer player, LoyaltyMilestone milestone) {
+    private void checkSessionMilestones(EntityPlayer player, SessionState session) {
+        Collection<LoyaltyMilestone> milestones = SumConfig.getLoyaltySessionMilestones();
+        if (milestones.isEmpty()) {
+            return;
+        }
+        for (LoyaltyMilestone milestone : milestones) {
+            if (session.ticks < milestone.getTicks()) {
+                continue;
+            }
+            if (session.firedMinutes.contains(milestone.getMinutes())) {
+                continue;
+            }
+            if (fireReward(player, milestone, /*sessionTrack=*/true)) {
+                session.firedMinutes.add(milestone.getMinutes());
+            }
+        }
+    }
+
+    private boolean fireReward(EntityPlayer player, LoyaltyMilestone milestone, boolean sessionTrack) {
         switch (milestone.getType()) {
             case MONEY:
-                return fireMoneyReward(player, milestone);
+                return fireMoneyReward(player, milestone, sessionTrack);
             case COMMAND:
-                return fireCommandReward(player, milestone);
+                return fireCommandReward(player, milestone, sessionTrack);
             default:
                 return false;
         }
     }
 
-    private boolean fireMoneyReward(EntityPlayer player, LoyaltyMilestone milestone) {
+    private boolean fireMoneyReward(EntityPlayer player, LoyaltyMilestone milestone, boolean sessionTrack) {
         double amount;
         try {
             amount = Double.parseDouble(milestone.getValue());
@@ -106,11 +176,12 @@ public class LoyaltyHandler {
         }
         notify(player, TextFormatting.GOLD + "[Loyalty] " + TextFormatting.GREEN
             + "+$" + formatAmount(amount) + TextFormatting.GRAY
-            + " for reaching " + milestone.getMinutes() + " minutes online.");
+            + " for reaching " + milestone.getMinutes() + " minutes "
+            + (sessionTrack ? "this session." : "online."));
         return true;
     }
 
-    private boolean fireCommandReward(EntityPlayer player, LoyaltyMilestone milestone) {
+    private boolean fireCommandReward(EntityPlayer player, LoyaltyMilestone milestone, boolean sessionTrack) {
         MinecraftServer server = player.getServer();
         if (server == null) {
             return false;
@@ -124,7 +195,9 @@ public class LoyaltyHandler {
             return false;
         }
         notify(player, TextFormatting.GOLD + "[Loyalty] " + TextFormatting.GRAY
-            + "Reached " + milestone.getMinutes() + " minutes online — reward delivered.");
+            + "Reached " + milestone.getMinutes() + " minutes "
+            + (sessionTrack ? "this session" : "online")
+            + " — reward delivered.");
         return true;
     }
 
@@ -156,5 +229,10 @@ public class LoyaltyHandler {
             }
         }
         return false;
+    }
+
+    private static final class SessionState {
+        int ticks;
+        final Set<Integer> firedMinutes = new HashSet<>();
     }
 }

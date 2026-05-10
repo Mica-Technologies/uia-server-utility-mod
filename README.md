@@ -56,7 +56,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 
 - Creative-tab favorites with optional gold-star overlay on favorited slots.
 - `/sum help` paginated command listing.
-- Loyalty rewards — playtime-milestone bonuses (money via `EconomyBridge` or arbitrary console commands with `{player}` substitution); persists fired milestones per-player so each fires once.
+- Loyalty rewards — playtime-milestone bonuses (money via `EconomyBridge` or arbitrary console commands with `{player}` substitution). Two tracks: lifetime (`milestones`) fires once per player ever, persisted in NBT; session (`sessionMilestones`) fires once per session and resets on every login.
 
 ## Inspirations
 

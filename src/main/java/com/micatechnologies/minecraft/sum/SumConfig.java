@@ -99,14 +99,27 @@ public class SumConfig {
 
     private static final String FIELD_KEY_LOYALTY_MILESTONES = "milestones";
     private static final String FIELD_DESCRIPTION_LOYALTY_MILESTONES =
-        "List of playtime milestones in the format '<minutes>=<type>:<value>'. Two reward types: "
-            + "'money:<amount>' deposits via the active economy backend (SUM or EconomyInc); "
-            + "'command:<command>' runs the command as the server console with {player} replaced "
-            + "by the player's name. Example entries: 30=money:10, 60=command:give {player} minecraft:diamond 1.";
+        "Lifetime / cumulative-playtime milestones — fire ONCE per player, ever. The fired list "
+            + "persists in player NBT, so a milestone configured later than a player's accumulated "
+            + "playtime fires immediately on next login (e.g. adding a 1-min milestone for a player "
+            + "who already played 5 hours fires it on next tick). Use 'sessionMilestones' for "
+            + "per-session rewards. Format: '<minutes>=<type>:<value>'. Reward types: "
+            + "'money:<amount>' deposits via EconomyBridge; 'command:<command>' runs as console "
+            + "with {player} replaced by the player's name. Examples: 30=money:10, "
+            + "60=command:give {player} minecraft:diamond 1.";
     private static final String[] FIELD_DEFAULT_LOYALTY_MILESTONES = {
         "30=money:10",
         "120=money:50"
     };
+
+    private static final String FIELD_KEY_LOYALTY_SESSION_MILESTONES = "sessionMilestones";
+    private static final String FIELD_DESCRIPTION_LOYALTY_SESSION_MILESTONES =
+        "Per-session playtime milestones — fire ONCE per session per player. Session resets each "
+            + "time the player logs in; milestones fire when the player has been online "
+            + "continuously for the configured minutes. Same format as 'milestones'. Use this for "
+            + "rewards that should recur each session (e.g. \"$10 after 30 minutes online this "
+            + "session\"). Empty by default.";
+    private static final String[] FIELD_DEFAULT_LOYALTY_SESSION_MILESTONES = new String[0];
 
     private static final String CATEGORY_MOVEMENT = "movement";
 
@@ -233,6 +246,7 @@ public class SumConfig {
 
     private static boolean loyaltyEnabled;
     private static List<LoyaltyMilestone> loyaltyMilestones = Collections.emptyList();
+    private static List<LoyaltyMilestone> loyaltySessionMilestones = Collections.emptyList();
 
     private static boolean autoDropperEnabled;
     private static int autoDropperTickInterval;
@@ -321,7 +335,11 @@ public class SumConfig {
         String[] milestoneEntries = config.getStringList(
             FIELD_KEY_LOYALTY_MILESTONES, CATEGORY_LOYALTY,
             FIELD_DEFAULT_LOYALTY_MILESTONES, FIELD_DESCRIPTION_LOYALTY_MILESTONES);
-        loyaltyMilestones = parseLoyaltyMilestones(milestoneEntries);
+        loyaltyMilestones = parseLoyaltyMilestones(milestoneEntries, "lifetime");
+        String[] sessionEntries = config.getStringList(
+            FIELD_KEY_LOYALTY_SESSION_MILESTONES, CATEGORY_LOYALTY,
+            FIELD_DEFAULT_LOYALTY_SESSION_MILESTONES, FIELD_DESCRIPTION_LOYALTY_SESSION_MILESTONES);
+        loyaltySessionMilestones = parseLoyaltyMilestones(sessionEntries, "session");
 
         autoDropperEnabled = config.getBoolean(
             FIELD_KEY_AUTO_DROPPER_ENABLED, CATEGORY_AUTO_DROPPER,
@@ -438,7 +456,11 @@ public class SumConfig {
         return loyaltyMilestones;
     }
 
-    private static List<LoyaltyMilestone> parseLoyaltyMilestones(String[] entries) {
+    public static Collection<LoyaltyMilestone> getLoyaltySessionMilestones() {
+        return loyaltySessionMilestones;
+    }
+
+    private static List<LoyaltyMilestone> parseLoyaltyMilestones(String[] entries, String labelForLogs) {
         List<LoyaltyMilestone> result = new ArrayList<>();
         Set<Integer> seenMinutes = new HashSet<>();
         for (String raw : entries) {
@@ -448,24 +470,24 @@ public class SumConfig {
             }
             int eq = entry.indexOf('=');
             if (eq <= 0) {
-                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': expected '<minutes>=<type>:<value>'", entry);
+                Sum.LOGGER.warn("[loyalty:{}] invalid milestone '{}': expected '<minutes>=<type>:<value>'", labelForLogs, entry);
                 continue;
             }
             int minutes;
             try {
                 minutes = Integer.parseInt(entry.substring(0, eq).trim());
             } catch (NumberFormatException e) {
-                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': minutes is not an integer", entry);
+                Sum.LOGGER.warn("[loyalty:{}] invalid milestone '{}': minutes is not an integer", labelForLogs, entry);
                 continue;
             }
             if (minutes <= 0) {
-                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': minutes must be positive", entry);
+                Sum.LOGGER.warn("[loyalty:{}] invalid milestone '{}': minutes must be positive", labelForLogs, entry);
                 continue;
             }
             String body = entry.substring(eq + 1).trim();
             int colon = body.indexOf(':');
             if (colon <= 0) {
-                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': expected '<type>:<value>'", entry);
+                Sum.LOGGER.warn("[loyalty:{}] invalid milestone '{}': expected '<type>:<value>'", labelForLogs, entry);
                 continue;
             }
             String typeRaw = body.substring(0, colon).trim().toUpperCase();
@@ -474,12 +496,12 @@ public class SumConfig {
             try {
                 type = LoyaltyMilestone.Type.valueOf(typeRaw);
             } catch (IllegalArgumentException e) {
-                Sum.LOGGER.warn("[loyalty] invalid milestone '{}': unknown type '{}' (expected money or command)",
-                    entry, typeRaw);
+                Sum.LOGGER.warn("[loyalty:{}] invalid milestone '{}': unknown type '{}' (expected money or command)",
+                    labelForLogs, entry, typeRaw);
                 continue;
             }
             if (!seenMinutes.add(minutes)) {
-                Sum.LOGGER.warn("[loyalty] duplicate milestone for {}min; keeping the first entry", minutes);
+                Sum.LOGGER.warn("[loyalty:{}] duplicate milestone for {}min; keeping the first entry", labelForLogs, minutes);
                 continue;
             }
             result.add(new LoyaltyMilestone(minutes, type, value));
