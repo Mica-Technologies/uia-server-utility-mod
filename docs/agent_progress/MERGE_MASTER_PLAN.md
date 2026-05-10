@@ -332,13 +332,14 @@ All testing happens on Alex's solo dev client (`./gradlew runClient`). No multip
 
 ### M3 — Server Pauser
 
-The trick for solo testing is "exit to title screen" = "no players online" for SP worlds.
+**⚠ Not testable in single-player.** The Mixin only fires when `getCurrentPlayerCount() <= 0`, but in SP the integrated server (a) only runs while you're in the world, where you = 1 player connected, and (b) fully shuts down when you exit to title. So there's never a moment in SP where the server is running with 0 players. A SP "exit to title, time doesn't advance" test passes for the wrong reason (server not running) regardless of our Mixin.
 
-- [ ] **Time pauses** — Note in-game time. Exit to title. Wait 60+ real seconds. Return. Time should be within a few in-game seconds of where you left it (not advanced 60+).
-- [ ] **Weather pauses** — `/weather rain`. Exit to title. Wait. Return. Rain still in progress at roughly the same point.
-- [ ] **TileEntity pauses (the killer test)** — Place a furnace, light it with coal+raw food. Furnace progress bar starts. Exit to title halfway through. Wait 60 seconds. Return. Smelt progress should be near where you left it, NOT completed.
-- [ ] **Resume on login** — After verifying the above, confirm time/weather/furnace resume normally on next login.
-- [ ] **Disabled** — `B:enabled=false`, reload, exit, wait, return → time advances normally (vanilla behavior).
+**Deferred to dedicated server validation.** Run when test server or production Alto deployment is available:
+
+- [—] **Dedicated server time pause** — `./gradlew runServer`, connect, `/time set 0`, disconnect, wait 60s, reconnect, `/time query daytime` → still near 0 (not ~1200 ticks advanced).
+- [—] **Dedicated server weather pause** — Connect, `/weather rain 100000`, disconnect, wait 60s, reconnect → still raining at near same weather time.
+- [—] **Dedicated server TileEntity pause** — Connect, place a furnace mid-smelt, disconnect, wait 60s, reconnect → smelt progress unchanged.
+- [—] **Disabled flag** — Set `B:enabled=false`, repeat above tests → vanilla behavior (time advances, etc).
 
 ### M4 — Loyalty Rewards
 
