@@ -37,10 +37,12 @@ public class BlockJobBoard extends Block {
     public static final PropertyDirection FACING = PropertyDirection.create(
         "facing", EnumFacing.Plane.HORIZONTAL);
 
-    private static final AxisAlignedBB BB_NORTH = new AxisAlignedBB(0.0, 0.0, 0.0, 1.0, 1.0, 2.0 / 16.0);
-    private static final AxisAlignedBB BB_SOUTH = new AxisAlignedBB(0.0, 0.0, 14.0 / 16.0, 1.0, 1.0, 1.0);
-    private static final AxisAlignedBB BB_WEST = new AxisAlignedBB(0.0, 0.0, 0.0, 2.0 / 16.0, 1.0, 1.0);
-    private static final AxisAlignedBB BB_EAST = new AxisAlignedBB(14.0 / 16.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+    // FACING = direction the board points outward. Body sits on the wall behind it
+    // (opposite side of the cell from FACING), matching the rotated model.
+    private static final AxisAlignedBB BB_NORTH = new AxisAlignedBB(0.0, 0.0, 14.0 / 16.0, 1.0, 1.0, 1.0);
+    private static final AxisAlignedBB BB_SOUTH = new AxisAlignedBB(0.0, 0.0, 0.0, 1.0, 1.0, 2.0 / 16.0);
+    private static final AxisAlignedBB BB_WEST = new AxisAlignedBB(14.0 / 16.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+    private static final AxisAlignedBB BB_EAST = new AxisAlignedBB(0.0, 0.0, 0.0, 2.0 / 16.0, 1.0, 1.0);
 
     public BlockJobBoard() {
         super(Material.WOOD);
@@ -69,10 +71,10 @@ public class BlockJobBoard extends Block {
     public boolean onBlockActivated(World world, BlockPos pos, IBlockState state,
                                     EntityPlayer player, EnumHand hand, EnumFacing facing,
                                     float hitX, float hitY, float hitZ) {
-        if (!world.isRemote) {
-            player.openGui(Sum.instance, SumGuiHandler.GUI_JOB_BOARD, world,
-                pos.getX(), pos.getY(), pos.getZ());
-        }
+        // GuiJobBoard is screen-only — getServerGuiElement returns null for GUI_JOB_BOARD,
+        // so the server-side openGui call alone won't reach the client. Fire on both sides.
+        player.openGui(Sum.instance, SumGuiHandler.GUI_JOB_BOARD, world,
+            pos.getX(), pos.getY(), pos.getZ());
         return true;
     }
 

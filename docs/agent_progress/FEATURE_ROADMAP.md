@@ -197,12 +197,16 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **A2.1 bank counter**: places, renders correctly.
 - [x] **A2.2 safe deposit box**: persistence works across save/reload after the `7c74d4e` fix; multiple items in different slots stay put.
 - [x] **A2.4 velvet rope**: brass color reads as brass; auto-connecting burgundy rope segments work.
-- [x] **C1 partial**: `/sum econ add 100` → `/balance` reports $100 and persists. EconomyInc was loaded during this test, so the SUM-only path is still unverified.
+- [x] **C1 economy**: `/sum econ add 100` → `/balance` reports $100 and persists, both with EconomyInc loaded AND with EconomyInc absent (SUM-native standalone path verified).
 - [x] **C2 bills (post-fix)**: render correctly after the JSON-newline fix in `15192f2`.
 - [x] **A3 bank teller role (post-fix)**: `/sum roamer role set nearest bank_teller` correctly auto-names the roamer "Bank Teller" and greetings fire after `c9a40e2`.
 - [x] **C4 phone + debit card (post-fix)**: bind on first right-click works; **second right-click opens the ATM GUI** after the proxy-based fix in `03f715d`.
 - [x] **C5 player shop**: working in solo testing per Alex's report.
+- [x] **C8 bills display**: TESR + insert/take flow working.
 - [x] **C9 migrate-economy build**: command compiles + dispatches; full migration flow not yet end-to-end tested.
+- [x] **`/sum help` (`af0b3b6`)**: paginated help across 7 pages, all reachable; op-only entries tagged `[op]`.
+- [x] **TR trash can**: 9-slot ephemeral inventory; closing destroys contents.
+- [x] **MX mailbox**: claim-on-first-right-click; deposit-only for non-owners; owner takes; break drops contents.
 
 ### Bugs found in playtest and fixed this session
 
@@ -216,9 +220,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 Highest priority (load-bearing features):
 
-- [ ] **`/sum help` (`af0b3b6`)**: paginated help, 7 pages. `/sum help` shows the index. `/sum help 2` through `/sum help 7` cover Bank/ATM, Roamer NPCs, Jobs/Mail, Plots, Items/blocks, Admin. Op-only entries inline-tagged `[op]`.
-- [ ] **C1 standalone path**: remove EconomyInc → `/sum econ add 100` should still work, `/balance` should report $100, ATM should produce SUM bills.
-- [ ] **C9 migrate-economy end-to-end**: `/sum migrate-economy verify` (dry run) → `/sum migrate-economy` for real → restart without EconomyInc → confirm balances + bills are intact.
+- [—] **C9 migrate-economy end-to-end**: deferred to Alex's server, to be run once most of the rest of the unverified list is cleared.
 
 Plots system (D1–D5, all need real testing):
 
@@ -242,12 +244,9 @@ Section B (still unverified end-to-end):
 - [ ] **C3 `/balance`** from non-op; admin `/balance <player>` with op.
 - [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet. 1 packet + Unbundle → 64 bills. Mismatched output rejects.
 - [ ] **C7 chest loot**: open dungeon/stronghold/temple chests; some should drop bills (mostly small denoms).
-- [ ] **C8 bills display**: TESR renders 1-5 stacked rotating sheets above the tray as count grows. Right-click bills/packet to insert; right-click empty to take.
-- [ ] **TR trash can**: 9-slot ephemeral GUI; closing destroys; shift-click rescues before close.
 - [ ] **SV sleep voting**: 2+ players online, one sleeps → "1/2 players sleeping" announcement; threshold met → night skips + weather clears.
 - [ ] **BC business cards**: right-click air to personalize; right-click another player to give a copy. Anvil-rename for title.
-- [ ] **MX mailbox**: claim on first right-click; non-owner can deposit but not take; owner can do both. Break drops contents.
-- [ ] **JB job board**: `/sum job post 50 Need help` → posts. Place a job board, right-click → browse listings, paginated. Original poster sees Remove button; others don't.
+- [ ] **JB job board** (post-fix 2026-05-16): right-click no longer guarded by `!world.isRemote` so the screen-only `GuiJobBoard` opens; bbox constants swapped to match the rotated model. Re-test that right-click opens the listings GUI and the targeting outline matches where the panel renders for all 4 facings.
 
 ### Pre-flight (always green)
 
