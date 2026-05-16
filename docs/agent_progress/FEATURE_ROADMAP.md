@@ -211,6 +211,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. Open-state mouseover NPE fixed by overriding `collisionRayTrace`; open state now renders a doorway frame so the door is visible.
 - [x] **BC business cards**: right-click air to personalize; right-click another player to give a copy; anvil-rename for title.
 - [x] **SV sleep voting**: threshold-met → night skips. Weather is intentionally left alone (server-controlled).
+- [x] **C6 bill changer**: bundle requires ≥64 bills of one denom; unbundle splits a packet back into 64. Logic was already correct; GUI now shows a `$N` total under each slot so a 64-stack of bills can't be mistaken for a single bill.
 
 ### Bugs found in playtest and fixed this session
 
@@ -245,7 +246,6 @@ Section B (still unverified end-to-end):
 
 - [ ] **C2 SUM bills functional**: ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
 - [ ] **C3 `/balance`** from non-op; admin `/balance <player>` with op.
-- [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet. 1 packet + Unbundle → 64 bills. Mismatched output rejects.
 - [ ] **C7 chest loot**: open dungeon/stronghold/temple chests; some should drop bills (mostly small denoms).
 
 ### Pre-flight (always green)

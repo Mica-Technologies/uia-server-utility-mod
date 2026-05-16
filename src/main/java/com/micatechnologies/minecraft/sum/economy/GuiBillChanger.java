@@ -1,10 +1,13 @@
 package com.micatechnologies.minecraft.sum.economy;
 
+import com.micatechnologies.minecraft.sum.atm.Bills;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import java.io.IOException;
+import java.util.Locale;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.item.ItemStack;
 
 /**
  * Bill-changer GUI. Two slots (input + output) with two action buttons between them.
@@ -19,6 +22,7 @@ public class GuiBillChanger extends GuiContainer {
     private static final int BG_INNER = 0xFF40444C;
     private static final int TEXT_TITLE = 0xFFE0E0E0;
     private static final int TEXT_DIM = 0xFF9098A0;
+    private static final int TEXT_VALUE = 0xFFD4B258;
 
     private static final int BTN_BUNDLE = 100;
     private static final int BTN_UNBUNDLE = 101;
@@ -91,9 +95,34 @@ public class GuiBillChanger extends GuiContainer {
         drawString(this.fontRenderer, "Input", 46, 14, TEXT_DIM);
         drawString(this.fontRenderer, "Output", 100, 14, TEXT_DIM);
 
+        // Dollar-value readouts under each slot - shows the total $ a stack is worth so
+        // a 64-stack of bills can't be mistaken for a single bill before pressing Bundle.
+        drawValueLabel(60, inventorySlots.getSlot(TileEntityBillChanger.SLOT_INPUT).getStack());
+        drawValueLabel(114, inventorySlots.getSlot(TileEntityBillChanger.SLOT_OUTPUT).getStack());
+
         // Inventory label
         drawString(this.fontRenderer, "Inventory", 8,
             ContainerBillChanger.PLAYER_INV_Y - 12, TEXT_DIM);
+    }
+
+    /** Draw a "$N" total under a slot, centered at slotCenterX, just below the slot frame. */
+    private void drawValueLabel(int slotCenterX, ItemStack stack) {
+        int value = stackValue(stack);
+        if (value <= 0) return;
+        String text = "$" + String.format(Locale.ROOT, "%,d", value);
+        int width = this.fontRenderer.getStringWidth(text);
+        drawString(this.fontRenderer, text, slotCenterX - width / 2, 43, TEXT_VALUE);
+    }
+
+    /** Total dollar value of {@code stack}: denom*count for bills, packetValue*count for packets. */
+    private static int stackValue(ItemStack stack) {
+        if (stack.isEmpty()) return 0;
+        int denom = Bills.denominationOf(stack.getItem());
+        if (denom > 0) return denom * stack.getCount();
+        if (stack.getItem() instanceof ItemSumPacket) {
+            return ((ItemSumPacket) stack.getItem()).getPacketValue() * stack.getCount();
+        }
+        return 0;
     }
 
     @Override
