@@ -24,6 +24,8 @@ import net.minecraft.util.Rotation;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.IBlockAccess;
@@ -145,6 +147,18 @@ public class BlockVaultDoor extends BlockContainer {
     @Override
     public AxisAlignedBB getCollisionBoundingBox(IBlockState state, IBlockAccess world, BlockPos pos) {
         return state.getValue(OPEN) ? Block.NULL_AABB : Block.FULL_BLOCK_AABB;
+    }
+
+    /** When OPEN, getBoundingBox returns NULL_AABB (== null). The vanilla collisionRayTrace
+     *  would then NPE in Block.rayTrace dereferencing it. Skip the trace entirely instead so
+     *  the open door is pass-through for mouseover/targeting too. */
+    @Override
+    public RayTraceResult collisionRayTrace(IBlockState state, World world, BlockPos pos,
+                                            Vec3d start, Vec3d end) {
+        if (state.getValue(OPEN)) {
+            return null;
+        }
+        return super.collisionRayTrace(state, world, pos, start, end);
     }
 
     @Override
