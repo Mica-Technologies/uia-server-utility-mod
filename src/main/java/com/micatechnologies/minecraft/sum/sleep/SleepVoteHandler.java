@@ -16,9 +16,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
  * through the night. This handler closes the gap.
  *
  * <p>Runs entirely server-side. Only checks the overworld (dimension 0). Skips the night by
- * advancing the world time to the next morning, clearing rain/thunder, and waking sleeping
- * players (vanilla's morning-arrival path also does this, but doing it explicitly keeps the
- * announcement and the sleep state in sync).
+ * advancing the world time to the next morning and waking sleeping players. Weather is left
+ * alone — the server controls rain/thunder via its own systems and the sleep vote should not
+ * override that.
  */
 public class SleepVoteHandler {
 
@@ -81,12 +81,6 @@ public class SleepVoteHandler {
         long timeOfDay = now % 24000;
         long delta = timeOfDay == 0 ? 0 : (24000 - timeOfDay);
         world.setWorldTime(now + delta);
-
-        // Stop any active storm.
-        world.getWorldInfo().setRaining(false);
-        world.getWorldInfo().setThundering(false);
-        world.getWorldInfo().setRainTime(0);
-        world.getWorldInfo().setThunderTime(0);
 
         // Wake everyone who was in a bed. wakeUpPlayer(immediately, updateWorldFlag, setSpawn).
         // setSpawn=true matches vanilla's natural morning-wake behavior — the bed becomes the

@@ -209,6 +209,8 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **MX mailbox**: claim-on-first-right-click; deposit-only for non-owners; owner takes; break drops contents.
 - [x] **JB job board**: right-click opens listings GUI after dropping the `!world.isRemote` guard; bbox aligned with the rotated model; long empty-state hint wraps across lines.
 - [x] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. Open-state mouseover NPE fixed by overriding `collisionRayTrace`; open state now renders a doorway frame so the door is visible.
+- [x] **BC business cards**: right-click air to personalize; right-click another player to give a copy; anvil-rename for title.
+- [x] **SV sleep voting**: threshold-met → night skips. Weather is intentionally left alone (server-controlled).
 
 ### Bugs found in playtest and fixed this session
 
@@ -245,8 +247,6 @@ Section B (still unverified end-to-end):
 - [ ] **C3 `/balance`** from non-op; admin `/balance <player>` with op.
 - [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet. 1 packet + Unbundle → 64 bills. Mismatched output rejects.
 - [ ] **C7 chest loot**: open dungeon/stronghold/temple chests; some should drop bills (mostly small denoms).
-- [ ] **SV sleep voting**: 2+ players online, one sleeps → "1/2 players sleeping" announcement; threshold met → night skips + weather clears.
-- [ ] **BC business cards**: right-click air to personalize; right-click another player to give a copy. Anvil-rename for title.
 
 ### Pre-flight (always green)
 
