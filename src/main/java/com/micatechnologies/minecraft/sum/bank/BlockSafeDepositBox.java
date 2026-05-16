@@ -37,20 +37,20 @@ public class BlockSafeDepositBox extends Block {
 
     public static final PropertyDirection FACING = PropertyDirection.create("facing", EnumFacing.Plane.HORIZONTAL);
 
-    // Same wall-mounted thin-shell footprint as BlockAtmWall - only the front 5/16 of the
-    // block's depth is occupied; the back hugs the wall behind.
+    // Wall-mounted thin-shell footprint - the back of the box hugs the wall it was placed
+    // on (opposite side of the cell from FACING), so the front face is visible to the player.
     private static final AxisAlignedBB BB_NORTH = new AxisAlignedBB(
-        3.0 / 16.0, 0.0, 0.0,
-        13.0 / 16.0, 1.0, 5.0 / 16.0);
-    private static final AxisAlignedBB BB_SOUTH = new AxisAlignedBB(
         3.0 / 16.0, 0.0, 11.0 / 16.0,
         13.0 / 16.0, 1.0, 1.0);
+    private static final AxisAlignedBB BB_SOUTH = new AxisAlignedBB(
+        3.0 / 16.0, 0.0, 0.0,
+        13.0 / 16.0, 1.0, 5.0 / 16.0);
     private static final AxisAlignedBB BB_WEST = new AxisAlignedBB(
-        0.0, 0.0, 3.0 / 16.0,
-        5.0 / 16.0, 1.0, 13.0 / 16.0);
-    private static final AxisAlignedBB BB_EAST = new AxisAlignedBB(
         11.0 / 16.0, 0.0, 3.0 / 16.0,
         1.0, 1.0, 13.0 / 16.0);
+    private static final AxisAlignedBB BB_EAST = new AxisAlignedBB(
+        0.0, 0.0, 3.0 / 16.0,
+        5.0 / 16.0, 1.0, 13.0 / 16.0);
 
     public BlockSafeDepositBox() {
         super(Material.IRON);

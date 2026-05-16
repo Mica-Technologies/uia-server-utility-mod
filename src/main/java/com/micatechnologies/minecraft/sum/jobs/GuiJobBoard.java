@@ -114,9 +114,14 @@ public class GuiJobBoard extends GuiScreen {
         if (listings.isEmpty()) {
             drawCenteredString(this.fontRenderer, "No listings posted.",
                 guiLeft + GUI_W / 2, guiTop + 60, TEXT_DIM);
-            drawCenteredString(this.fontRenderer,
-                "Post one with /sum job post <reward> <description>.",
-                guiLeft + GUI_W / 2, guiTop + 76, TEXT_HINT);
+            List<String> hintLines = this.fontRenderer.listFormattedStringToWidth(
+                "Post one with /sum job post <reward> <description>.", GUI_W - 24);
+            int hintY = guiTop + 76;
+            for (String line : hintLines) {
+                drawCenteredString(this.fontRenderer, line,
+                    guiLeft + GUI_W / 2, hintY, TEXT_HINT);
+                hintY += this.fontRenderer.FONT_HEIGHT + 1;
+            }
         } else {
             int start = page * LISTINGS_PER_PAGE;
             int end = Math.min(start + LISTINGS_PER_PAGE, listings.size());

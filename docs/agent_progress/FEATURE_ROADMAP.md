@@ -195,7 +195,7 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 
 - [x] **A1 ATMs**: ATM kiosk + wall + drive-thru blocks place, render, open `GuiSumAtm`. EconomyInc balance shows; withdraw produces EconomyInc bills; deposit consumes them.
 - [x] **A2.1 bank counter**: places, renders correctly.
-- [x] **A2.2 safe deposit box**: persistence works across save/reload after the `7c74d4e` fix; multiple items in different slots stay put.
+- [x] **A2.2 safe deposit box**: persistence works across save/reload after the `7c74d4e` fix; multiple items in different slots stay put. Box now recesses against the wall behind it after the panel-position fix (was floating on the player-facing side).
 - [x] **A2.4 velvet rope**: brass color reads as brass; auto-connecting burgundy rope segments work.
 - [x] **C1 economy**: `/sum econ add 100` → `/balance` reports $100 and persists, both with EconomyInc loaded AND with EconomyInc absent (SUM-native standalone path verified).
 - [x] **C2 bills (post-fix)**: render correctly after the JSON-newline fix in `15192f2`.
@@ -207,6 +207,8 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **`/sum help` (`af0b3b6`)**: paginated help across 7 pages, all reachable; op-only entries tagged `[op]`.
 - [x] **TR trash can**: 9-slot ephemeral inventory; closing destroys contents.
 - [x] **MX mailbox**: claim-on-first-right-click; deposit-only for non-owners; owner takes; break drops contents.
+- [x] **JB job board**: right-click opens listings GUI after dropping the `!world.isRemote` guard; bbox aligned with the rotated model; long empty-state hint wraps across lines.
+- [x] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. Open-state mouseover NPE fixed by overriding `collisionRayTrace`; open state now renders a doorway frame so the door is visible.
 
 ### Bugs found in playtest and fixed this session
 
@@ -239,14 +241,12 @@ Storm shelter sign (post-`6866ebc`):
 
 Section B (still unverified end-to-end):
 
-- [ ] **A2.3 vault door**: claim flow, passcode unlock, auto-close, owner overrides. **`"elements": []` open-state model is the watchpoint** — could render as missing-texture squares on some renderers.
 - [ ] **C2 SUM bills functional**: ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
 - [ ] **C3 `/balance`** from non-op; admin `/balance <player>` with op.
 - [ ] **C6 bill changer**: place + right-click → Bundle/Unbundle GUI. 64 same-denom bills + Bundle → 1 packet. 1 packet + Unbundle → 64 bills. Mismatched output rejects.
 - [ ] **C7 chest loot**: open dungeon/stronghold/temple chests; some should drop bills (mostly small denoms).
 - [ ] **SV sleep voting**: 2+ players online, one sleeps → "1/2 players sleeping" announcement; threshold met → night skips + weather clears.
 - [ ] **BC business cards**: right-click air to personalize; right-click another player to give a copy. Anvil-rename for title.
-- [ ] **JB job board** (post-fix 2026-05-16): right-click no longer guarded by `!world.isRemote` so the screen-only `GuiJobBoard` opens; bbox constants swapped to match the rotated model. Re-test that right-click opens the listings GUI and the targeting outline matches where the panel renders for all 4 facings.
 
 ### Pre-flight (always green)
 
