@@ -198,7 +198,8 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **A2.2 safe deposit box**: persistence works across save/reload after the `7c74d4e` fix; multiple items in different slots stay put. Box now recesses against the wall behind it after the panel-position fix (was floating on the player-facing side).
 - [x] **A2.4 velvet rope**: brass color reads as brass; auto-connecting burgundy rope segments work.
 - [x] **C1 economy**: `/sum econ add 100` → `/balance` reports $100 and persists, both with EconomyInc loaded AND with EconomyInc absent (SUM-native standalone path verified).
-- [x] **C2 bills (post-fix)**: render correctly after the JSON-newline fix in `15192f2`.
+- [x] **C2 bills (post-fix)**: render correctly after the JSON-newline fix in `15192f2`. Functional path verified: ATM produces SUM bills (without EconomyInc), deposit accepts SUM bills.
+- [x] **C3 `/balance`**: non-op self-query and op `/balance <player>` both working.
 - [x] **A3 bank teller role (post-fix)**: `/sum roamer role set nearest bank_teller` correctly auto-names the roamer "Bank Teller" and greetings fire after `c9a40e2`.
 - [x] **C4 phone + debit card (post-fix)**: bind on first right-click works; **second right-click opens the ATM GUI** after the proxy-based fix in `03f715d`.
 - [x] **C5 player shop**: working in solo testing per Alex's report.
@@ -244,8 +245,6 @@ Storm shelter sign (post-`6866ebc`):
 
 Section B (still unverified end-to-end):
 
-- [ ] **C2 SUM bills functional**: ATM produces SUM bills (when EconomyInc absent), deposit accepts SUM bills.
-- [ ] **C3 `/balance`** from non-op; admin `/balance <player>` with op.
 - [ ] **C7 chest loot**: open dungeon/stronghold/temple chests; some should drop bills (mostly small denoms).
 
 ### Pre-flight (always green)
