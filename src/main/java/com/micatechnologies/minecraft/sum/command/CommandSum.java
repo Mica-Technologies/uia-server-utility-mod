@@ -1387,6 +1387,7 @@ public class CommandSum extends CommandBase {
         }),
         new HelpPage("Items & blocks", new HelpEntry[] {
             h("Phone", "Right-click to bind, again to open. Home screen with Banking, Notes, Calculator, Weather, Contacts, Messages — contacts/messages/notes live in your server-side cloud and follow you across devices."),
+            h("Desk phone", "Place block, right-click to use as a shared phone. Same apps as the phone item except Banking; opens each player's own cloud."),
             h("Debit card", "Right-click to bind, again to open the ATM GUI directly (no phone shell)."),
             h("Shop block", "Vending machine. Owner sets template+stock+price; buyers see item + price + Buy button."),
             h("Bill changer", "Drop 64 bills + Bundle → packet. Drop a packet + Unbundle → 64 bills."),

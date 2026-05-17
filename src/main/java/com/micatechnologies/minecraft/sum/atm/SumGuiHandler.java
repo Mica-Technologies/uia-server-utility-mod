@@ -12,6 +12,7 @@ import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.mailbox.ContainerMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.GuiMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
+import com.micatechnologies.minecraft.sum.phone.GuiSumPhone;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopBuyer;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopOwner;
 import com.micatechnologies.minecraft.sum.shop.GuiShopBuyer;
@@ -45,6 +46,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_MAILBOX = 6;
     public static final int GUI_JOB_BOARD = 7;
     // GUI id 8 is reserved (was Signpost — moved to CSM, see CSM CUSTOM_SIGNPOSTS_PLAN.md).
+    public static final int GUI_DESK_PHONE = 9;
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -119,6 +121,10 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_JOB_BOARD) {
             return new GuiJobBoard(player,
                 JobBoardSavedData.get(world).getActive(System.currentTimeMillis()));
+        }
+        if (id == GUI_DESK_PHONE) {
+            // Shared phone — no banking app, but otherwise the same multi-app shell.
+            return new GuiSumPhone(player, false);
         }
         return null;
     }

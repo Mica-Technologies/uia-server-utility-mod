@@ -1,0 +1,52 @@
+{
+  "parent": "block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "sum:blocks/desk_phone_dial",
+    "dial":    "sum:blocks/desk_phone_dial",
+    "body":    "sum:blocks/desk_phone_body",
+    "cradle":  "sum:blocks/desk_phone_cradle",
+    "handset": "sum:blocks/desk_phone_handset"
+  },
+  "elements": [
+    {
+      "__comment": "Body: flat 12x2x12 base with the keypad-top.",
+      "from": [2, 0, 2],
+      "to":   [14, 2, 14],
+      "faces": {
+        "down":  { "uv": [2, 2, 14, 14], "texture": "#dial", "cullface": "down" },
+        "up":    { "uv": [2, 2, 14, 14], "texture": "#dial" },
+        "north": { "uv": [0, 14, 12, 16], "texture": "#body" },
+        "south": { "uv": [0, 14, 12, 16], "texture": "#body" },
+        "west":  { "uv": [0, 14, 12, 16], "texture": "#body" },
+        "east":  { "uv": [0, 14, 12, 16], "texture": "#body" }
+      }
+    },
+    {
+      "__comment": "Cradle: 12x3x7 rise at the back where the handset rests.",
+      "from": [2, 2, 8],
+      "to":   [14, 5, 14],
+      "faces": {
+        "down":  { "uv": [2, 8, 14, 14], "texture": "#dial" },
+        "up":    { "uv": [2, 1, 14, 7],  "texture": "#cradle" },
+        "north": { "uv": [2, 11, 14, 14], "texture": "#cradle" },
+        "south": { "uv": [2, 11, 14, 14], "texture": "#cradle" },
+        "west":  { "uv": [8, 11, 14, 14], "texture": "#cradle" },
+        "east":  { "uv": [8, 11, 14, 14], "texture": "#cradle" }
+      }
+    },
+    {
+      "__comment": "Handset: 10x2x4 dark bar resting on the cradle.",
+      "from": [3, 5, 9],
+      "to":   [13, 7, 13],
+      "faces": {
+        "down":  { "uv": [3, 6, 13, 10], "texture": "#handset" },
+        "up":    { "uv": [3, 6, 13, 10], "texture": "#handset" },
+        "north": { "uv": [3, 5, 13, 7],  "texture": "#handset" },
+        "south": { "uv": [3, 5, 13, 7],  "texture": "#handset" },
+        "west":  { "uv": [9, 5, 13, 7],  "texture": "#handset" },
+        "east":  { "uv": [9, 5, 13, 7],  "texture": "#handset" }
+      }
+    }
+  ]
+}

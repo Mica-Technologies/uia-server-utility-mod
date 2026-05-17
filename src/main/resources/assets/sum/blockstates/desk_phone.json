@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:desk_phone" },
+    "facing=south": { "model": "sum:desk_phone", "y": 180 },
+    "facing=west":  { "model": "sum:desk_phone", "y": 270 },
+    "facing=east":  { "model": "sum:desk_phone", "y": 90  }
+  }
+}
