@@ -76,8 +76,8 @@ public class SumTab {
         for (int i = 0; i < BILL_DENOMINATIONS.length; i++) {
             bills[i] = new ItemSumBill(BILL_DENOMINATIONS[i]);
         }
-        phone = new ItemAccountAccess("phone");
-        debitCard = new ItemAccountAccess("debit_card");
+        phone = new ItemAccountAccess("phone", true);
+        debitCard = new ItemAccountAccess("debit_card", false);
         shop = new BlockSumShop();
         billChanger = new BlockBillChanger();
         packets = new ItemSumPacket[BILL_DENOMINATIONS.length];

@@ -20,9 +20,14 @@ import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
 
 /**
- * Personal-account access item — right-click anywhere to open {@link
- * com.micatechnologies.minecraft.sum.atm.GuiSumAtm}, no ATM block needed. Registered twice
- * (phone, debit card) for two visual styles; behavior is identical.
+ * Personal-account access item — right-click anywhere to open the owner's account UI without
+ * needing an ATM block. Registered twice for two visual styles:
+ * <ul>
+ *   <li>{@code sum:phone} ({@code isPhone=true}) opens the multi-app phone GUI; banking is one
+ *       app among notes/calculator/weather.</li>
+ *   <li>{@code sum:debit_card} ({@code isPhone=false}) opens {@link
+ *       com.micatechnologies.minecraft.sum.atm.GuiSumAtm} directly — a card is not a phone.</li>
+ * </ul>
  *
  * <p><b>Owner binding.</b> A fresh item is unowned. The first player to right-click claims it
  * by stamping their UUID + display name into NBT. From then on, only that player can open the
@@ -37,7 +42,10 @@ public class ItemAccountAccess extends Item {
     private static final String NBT_OWNER_UUID = "OwnerUUID";
     private static final String NBT_OWNER_NAME = "OwnerName";
 
-    public ItemAccountAccess(String registryPath) {
+    private final boolean isPhone;
+
+    public ItemAccountAccess(String registryPath, boolean isPhone) {
+        this.isPhone = isPhone;
         setRegistryName(SumConstants.MOD_NAMESPACE, registryPath);
         setTranslationKey(SumConstants.MOD_NAMESPACE + "." + registryPath);
         setMaxStackSize(1);
@@ -59,7 +67,11 @@ public class ItemAccountAccess extends Item {
             // client has no owner NBT yet, so this branch skips — the server's bind path
             // sends a chat message and the player's next click opens the GUI.
             if (owner != null && owner.equals(playerId)) {
-                Sum.proxy.openAccountAccessGui(player);
+                if (isPhone) {
+                    Sum.proxy.openPhoneGui(player, true);
+                } else {
+                    Sum.proxy.openAccountAccessGui(player);
+                }
             }
             return new ActionResult<>(EnumActionResult.SUCCESS, stack);
         }

@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.atm.GuiSumAtm;
+import com.micatechnologies.minecraft.sum.phone.GuiSumPhone;
 import com.micatechnologies.minecraft.sum.economy.TESRBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
@@ -57,5 +58,10 @@ public class SumClientProxy implements SumProxy {
     @Override
     public void openAccountAccessGui(EntityPlayer player) {
         Minecraft.getMinecraft().displayGuiScreen(new GuiSumAtm(player));
+    }
+
+    @Override
+    public void openPhoneGui(EntityPlayer player, boolean enableBanking) {
+        Minecraft.getMinecraft().displayGuiScreen(new GuiSumPhone(player, enableBanking));
     }
 }

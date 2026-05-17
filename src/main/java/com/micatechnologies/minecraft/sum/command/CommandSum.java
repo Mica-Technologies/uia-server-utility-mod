@@ -1386,7 +1386,8 @@ public class CommandSum extends CommandBase {
             h("/sum plots transfer <id> <player>", "Transfer ownership outright. Trust list carries over."),
         }),
         new HelpPage("Items & blocks", new HelpEntry[] {
-            h("Phone / Debit card", "Right-click air to bind to you, then right-click again to open the ATM GUI anywhere."),
+            h("Phone", "Right-click to bind, again to open. Home screen with Banking, Notes, Calculator, Weather, Contacts, Messages — contacts/messages/notes live in your server-side cloud and follow you across devices."),
+            h("Debit card", "Right-click to bind, again to open the ATM GUI directly (no phone shell)."),
             h("Shop block", "Vending machine. Owner sets template+stock+price; buyers see item + price + Buy button."),
             h("Bill changer", "Drop 64 bills + Bundle → packet. Drop a packet + Unbundle → 64 bills."),
             h("Bills display", "Decorative tray; right-click bills/packet to insert, right-click empty to take."),

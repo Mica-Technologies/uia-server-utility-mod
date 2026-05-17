@@ -23,4 +23,9 @@ public class SumCommonProxy implements SumProxy {
     public void openAccountAccessGui(EntityPlayer player) {
         // No-op on dedicated server; only the local client renders GUIs.
     }
+
+    @Override
+    public void openPhoneGui(EntityPlayer player, boolean enableBanking) {
+        // No-op on dedicated server; only the local client renders GUIs.
+    }
 }

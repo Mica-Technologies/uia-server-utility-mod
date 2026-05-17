@@ -4,6 +4,9 @@ import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.economy.PacketBillChangerAction;
 import com.micatechnologies.minecraft.sum.economy.PacketSyncSumMoney;
 import com.micatechnologies.minecraft.sum.jobs.PacketJobAction;
+import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudAction;
+import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudFetchRequest;
+import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudSync;
 import com.micatechnologies.minecraft.sum.shop.PacketShopBuy;
 import com.micatechnologies.minecraft.sum.shop.PacketShopOwnerAction;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
@@ -41,6 +44,14 @@ public final class SumNetwork {
             PacketJobAction.class, 5, Side.SERVER);
         // Slot 6 is reserved (was PacketSignpostUpdate — moved to CSM,
         // see CSM CUSTOM_SIGNPOSTS_PLAN.md).
+        // Slot 7 reserved (was PhonePacketNotesSync — replaced by PhoneCloudAction
+        // UPDATE_NOTES, since notes now live in the server cloud, not on the phone item).
+        CHANNEL.registerMessage(PhoneCloudFetchRequest.Handler.class,
+            PhoneCloudFetchRequest.class, 8, Side.SERVER);
+        CHANNEL.registerMessage(PhoneCloudSync.Handler.class,
+            PhoneCloudSync.class, 9, Side.CLIENT);
+        CHANNEL.registerMessage(PhoneCloudAction.Handler.class,
+            PhoneCloudAction.class, 10, Side.SERVER);
         initialized = true;
     }
 }

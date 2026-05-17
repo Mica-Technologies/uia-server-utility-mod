@@ -18,4 +18,9 @@ public interface SumProxy {
      *  to open the GUI without going through {@code player.openGui}, which has been observed to
      *  silently drop GUI-open packets when invoked from {@link Item#onItemRightClick}. */
     void openAccountAccessGui(EntityPlayer player);
+
+    /** Opens the multi-app phone GUI on the local client. {@code enableBanking=false} hides
+     *  the banking app — used for the shared desk phone block (which isn't bound to an
+     *  account). Server-side proxy is a no-op. */
+    void openPhoneGui(EntityPlayer player, boolean enableBanking);
 }
