@@ -48,6 +48,21 @@ dependencies {
     // OneConfig via EvergreenHUD in the standard UIA modpack, so no extra install step.
     // The 0.2.x alpha line is what EvergreenHUD 2.x for 1.12.2 pins, so we match it to avoid
     // version drift in the modpack. See repositories.gradle for the Polyfrost Maven URL.
+    //
+    // Three artifacts at play:
+    //   - oneconfig-1.12.2-forge — the actual API (Config, BasicHud, annotations, etc).
+    //     compileOnly for our @HUD / @Switch / etc references; runtime-only for the dev
+    //     env so the classes resolve when launchwrapper instantiates HUD modules.
+    //   - oneconfig-wrapper-launchwrapper — the small "bootstrap" jar shipped to users
+    //     as OneConfig-Bootstrap. Contains the OneConfigTweaker class that
+    //     oneconfig-1.12.2-forge's MANIFEST.MF references as TweakClass. Without it on
+    //     the runtime classpath, launchwrapper finds the tweaker name in the OneConfig
+    //     manifest and crashes with ClassNotFoundException because the class lives over
+    //     here, not in the main jar. Pinned to match EvergreenHUD's pin so the modpack
+    //     ends up with one consistent OneConfig install rather than version drift.
+    //   - kotlin-stdlib / universalcraft — transitive deps of OneConfig; not declared
+    //     here, RFG pulls them via the compileOnly resolution.
     compileOnly 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
     runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
+    runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
 }
