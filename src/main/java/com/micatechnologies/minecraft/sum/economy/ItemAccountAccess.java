@@ -68,6 +68,13 @@ public class ItemAccountAccess extends Item {
         return isPhone ? PersonalItemsSavedData.Kind.PHONE : PersonalItemsSavedData.Kind.DEBIT_CARD;
     }
 
+    /** True if this Item is the phone variant; false for the debit card variant. Exposed so
+     *  callers (pocket slot filters, etc.) can distinguish the two registered instances
+     *  without re-checking registry names. */
+    public boolean isPhone() {
+        return isPhone;
+    }
+
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
         ItemStack stack = player.getHeldItem(hand);

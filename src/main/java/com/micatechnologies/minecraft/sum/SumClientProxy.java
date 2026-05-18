@@ -7,6 +7,9 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
+import com.micatechnologies.minecraft.sum.pocket.PocketHudConfig;
+import com.micatechnologies.minecraft.sum.pocket.PocketHudOverlay;
+import com.micatechnologies.minecraft.sum.pocket.PocketKeybinds;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RenderRoamer;
 import net.minecraft.client.Minecraft;
@@ -33,6 +36,14 @@ public class SumClientProxy implements SumProxy {
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
         FavoritesClientHandler.registerKeybinds();
         MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
+
+        // Pocket HUD: load saved layout, register the overlay event subscriber, and bind
+        // the open/edit keybinds. The keybinds live in the same SUM category as the
+        // favorites bindings so the Controls screen has one consolidated section.
+        PocketHudConfig.setStorageFile(event.getModConfigurationDirectory());
+        MinecraftForge.EVENT_BUS.register(new PocketHudOverlay());
+        PocketKeybinds.register();
+        MinecraftForge.EVENT_BUS.register(new PocketKeybinds());
     }
 
     @Override
