@@ -51,6 +51,28 @@ public class SafeDepositSavedData extends WorldSavedData {
             .computeIfAbsent(pos.toImmutable(), k -> NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY));
     }
 
+    /**
+     * Sum of currency-bill values across every safe-deposit box owned by {@code owner} in
+     * this dimension. Item stacks that aren't bills (per {@link com.micatechnologies.minecraft.sum.atm.Bills})
+     * are ignored — boxes also hold arbitrary items, but only bills contribute to the
+     * "bank balance" readout surfaced by the player-status snapshot.
+     */
+    public long totalBillValueFor(UUID owner) {
+        Map<BlockPos, NonNullList<ItemStack>> boxes = inventories.get(owner);
+        if (boxes == null || boxes.isEmpty()) return 0L;
+        long total = 0L;
+        for (NonNullList<ItemStack> box : boxes.values()) {
+            for (ItemStack stack : box) {
+                if (stack.isEmpty()) continue;
+                int denom = com.micatechnologies.minecraft.sum.atm.Bills.denominationOf(stack.getItem());
+                if (denom > 0) {
+                    total += (long) denom * stack.getCount();
+                }
+            }
+        }
+        return total;
+    }
+
     @Override
     public NBTTagCompound writeToNBT(NBTTagCompound nbt) {
         NBTTagList playerList = new NBTTagList();

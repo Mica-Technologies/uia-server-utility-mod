@@ -84,6 +84,16 @@ public class HudStateTracker {
         // Reset session-start when the player joins a new world / session.
         if (sessionStartMillis == 0L && Minecraft.getMinecraft().player != null) {
             sessionStartMillis = System.currentTimeMillis();
+            // One-shot fetch so PhoneNumberHud (and any future phone-cloud-driven HUDs)
+            // have data without the user needing to open the phone GUI first. The server
+            // replies with PhoneCloudSync which feeds GuiSumPhone.lastCloud.
+            try {
+                com.micatechnologies.minecraft.sum.phone.GuiSumPhone.requestCloudSync();
+            } catch (Throwable ignored) {
+                // Defensive: SUM might be running in a context without networking (eg.
+                // a unit test or stripped dev env) — don't crash the tick loop over a
+                // best-effort prefetch.
+            }
         }
     }
 
