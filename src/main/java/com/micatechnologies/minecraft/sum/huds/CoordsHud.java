@@ -16,7 +16,7 @@ public class CoordsHud extends SingleTextHud {
     public boolean showY = true;
 
     public CoordsHud() {
-        super("XYZ:", true, 5, 5);
+        super("XYZ:", false, 5, 5);
     }
 
     @Override

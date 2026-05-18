@@ -559,7 +559,7 @@ public class SumConfig {
     public static boolean isFavoritesStarOverlayEnabled() {
         try {
             if (com.micatechnologies.minecraft.sum.pocket.SumOneConfig.INSTANCE != null) {
-                return com.micatechnologies.minecraft.sum.pocket.SumOneConfig.favoritesStarOverlay;
+                return com.micatechnologies.minecraft.sum.pocket.SumOneConfig.INSTANCE.favoritesStarOverlay;
             }
         } catch (NoClassDefFoundError oneConfigMissing) {
             // SUM declares OneConfig as required-after in @Mod, so this branch shouldn't

@@ -10,7 +10,7 @@ public class MemoryHud extends SingleTextHud {
     public boolean asPercent = false;
 
     public MemoryHud() {
-        super("Memory:", true, 5, 5);
+        super("Memory:", false, 5, 5);
     }
 
     @Override

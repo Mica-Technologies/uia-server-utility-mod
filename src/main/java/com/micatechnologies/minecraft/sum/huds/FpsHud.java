@@ -10,7 +10,7 @@ import net.minecraft.client.Minecraft;
 public class FpsHud extends SingleTextHud {
 
     public FpsHud() {
-        super("FPS:", true, 5, 5);
+        super("FPS:", false, 5, 5);
     }
 
     @Override

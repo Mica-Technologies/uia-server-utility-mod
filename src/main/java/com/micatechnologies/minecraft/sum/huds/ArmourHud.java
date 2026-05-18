@@ -14,7 +14,7 @@ import net.minecraft.item.ItemStack;
 public class ArmourHud extends SingleTextHud {
 
     public ArmourHud() {
-        super("Armor:", true, 5, 5);
+        super("Armor:", false, 5, 5);
     }
 
     @Override

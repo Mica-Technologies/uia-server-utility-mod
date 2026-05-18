@@ -8,7 +8,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class PitchHud extends SingleTextHud {
 
     public PitchHud() {
-        super("Pitch:", true, 5, 5);
+        super("Pitch:", false, 5, 5);
     }
 
     @Override

@@ -8,7 +8,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class YawHud extends SingleTextHud {
 
     public YawHud() {
-        super("Yaw:", true, 5, 5);
+        super("Yaw:", false, 5, 5);
     }
 
     @Override

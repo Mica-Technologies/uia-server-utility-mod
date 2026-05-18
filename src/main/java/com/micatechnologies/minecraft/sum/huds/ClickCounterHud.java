@@ -7,7 +7,7 @@ import cc.polyfrost.oneconfig.hud.SingleTextHud;
 public class ClickCounterHud extends SingleTextHud {
 
     public ClickCounterHud() {
-        super("Clicks:", true, 5, 5);
+        super("Clicks:", false, 5, 5);
     }
 
     @Override
