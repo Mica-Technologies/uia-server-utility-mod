@@ -151,12 +151,12 @@ public final class HudPresets {
 
         // Vanilla+ — coords + FPS, top-left.
         HudLayout.builder("Vanilla+")
-            .column(10f, 10f, Direction.DOWN, "coordsHud", "fpsHud")
+            .column(0f, 10f, Direction.DOWN, "coordsHud", "fpsHud")
             .build(),
 
         // Survival Essentials — left column with the always-relevant survival info.
         HudLayout.builder("Survival Essentials")
-            .column(10f, 10f, Direction.DOWN,
+            .column(0f, 10f, Direction.DOWN,
                 "coordsHud", "biomeHud", "timeHud", "dayCounterHud",
                 "armourHud", "saturationHud")
             .build(),
@@ -164,7 +164,7 @@ public final class HudPresets {
         // Speedrunner — splits-relevant info distributed for at-a-glance reading.
         HudLayout.builder("Speedrunner")
             .place("coordsHud", 960f, 10f)
-            .column(10f, 10f, Direction.DOWN, "timeHud", "playtimeHud")
+            .column(0f, 10f, Direction.DOWN, "timeHud", "playtimeHud")
             .column(1920f, 10f, Direction.DOWN, "fpsHud", "pingHud")
             .build(),
 
@@ -172,14 +172,14 @@ public final class HudPresets {
         // anchored columns extend upward, so the FIRST entry sits flush against the
         // bottom and the rest stack above it.
         HudLayout.builder("PvP Focus")
-            .column(10f, 1050f, Direction.UP, "cpsHud", "saturationHud", "armourHud")
-            .column(1920f, 1050f, Direction.UP,
+            .column(0f, 1080f, Direction.UP, "cpsHud", "saturationHud", "armourHud")
+            .column(1920f, 1080f, Direction.UP,
                 "directionHud", "fpsHud", "pingHud")
             .build(),
 
         // Builder — survival builder focus (block above, height limit for tall builds).
         HudLayout.builder("Builder")
-            .column(10f, 10f, Direction.DOWN,
+            .column(0f, 10f, Direction.DOWN,
                 "coordsHud", "directionHud", "blockAboveHud", "heightLimitHud")
             .build(),
 
@@ -190,15 +190,15 @@ public final class HudPresets {
         // having to math out a separate anchor y for each.
         HudLayout.builder("Explorer")
             .place("coordsHud", 960f, 10f)
-            .column(10f, 1050f, Direction.UP,
+            .column(0f, 1080f, Direction.UP,
                 "dayCounterHud", "timeHud", "directionHud", "speedHud")
-            .column(1920f, 1050f, Direction.UP,
+            .column(1920f, 1080f, Direction.UP,
                 "fpsHud", "ftiHud", "tpsHud", "memoryHud", "playtimeHud")
             .build(),
 
         // Performance Watcher — diagnostics stack bottom-right, nothing else.
         HudLayout.builder("Performance Watcher")
-            .column(1920f, 1050f, Direction.UP,
+            .column(1920f, 1080f, Direction.UP,
                 "memoryHud", "pingHud", "tpsHud", "ftiHud", "fpsHud")
             .build(),
 
@@ -216,7 +216,7 @@ public final class HudPresets {
 
         // Server Op — admin-focused: server identity + health up top.
         HudLayout.builder("Server Op")
-            .column(10f, 10f, Direction.DOWN,
+            .column(0f, 10f, Direction.DOWN,
                 "serverIpHud", "tpsHud", "pingHud")
             .place("playtimeHud", 1920f, 10f)
             .build(),
@@ -227,7 +227,7 @@ public final class HudPresets {
         // for vertical-build reference; date + game mode on the right.
         HudLayout.builder("Urban Builder")
             .column(960f, 10f, Direction.DOWN, "coordsHud", "directionHud")
-            .column(10f, 10f, Direction.DOWN, "blockAboveHud", "heightLimitHud")
+            .column(0f, 10f, Direction.DOWN, "blockAboveHud", "heightLimitHud")
             .column(1920f, 10f, Direction.DOWN, "gameModeHud", "realLifeDateHud")
             .build(),
 
@@ -236,16 +236,16 @@ public final class HudPresets {
         HudLayout.builder("City Explorer")
             .place("coordsHud", 870f, 10f)
             .place("directionHud", 1060f, 10f)
-            .column(10f, 1050f, Direction.UP,
+            .column(0f, 1080f, Direction.UP,
                 "dayCounterHud", "timeHud", "biomeHud")
-            .column(1920f, 1050f, Direction.UP,
+            .column(1920f, 1080f, Direction.UP,
                 "playtimeHud", "serverIpHud")
             .build(),
 
         // Architect — precision-build mode. Detailed coords + height limit + block-above
         // on the left, everything else suppressed so the viewport is uncluttered.
         HudLayout.builder("Architect")
-            .column(10f, 10f, Direction.DOWN,
+            .column(0f, 10f, Direction.DOWN,
                 "coordsHud", "directionHud", "heightLimitHud",
                 "blockAboveHud", "gameModeHud")
             .build(),
@@ -254,7 +254,7 @@ public final class HudPresets {
         // line bottom-centre and the real-life date top-right; user is expected to pair
         // this with the Realistic Game HUD style for the smallest possible footprint.
         HudLayout.builder("Cityscape Photographer")
-            .place("coordsHud", 870f, 1060f)
+            .place("coordsHud", 870f, 1080f)
             .place("realLifeDateHud", 1920f, 10f)
             .build()
     };
