@@ -58,10 +58,13 @@ public abstract class BlockAtmBase extends Block {
     public boolean onBlockActivated(World world, BlockPos pos, IBlockState state, EntityPlayer player,
                                     EnumHand hand, EnumFacing facing,
                                     float hitX, float hitY, float hitZ) {
-        if (!world.isRemote) {
-            player.openGui(Sum.instance, SumGuiHandler.GUI_ATM, world,
-                pos.getX(), pos.getY(), pos.getZ());
-        }
+        // Screen-only GUI: SumGuiHandler.getServerGuiElement returns null for GUI_ATM, so the
+        // server-side openGui call is a no-op (Forge gates the OPEN_WINDOW packet behind a
+        // non-null Container). The client-side branch of FMLNetworkHandler.openGui is what
+        // actually calls showGuiScreen. Guarding with !world.isRemote skips that branch and
+        // nothing opens on dedicated server. Mirrors BlockDeskPhone / BlockJobBoard.
+        player.openGui(Sum.instance, SumGuiHandler.GUI_ATM, world,
+            pos.getX(), pos.getY(), pos.getZ());
         return true;
     }
 
