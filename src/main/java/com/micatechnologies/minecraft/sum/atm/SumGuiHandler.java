@@ -13,6 +13,7 @@ import com.micatechnologies.minecraft.sum.mailbox.ContainerMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.GuiMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.phone.GuiSumPhone;
+import com.micatechnologies.minecraft.sum.phone.TileEntityDeskPhone;
 import com.micatechnologies.minecraft.sum.pocket.ContainerPocket;
 import com.micatechnologies.minecraft.sum.pocket.GuiPocket;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopBuyer;
@@ -130,7 +131,15 @@ public class SumGuiHandler implements IGuiHandler {
         }
         if (id == GUI_DESK_PHONE) {
             // Shared phone — no banking app, but otherwise the same multi-app shell.
-            return new GuiSumPhone(player, false);
+            // The desk phone's TE carries its own phone number (chunk-derived exchange);
+            // anyone right-clicking sees that number on the home screen rather than the
+            // activator's personal number. TE may briefly be null on the client if the
+            // initial chunk-update hasn't been processed yet; GuiSumPhone falls back to
+            // the loading placeholder until the next refresh.
+            TileEntity deskTe = world.getTileEntity(new BlockPos(x, y, z));
+            String deskNumber = (deskTe instanceof TileEntityDeskPhone)
+                ? ((TileEntityDeskPhone) deskTe).getPhoneNumber() : null;
+            return new GuiSumPhone(player, false, deskNumber);
         }
         if (id == GUI_POCKET) {
             return new GuiPocket(new ContainerPocket(player));

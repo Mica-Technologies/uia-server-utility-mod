@@ -5,6 +5,8 @@ import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
 import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
+import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudSavedData;
+import javax.annotation.Nullable;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
 import net.minecraft.block.material.Material;
@@ -14,6 +16,8 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
+import net.minecraft.item.ItemStack;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.Mirror;
@@ -29,8 +33,12 @@ import net.minecraft.world.World;
  * bound to any one player's account). Each player who uses it sees their own cloud
  * (contacts, messages, notes), routed by their player UUID server-side.
  *
- * <p>No tile entity: the block carries no state of its own. The "phone number" displayed in
- * the GUI is the right-clicking player's own number, allocated lazily on first phone open.
+ * <p>Each placed block carries its own phone number via {@link TileEntityDeskPhone},
+ * distinct from whichever player is using it at the moment. The exchange (middle 3
+ * digits of the AAA-EEE-XXXX number) is derived from the block's chunk so phones placed
+ * in one chunk share their middle 3 digits — mirroring how real-world exchange codes
+ * cluster geographically. When the block is broken its number is released back to the
+ * pool by {@link PhoneCloudSavedData#releaseNumber}.</p>
  */
 public class BlockDeskPhone extends Block {
 
@@ -66,6 +74,58 @@ public class BlockDeskPhone extends Block {
                                             float hitX, float hitY, float hitZ, int meta,
                                             EntityLivingBase placer) {
         return getDefaultState().withProperty(FACING, placer.getHorizontalFacing().getOpposite());
+    }
+
+    @Override
+    public boolean hasTileEntity(IBlockState state) {
+        return true;
+    }
+
+    @Override
+    @Nullable
+    public TileEntity createTileEntity(World world, IBlockState state) {
+        return new TileEntityDeskPhone();
+    }
+
+    /**
+     * Server-side: as soon as the block lands, allocate the phone's number so the
+     * desk phone is "ringable" before anyone right-clicks. Doing it on placement (rather
+     * than first activation) also guarantees the TE is synced to clients with a non-null
+     * number by the time any player can open the GUI, so the home screen doesn't flash
+     * a "Loading…" placeholder.
+     */
+    @Override
+    public void onBlockPlacedBy(World world, BlockPos pos, IBlockState state,
+                                EntityLivingBase placer, ItemStack stack) {
+        super.onBlockPlacedBy(world, pos, state, placer, stack);
+        if (world.isRemote) {
+            return;
+        }
+        TileEntity te = world.getTileEntity(pos);
+        if (te instanceof TileEntityDeskPhone) {
+            PhoneCloudSavedData cloud = PhoneCloudSavedData.get(world);
+            ((TileEntityDeskPhone) te).ensureNumberAllocated(cloud);
+            // Push the updated NBT so the client sees the number on the very next
+            // chunk-update tick (otherwise the TE-update packet only fires when the
+            // chunk is re-streamed).
+            te.markDirty();
+            world.notifyBlockUpdate(pos, state, state, 3);
+        }
+    }
+
+    /**
+     * Release the desk phone's number back into the allocation pool when the block is
+     * destroyed, so a placed-then-broken sequence doesn't permanently strand the number.
+     */
+    @Override
+    public void breakBlock(World world, BlockPos pos, IBlockState state) {
+        if (!world.isRemote) {
+            TileEntity te = world.getTileEntity(pos);
+            if (te instanceof TileEntityDeskPhone) {
+                ((TileEntityDeskPhone) te).releaseNumber(PhoneCloudSavedData.get(world));
+            }
+        }
+        super.breakBlock(world, pos, state);
     }
 
     @Override
