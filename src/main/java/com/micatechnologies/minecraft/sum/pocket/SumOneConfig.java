@@ -4,6 +4,12 @@ import cc.polyfrost.oneconfig.config.Config;
 import cc.polyfrost.oneconfig.config.annotations.HUD;
 import cc.polyfrost.oneconfig.config.data.Mod;
 import cc.polyfrost.oneconfig.config.data.ModType;
+import com.micatechnologies.minecraft.sum.huds.BiomeHud;
+import com.micatechnologies.minecraft.sum.huds.CoordsHud;
+import com.micatechnologies.minecraft.sum.huds.DayCounterHud;
+import com.micatechnologies.minecraft.sum.huds.DirectionHud;
+import com.micatechnologies.minecraft.sum.huds.FpsHud;
+import com.micatechnologies.minecraft.sum.huds.TimeHud;
 
 /**
  * Root OneConfig entry-point for SUM. Owns all client-side preference fields and
@@ -35,6 +41,29 @@ public class SumOneConfig extends Config {
          category = "Pocket",
          subcategory = "HUD")
     public PocketHud pocketHud = new PocketHud();
+
+    // Text HUDs, modeled on EvergreenHUD's element catalog. Each is a thin SingleTextHud
+    // subclass that exposes its own per-element knobs (color the title, hide an axis,
+    // etc.) via its own annotated fields — OneConfig auto-surfaces those under the HUD's
+    // settings page so we don't need to wire them here.
+
+    @HUD(name = "Coordinates", category = "HUDs", subcategory = "Information")
+    public CoordsHud coordsHud = new CoordsHud();
+
+    @HUD(name = "FPS", category = "HUDs", subcategory = "Performance")
+    public FpsHud fpsHud = new FpsHud();
+
+    @HUD(name = "Facing Direction", category = "HUDs", subcategory = "Information")
+    public DirectionHud directionHud = new DirectionHud();
+
+    @HUD(name = "Clock", category = "HUDs", subcategory = "Information")
+    public TimeHud timeHud = new TimeHud();
+
+    @HUD(name = "Biome", category = "HUDs", subcategory = "Information")
+    public BiomeHud biomeHud = new BiomeHud();
+
+    @HUD(name = "Day Counter", category = "HUDs", subcategory = "Information")
+    public DayCounterHud dayCounterHud = new DayCounterHud();
 
     public SumOneConfig() {
         super(new Mod("Server Utility Mod", ModType.UTIL_QOL), "sum.json");
