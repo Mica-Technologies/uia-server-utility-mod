@@ -543,7 +543,28 @@ public class SumConfig {
         return sleepVoteThresholdPercent;
     }
 
+    /**
+     * Favorites star overlay is now owned by {@link com.micatechnologies.minecraft.sum
+     * .pocket.SumOneConfig#favoritesStarOverlay} (OneConfig-managed). The legacy Forge
+     * Configuration value is kept as a fallback for environments where SumOneConfig
+     * hasn't initialized (e.g. server-side capability checks that happen to call into
+     * this path — uncommon since the overlay is purely client-side UI).
+     *
+     * <p>Migration semantics: existing installs that had favorites.enableStarOverlay set
+     * in the Forge config will see their preference reset to OneConfig's default on the
+     * first boot after this migration. Users can re-set it via the SUM OneConfig page.
+     * No automated forge→oneconfig migration because OneConfig's own persistence kicks in
+     * before we get a chance to inspect whether its value is "default" or "loaded".</p>
+     */
     public static boolean isFavoritesStarOverlayEnabled() {
+        try {
+            if (com.micatechnologies.minecraft.sum.pocket.SumOneConfig.INSTANCE != null) {
+                return com.micatechnologies.minecraft.sum.pocket.SumOneConfig.favoritesStarOverlay;
+            }
+        } catch (NoClassDefFoundError oneConfigMissing) {
+            // SUM declares OneConfig as required-after in @Mod, so this branch shouldn't
+            // fire in a real install — defensive fallback for stripped dev envs.
+        }
         return favoritesStarOverlay;
     }
 
