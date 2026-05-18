@@ -11,6 +11,7 @@ import com.micatechnologies.minecraft.sum.huds.BlockAboveHud;
 import com.micatechnologies.minecraft.sum.huds.ClickCounterHud;
 import com.micatechnologies.minecraft.sum.huds.CoordsHud;
 import com.micatechnologies.minecraft.sum.huds.CpsHud;
+import com.micatechnologies.minecraft.sum.huds.CustomTextHud;
 import com.micatechnologies.minecraft.sum.huds.DayCounterHud;
 import com.micatechnologies.minecraft.sum.huds.DirectionHud;
 import com.micatechnologies.minecraft.sum.huds.FpsHud;
@@ -27,6 +28,7 @@ import com.micatechnologies.minecraft.sum.huds.SaturationHud;
 import com.micatechnologies.minecraft.sum.huds.ServerIpHud;
 import com.micatechnologies.minecraft.sum.huds.SpeedHud;
 import com.micatechnologies.minecraft.sum.huds.TimeHud;
+import com.micatechnologies.minecraft.sum.huds.TpsHud;
 import com.micatechnologies.minecraft.sum.huds.YawHud;
 
 /**
@@ -126,6 +128,9 @@ public class SumOneConfig extends Config {
     @HUD(name = "Ping", category = "HUDs", subcategory = "Performance")
     public PingHud pingHud = new PingHud();
 
+    @HUD(name = "TPS", category = "HUDs", subcategory = "Performance")
+    public TpsHud tpsHud = new TpsHud();
+
     // Counter HUDs — backed by HudStateTracker (registered separately in
     // SumClientProxy).
 
@@ -140,6 +145,27 @@ public class SumOneConfig extends Config {
 
     @HUD(name = "Session Playtime", category = "HUDs", subcategory = "Counters")
     public PlaytimeHud playtimeHud = new PlaytimeHud();
+
+    // Five fixed custom-text slots. Each is independently positioned, scaled, and
+    // shown/hidden via OneConfig's standard HUD UI; the @Text option on each lets the
+    // user paint whatever string they want. A fixed-N pattern (rather than the upstream
+    // dynamic HudList) keeps the OneConfig wire-up simple without porting a custom
+    // option type.
+
+    @HUD(name = "Custom Text 1", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText1 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 2", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText2 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 3", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText3 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 4", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText4 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 5", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText5 = new CustomTextHud();
 
     // === Migrated client preferences ===
     // Server-side configuration (roamer walkable blocks, roadrunner multipliers, world
