@@ -7,9 +7,8 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
-import com.micatechnologies.minecraft.sum.pocket.PocketHudConfig;
-import com.micatechnologies.minecraft.sum.pocket.PocketHudOverlay;
 import com.micatechnologies.minecraft.sum.pocket.PocketKeybinds;
+import com.micatechnologies.minecraft.sum.pocket.SumOneConfig;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RenderRoamer;
 import net.minecraft.client.Minecraft;
@@ -37,11 +36,12 @@ public class SumClientProxy implements SumProxy {
         FavoritesClientHandler.registerKeybinds();
         MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
 
-        // Pocket HUD: load saved layout, register the overlay event subscriber, and bind
-        // the open/edit keybinds. The keybinds live in the same SUM category as the
-        // favorites bindings so the Controls screen has one consolidated section.
-        PocketHudConfig.setStorageFile(event.getModConfigurationDirectory());
-        MinecraftForge.EVENT_BUS.register(new PocketHudOverlay());
+        // SUM OneConfig — the simple `new SumOneConfig()` fires its constructor which
+        // registers the SUM mod with OneConfig and exposes any @HUD fields (currently
+        // just the pocket HUD; future EvergreenHUD-style elements will live here too).
+        // OneConfig drives all HUD rendering, persistence, and drag-to-reposition UX, so
+        // SUM doesn't register its own RenderGameOverlayEvent handler for the HUD.
+        new SumOneConfig();
         PocketKeybinds.register();
         MinecraftForge.EVENT_BUS.register(new PocketKeybinds());
     }

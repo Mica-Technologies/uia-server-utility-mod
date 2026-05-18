@@ -1,5 +1,11 @@
 // Add any additional repositories for your dependencies here
 
 repositories {
-
+    // Polyfrost — hosts OneConfig (config + HUD framework). Pulled in by SUM for the
+    // pocket-HUD layout editor and the (in-progress) port of EvergreenHUD's element
+    // catalog. See dependencies.gradle for the artifact coordinates.
+    maven {
+        name 'Polyfrost Releases'
+        url 'https://repo.polyfrost.org/releases'
+    }
 }

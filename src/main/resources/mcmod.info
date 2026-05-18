@@ -10,9 +10,9 @@
     "url": "",
     "updateUrl": "",
     "authorList": ["Mica Technologies"],
-    "dependencies": [],
+    "dependencies": ["oneconfig"],
     "dependants": [],
-    "requiredMods": [],
+    "requiredMods": ["oneconfig"],
     "useDependencyInformation": "true"
   }
 ]

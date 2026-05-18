@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum.pocket;
 
+import cc.polyfrost.oneconfig.gui.OneConfigGui;
 import javax.annotation.ParametersAreNonnullByDefault;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.inventory.GuiContainer;
@@ -53,11 +54,17 @@ public class GuiPocket extends GuiContainer {
     @Override
     protected void actionPerformed(GuiButton button) {
         if (button.id == BUTTON_ID_EDIT_HUD) {
-            // Closing the container before swapping screens matters: the editor is a plain
-            // GuiScreen, not a GuiContainer, so leaving the container open would leave the
-            // server thinking the player is still browsing slots.
-            this.mc.player.closeScreen();
-            this.mc.displayGuiScreen(new GuiPocketHudEditor());
+            // displayGuiScreen drives the proper close path for the outgoing GuiContainer
+            // (GuiContainer.onGuiClosed → InventoryPlayer.closeContainer → CPacketCloseWindow
+            // to the server), so we don't have to send the close packet manually.
+            //
+            // The button is intentionally NOT gated to ops here even though the SUM-settings
+            // keybind is: opening this button on a server already implies the player is
+            // standing at a pocket GUI (which they own), and OneConfig's pocket-HUD page
+            // only mutates client-side preferences. Cross-cutting server-affecting settings
+            // (none yet, but possible later) live in their own OneConfig categories and can
+            // be hidden per-category via OneConfig's visibility annotations if needed.
+            this.mc.displayGuiScreen(OneConfigGui.create());
         }
     }
 
