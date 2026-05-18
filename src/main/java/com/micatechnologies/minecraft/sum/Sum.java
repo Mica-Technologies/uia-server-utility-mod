@@ -44,7 +44,9 @@ import net.minecraftforge.fml.common.registry.GameRegistry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod(modid = SumConstants.MOD_NAMESPACE, version = SumConstants.MOD_VERSION, name = SumConstants.MOD_NAME, acceptedMinecraftVersions = "[1.12.2]", dependencies = "after:csm")
+@Mod(modid = SumConstants.MOD_NAMESPACE, version = SumConstants.MOD_VERSION, name = SumConstants.MOD_NAME,
+     acceptedMinecraftVersions = "[1.12.2]",
+     dependencies = "required-after:oneconfig;after:csm")
 public class Sum {
 
     public static final Logger LOGGER = LogManager.getLogger(SumConstants.MOD_NAMESPACE);

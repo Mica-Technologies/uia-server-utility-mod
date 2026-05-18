@@ -42,4 +42,12 @@ dependencies {
     // The SUM mod works without CSM present; integration classes are only classloaded when
     // Loader.isModLoaded("csm") returns true. Rebuild CSM before SUM if the API changes.
     compileOnly fileTree(dir: '../minecraft-city-super-mod/build/libs', include: '*-dev.jar')
+
+    // OneConfig (Polyfrost) — config + HUD framework used for SUM's client-side preferences
+    // and HUD layout management. Hard dependency at runtime; SUM users are already running
+    // OneConfig via EvergreenHUD in the standard UIA modpack, so no extra install step.
+    // The 0.2.x alpha line is what EvergreenHUD 2.x for 1.12.2 pins, so we match it to avoid
+    // version drift in the modpack. See repositories.gradle for the Polyfrost Maven URL.
+    compileOnly 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
+    runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
 }
