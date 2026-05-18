@@ -31,10 +31,27 @@ public class PhoneCloudSavedData extends WorldSavedData {
 
     public static final String NAME = SumConstants.MOD_NAMESPACE + "_phone_cloud";
 
-    /** Phone numbers are 7 digits in [1000000, 9999999]; the leading digit is never zero so
-     *  the formatted display ("XXX-YYYY") is always 8 chars. */
-    private static final int NUMBER_MIN = 1_000_000;
-    private static final int NUMBER_RANGE = 9_000_000;
+    /** Number layout is AAA-EEE-XXXX where AAA is the area code, EEE is the exchange
+     *  ("prefix") code, and XXXX is the subscriber number — matching the NANP/NPA-NXX-
+     *  XXXX shape players are used to from real-world phones. */
+
+    /** Area code 456 is the city's "primary" code. */
+    public static final int AREA_CODE_PRIMARY = 456;
+    /** Area code 987 is the secondary, used when the random roll misses the primary. */
+    public static final int AREA_CODE_SECONDARY = 987;
+    /** Probability of getting the primary area code. The complement goes to the
+     *  secondary. Tuned to {@code 0.60} to give the primary a clear majority while still
+     *  surfacing the secondary often enough that players notice it exists. */
+    private static final double AREA_CODE_PRIMARY_WEIGHT = 0.60;
+
+    /** Subscriber-number range, padded to 4 digits in the formatted output. */
+    private static final int SUBSCRIBER_MIN = 0;
+    private static final int SUBSCRIBER_RANGE = 10_000;
+    /** Exchange-code range, padded to 3 digits. The full random range is used for
+     *  player-allocated numbers; desk-phone exchanges are derived from chunk coordinates
+     *  in a follow-up so phones placed in the same chunk share their middle 3 digits. */
+    private static final int EXCHANGE_MIN = 0;
+    private static final int EXCHANGE_RANGE = 1_000;
     private static final int MAX_ALLOCATION_TRIES = 64;
 
     private final Map<UUID, PhoneCloudData> clouds = new HashMap<>();
@@ -169,26 +186,107 @@ public class PhoneCloudSavedData extends WorldSavedData {
         }
     }
 
+    /**
+     * Allocate a fresh, unused phone number for a player. Tries random
+     * AAA-EEE-XXXX combinations until one isn't taken, falling back to a linear scan
+     * across the full subscriber + exchange space if (extremely unlikely) the random
+     * pool is exhausted.
+     */
     private String allocateNumber() {
         for (int tries = 0; tries < MAX_ALLOCATION_TRIES; tries++) {
-            int n = NUMBER_MIN + random.nextInt(NUMBER_RANGE);
-            String formatted = formatNumber(n);
+            int area = pickAreaCode();
+            int exchange = EXCHANGE_MIN + random.nextInt(EXCHANGE_RANGE);
+            int subscriber = SUBSCRIBER_MIN + random.nextInt(SUBSCRIBER_RANGE);
+            String formatted = formatNumber(area, exchange, subscriber);
             if (!numberIndex.containsKey(formatted)) {
                 return formatted;
             }
         }
-        // Fallback: linear scan. Extremely unlikely with 9M numbers.
-        for (int n = NUMBER_MIN; n < NUMBER_MIN + NUMBER_RANGE; n++) {
-            String formatted = formatNumber(n);
-            if (!numberIndex.containsKey(formatted)) {
-                return formatted;
+        // Linear fallback: walk every combination across both area codes. With 20M
+        // available numbers this should never trigger in practice.
+        for (int area : new int[] { AREA_CODE_PRIMARY, AREA_CODE_SECONDARY }) {
+            for (int exchange = EXCHANGE_MIN;
+                 exchange < EXCHANGE_MIN + EXCHANGE_RANGE; exchange++) {
+                for (int subscriber = SUBSCRIBER_MIN;
+                     subscriber < SUBSCRIBER_MIN + SUBSCRIBER_RANGE; subscriber++) {
+                    String formatted = formatNumber(area, exchange, subscriber);
+                    if (!numberIndex.containsKey(formatted)) {
+                        return formatted;
+                    }
+                }
             }
         }
         throw new IllegalStateException("phone-number space exhausted");
     }
 
+    /**
+     * Allocate a fresh, unused number whose exchange (middle 3 digits) is the supplied
+     * value, biasing toward "real-world phone exchange" semantics — every phone in the
+     * same exchange shares its middle three digits. Used by desk phones whose exchange
+     * is derived from their chunk coordinates. Caller is responsible for keeping the
+     * resulting number reserved (the number IS recorded in {@link #numberIndex}, but
+     * not in {@link #clouds}; lookups by player UUID will not find it).
+     */
+    public String allocateNumberWithFixedExchange(int exchange, UUID assignTo) {
+        int safeExchange = Math.floorMod(exchange, EXCHANGE_RANGE);
+        for (int tries = 0; tries < MAX_ALLOCATION_TRIES; tries++) {
+            int area = pickAreaCode();
+            int subscriber = SUBSCRIBER_MIN + random.nextInt(SUBSCRIBER_RANGE);
+            String formatted = formatNumber(area, safeExchange, subscriber);
+            if (!numberIndex.containsKey(formatted)) {
+                numberIndex.put(formatted, assignTo);
+                markDirty();
+                return formatted;
+            }
+        }
+        // Fall back to walking the whole fixed-exchange range.
+        for (int area : new int[] { AREA_CODE_PRIMARY, AREA_CODE_SECONDARY }) {
+            for (int subscriber = SUBSCRIBER_MIN;
+                 subscriber < SUBSCRIBER_MIN + SUBSCRIBER_RANGE; subscriber++) {
+                String formatted = formatNumber(area, safeExchange, subscriber);
+                if (!numberIndex.containsKey(formatted)) {
+                    numberIndex.put(formatted, assignTo);
+                    markDirty();
+                    return formatted;
+                }
+            }
+        }
+        throw new IllegalStateException(
+            "phone-number space exhausted for exchange " + safeExchange);
+    }
+
+    /**
+     * Release a previously-allocated number from the index. Used by desk phones when the
+     * block is broken and its number can be handed out again.
+     */
+    public void releaseNumber(String number) {
+        if (number == null || number.isEmpty()) {
+            return;
+        }
+        if (numberIndex.remove(number) != null) {
+            markDirty();
+        }
+    }
+
+    /**
+     * Pick an area code per the weighted distribution. {@code random.nextDouble()} < the
+     * primary weight returns 456 ({@value #AREA_CODE_PRIMARY_WEIGHT} ≈ 60%); otherwise
+     * 987.
+     */
+    private int pickAreaCode() {
+        return random.nextDouble() < AREA_CODE_PRIMARY_WEIGHT
+            ? AREA_CODE_PRIMARY : AREA_CODE_SECONDARY;
+    }
+
+    /** Format a fully-specified AAA-EEE-XXXX number. */
+    public static String formatNumber(int area, int exchange, int subscriber) {
+        return String.format(java.util.Locale.ROOT, "%03d-%03d-%04d",
+            area, exchange, subscriber);
+    }
+
+    /** Legacy 7-digit allocator preserved for the NBT-migration path; converts to the
+     *  new format by prepending a freshly-weighted area code. */
     public static String formatNumber(int n) {
-        // NNN-YYYY
         return String.format(java.util.Locale.ROOT, "%03d-%04d", n / 10000, n % 10000);
     }
 
@@ -206,13 +304,29 @@ public class PhoneCloudSavedData extends WorldSavedData {
     public void readFromNBT(NBTTagCompound nbt) {
         clouds.clear();
         numberIndex.clear();
+        boolean migrated = false;
         NBTTagList list = nbt.getTagList("clouds", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < list.tagCount(); i++) {
             PhoneCloudData d = PhoneCloudData.readNbt(list.getCompoundTagAt(i));
+            // Legacy 7-digit numbers (NNN-YYYY, 8 chars) are upgraded to AAA-EEE-XXXX
+            // by prepending a weighted area code. The original middle 3 digits become
+            // the exchange, the last 4 become the subscriber number — so the user's
+            // number is recognizable: 123-4567 → 456-123-4567 (or 987-123-4567).
+            if (d.phoneNumber != null && d.phoneNumber.length() == 8
+                && d.phoneNumber.charAt(3) == '-') {
+                int area = pickAreaCode();
+                d.phoneNumber = area + "-" + d.phoneNumber;
+                migrated = true;
+                Sum.LOGGER.info("[phone] Migrated legacy number for {} → {}",
+                    d.ownerUuid, d.phoneNumber);
+            }
             clouds.put(d.ownerUuid, d);
             if (d.phoneNumber != null && !d.phoneNumber.isEmpty()) {
                 numberIndex.put(d.phoneNumber, d.ownerUuid);
             }
+        }
+        if (migrated) {
+            markDirty();
         }
     }
 }
