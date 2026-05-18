@@ -2,6 +2,7 @@ package com.micatechnologies.minecraft.sum.pocket;
 
 import cc.polyfrost.oneconfig.config.Config;
 import cc.polyfrost.oneconfig.config.annotations.HUD;
+import cc.polyfrost.oneconfig.config.annotations.Switch;
 import cc.polyfrost.oneconfig.config.data.Mod;
 import cc.polyfrost.oneconfig.config.data.ModType;
 import com.micatechnologies.minecraft.sum.huds.BiomeHud;
@@ -64,6 +65,21 @@ public class SumOneConfig extends Config {
 
     @HUD(name = "Day Counter", category = "HUDs", subcategory = "Information")
     public DayCounterHud dayCounterHud = new DayCounterHud();
+
+    // === Migrated client preferences ===
+    // Server-side configuration (roamer walkable blocks, roadrunner multipliers, world
+    // border, etc.) intentionally stays in the Forge Configuration file because OneConfig
+    // is client-only and we don't have a server→client config-sync system. Only true
+    // client-side preferences move here.
+
+    /**
+     * Whether to render the small gold star in the upper-right of every favorited slot in
+     * the creative inventory. Migrated from SumConfig's favorites.enableStarOverlay knob —
+     * the Forge config file is read once on load if the OneConfig file doesn't exist yet,
+     * so existing installs keep their setting on the first OneConfig boot.
+     */
+    @Switch(name = "Favorites Star Overlay", category = "Favorites")
+    public static boolean favoritesStarOverlay = true;
 
     public SumOneConfig() {
         super(new Mod("Server Utility Mod", ModType.UTIL_QOL), "sum.json");
