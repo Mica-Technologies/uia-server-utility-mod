@@ -7,6 +7,7 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
+import com.micatechnologies.minecraft.sum.huds.HudStateTracker;
 import com.micatechnologies.minecraft.sum.pocket.PocketKeybinds;
 import com.micatechnologies.minecraft.sum.pocket.SumOneConfig;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
@@ -37,11 +38,14 @@ public class SumClientProxy implements SumProxy {
         MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
 
         // SUM OneConfig — the simple `new SumOneConfig()` fires its constructor which
-        // registers the SUM mod with OneConfig and exposes any @HUD fields (currently
-        // just the pocket HUD; future EvergreenHUD-style elements will live here too).
-        // OneConfig drives all HUD rendering, persistence, and drag-to-reposition UX, so
-        // SUM doesn't register its own RenderGameOverlayEvent handler for the HUD.
+        // registers the SUM mod with OneConfig and exposes any @HUD fields. OneConfig
+        // drives all HUD rendering, persistence, and drag-to-reposition UX, so SUM
+        // doesn't register its own RenderGameOverlayEvent handler for the HUD.
         new SumOneConfig();
+        // The stateful counter HUDs (CPS, click count, blocks placed, session playtime)
+        // need a real event subscriber to keep their counters fresh — HUD modules are
+        // managed by OneConfig and can't subscribe to events themselves.
+        MinecraftForge.EVENT_BUS.register(new HudStateTracker());
         PocketKeybinds.register();
         MinecraftForge.EVENT_BUS.register(new PocketKeybinds());
     }
