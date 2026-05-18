@@ -13,6 +13,8 @@ import com.micatechnologies.minecraft.sum.mailbox.ContainerMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.GuiMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.phone.GuiSumPhone;
+import com.micatechnologies.minecraft.sum.pocket.ContainerPocket;
+import com.micatechnologies.minecraft.sum.pocket.GuiPocket;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopBuyer;
 import com.micatechnologies.minecraft.sum.shop.ContainerShopOwner;
 import com.micatechnologies.minecraft.sum.shop.GuiShopBuyer;
@@ -47,6 +49,7 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_JOB_BOARD = 7;
     // GUI id 8 is reserved (was Signpost — moved to CSM, see CSM CUSTOM_SIGNPOSTS_PLAN.md).
     public static final int GUI_DESK_PHONE = 9;
+    public static final int GUI_POCKET = 10;
 
     @Override
     public Object getServerGuiElement(int id, EntityPlayer player, World world, int x, int y, int z) {
@@ -78,6 +81,9 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_MAILBOX) {
             TileEntityMailbox mb = lookupMailbox(world, x, y, z);
             return mb == null ? null : new ContainerMailbox(mb, player);
+        }
+        if (id == GUI_POCKET) {
+            return new ContainerPocket(player);
         }
         // ATM is GuiScreen-only (no inventory slots), so no Container is needed server-side.
         return null;
@@ -125,6 +131,9 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_DESK_PHONE) {
             // Shared phone — no banking app, but otherwise the same multi-app shell.
             return new GuiSumPhone(player, false);
+        }
+        if (id == GUI_POCKET) {
+            return new GuiPocket(new ContainerPocket(player));
         }
         return null;
     }

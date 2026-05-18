@@ -16,6 +16,8 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.loyalty.LoyaltyHandler;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.plots.PlotsProtectionHandler;
+import com.micatechnologies.minecraft.sum.pocket.CapabilityPocket;
+import com.micatechnologies.minecraft.sum.pocket.PocketEvents;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
@@ -60,9 +62,11 @@ public class Sum {
     public void preInit(FMLPreInitializationEvent event) {
         SumConfig.init(event.getSuggestedConfigurationFile());
         CapabilitySumMoney.register();
+        CapabilityPocket.register();
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new RoadRunnerHandler());
         MinecraftForge.EVENT_BUS.register(new SumMoneyEvents());
+        MinecraftForge.EVENT_BUS.register(new PocketEvents());
         MinecraftForge.EVENT_BUS.register(new BillsLootInjector());
         MinecraftForge.EVENT_BUS.register(new SleepVoteHandler());
         MinecraftForge.EVENT_BUS.register(new PlotsProtectionHandler());
