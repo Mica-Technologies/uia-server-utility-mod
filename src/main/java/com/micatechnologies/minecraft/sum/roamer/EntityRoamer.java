@@ -17,8 +17,10 @@ import net.minecraft.nbt.NBTTagString;
 import net.minecraft.pathfinding.PathNavigate;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.Constants;
+import net.minecraftforge.fml.common.Loader;
 
 /**
  * A passive NPC entity that wanders around on blocks specified in the SUM config.
@@ -46,6 +48,15 @@ public class EntityRoamer extends EntityCreature {
 
     private int idleCheckTimer;
     private boolean playerNearby = true;
+    // True when a CSM fire or storm alarm is sounding within hearing range of this roamer.
+    // Refreshed on the same cadence as playerNearby. Acts as an override that keeps the AI
+    // ticking even when no player is in range, so the emergency response tasks (fire evac,
+    // storm shelter) can drive the roamer to safety regardless of where players are. Without
+    // this, a roamer parked in a chunk no one is currently visiting would stay frozen while
+    // the alarm sounded — the bug Multiplayer hit because alarm sources aren't always
+    // co-located with the activator.
+    private boolean emergencyNearby = false;
+    private final boolean csmLoaded = Loader.isModLoaded("csm");
 
     private boolean greetEnabled = true;
     private double greetRadius = DEFAULT_GREET_RADIUS;
@@ -100,11 +111,13 @@ public class EntityRoamer extends EntityCreature {
         } else {
             idleCheckTimer = IDLE_CHECK_INTERVAL;
             playerNearby = world.getClosestPlayer(posX, posY, posZ, IDLE_RANGE, false) != null;
+            emergencyNearby = checkEmergencyNearby();
         }
 
-        if (!playerNearby) {
-            // Stop in place when nobody can see us. AI resumes on the next tick that finds a
-            // player back in range — including any active fire/storm response.
+        if (!playerNearby && !emergencyNearby) {
+            // Stop in place when nobody can see us AND no emergency demands a response. AI
+            // resumes on the next tick that finds a player back in range (or an alarm
+            // activates).
             if (!getNavigator().noPath()) {
                 getNavigator().clearPath();
             }
@@ -112,6 +125,24 @@ public class EntityRoamer extends EntityCreature {
         }
 
         super.updateAITasks();
+    }
+
+    /**
+     * Returns true if a CSM fire or storm alarm is currently sounding within hearing range
+     * of this roamer. Used to override the player-proximity idle gate so the emergency-
+     * response AI tasks fire even when nobody is in range to watch — a roamer who needs to
+     * evacuate a burning building shouldn't have to wait for a player to wander by.
+     *
+     * <p>Cheap when no panels are registered (registry returns an empty set and the query
+     * short-circuits), which is the steady-state case on most servers.
+     */
+    private boolean checkEmergencyNearby() {
+        if (!csmLoaded) {
+            return false;
+        }
+        BlockPos pos = getPosition();
+        return CsmIntegration.isFireAlarmActiveNear(world, pos)
+            || CsmIntegration.isStormAlarmActiveNear(world, pos);
     }
 
     @Override
