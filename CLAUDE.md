@@ -4,29 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build Commands
 
+Set `JAVA_HOME` to a Java 17 install before each `./gradlew` invocation:
+- Windows: `C:/Users/<username>/.jdks/azul-17.0.18` (managed by IntelliJ)
+- macOS:   `/Users/<username>/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home`
+
 ```bash
 # Setup workspace (required first time, or after clean)
-JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew setupDecompWorkspace
+JAVA_HOME="..." ./gradlew setupDecompWorkspace
 
 # Build the mod
-JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build
+JAVA_HOME="..." ./gradlew build
 
-# Run Minecraft client in dev
-JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew runClient
+# Run Minecraft client in dev (x86_64 / Windows)
+JAVA_HOME="..." ./gradlew runClient
+
+# Run Minecraft client in dev (Apple Silicon Mac — uses lwjgl3ify)
+JAVA_HOME="..." ./gradlew runClient17
 
 # Run Minecraft server in dev
-JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew runServer
+JAVA_HOME="..." ./gradlew runServer
 
 # Clean build artifacts
-JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew clean
+JAVA_HOME="..." ./gradlew clean
 
 # Run tests (JUnit 5)
-JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew test
+JAVA_HOME="..." ./gradlew test
 ```
 
 **Requirements:** Java 17 (Azul Zulu Community). The project uses Jabel to allow modern Java syntax while targeting JVM 8. Heap is set to `-Xmx3G` in `gradle.properties` for decompilation.
 
-**JDK Location:** Managed via IntelliJ at `C:\Users\<username>\.jdks\azul-17.0.18`. Always set `JAVA_HOME` when running Gradle from the CLI.
+## Dependencies
+
+Two non-Maven dependencies are pulled automatically by Gradle — no manual jar wrangling on a fresh checkout:
+
+- **CSM (City Super Mod)** — resolved via the GitHub Releases Ivy repo in `repositories.gradle`. Pin lives in `gradle.properties` as `csmVersion`; bump it when SUM needs API surface from a newer CSM release. CI and fresh checkouts get the same binary with no `gh release download` glue.
+- **OneConfig (Polyfrost)** — `oneconfig-1.12.2-forge` is `compileOnly` (API surface only); the actual runtime is bootstrapped by `oneconfig-wrapper-launchwrapper` (`devOnlyNonPublishable`) whose `LaunchWrapperTweaker` downloads the real OneConfig binary into `run/client/OneConfig/Loader/` on first launch. The tweaker name is injected into the dev launch args via `addon.gradle`'s `minecraft.extraTweakClasses`. **Do not put `oneconfig-1.12.2-forge` on the dev runtime classpath** — its manifest references a tweaker class that's not in the jar, and GradleStart's coremod scan will crash on it before OneConfig ever loads.
 
 ## Architecture Overview
 
