@@ -92,6 +92,9 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "mailbox"));
         GameRegistry.registerTileEntity(TileEntityAutoDropper.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "auto_dropper"));
+        GameRegistry.registerTileEntity(
+            com.micatechnologies.minecraft.sum.phone.TileEntityDeskPhone.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "desk_phone"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 

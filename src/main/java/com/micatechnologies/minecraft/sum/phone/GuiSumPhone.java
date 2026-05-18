@@ -131,10 +131,19 @@ public class GuiSumPhone extends GuiScreen {
     // Tile click regions, recomputed every initGui()
     private final List<TileRegion> tiles = new ArrayList<>();
 
+    /** Override number used by the home screen when the GUI was opened from a desk phone
+     *  rather than the player's personal phone. Null means "show the player's number". */
+    private final String deskPhoneNumberOverride;
+
     public GuiSumPhone(EntityPlayer player, boolean enableBanking) {
+        this(player, enableBanking, null);
+    }
+
+    public GuiSumPhone(EntityPlayer player, boolean enableBanking, String deskPhoneNumberOverride) {
         this.player = player;
         this.enableBanking = enableBanking;
         this.cloud = lastCloud;
+        this.deskPhoneNumberOverride = deskPhoneNumberOverride;
     }
 
     @Override
@@ -611,9 +620,16 @@ public class GuiSumPhone extends GuiScreen {
         int tw = this.fontRenderer.getStringWidth(title);
         this.fontRenderer.drawString(title, (x1 + x2) / 2 - tw / 2, y1 + 4, TEXT_DIM);
 
-        String num = cloud != null && cloud.phoneNumber != null && !cloud.phoneNumber.isEmpty()
-            ? cloud.phoneNumber
-            : I18n.format("sum.phone.home.loading");
+        // Desk phones show their own number (anyone using the desk phone sees + shares
+        // the same number). Personal phones fall back to the player's cloud number.
+        String num;
+        if (deskPhoneNumberOverride != null && !deskPhoneNumberOverride.isEmpty()) {
+            num = deskPhoneNumberOverride;
+        } else {
+            num = cloud != null && cloud.phoneNumber != null && !cloud.phoneNumber.isEmpty()
+                ? cloud.phoneNumber
+                : I18n.format("sum.phone.home.loading");
+        }
         String numLabel = I18n.format("sum.phone.home.number_label", num);
         int nw = this.fontRenderer.getStringWidth(numLabel);
         this.fontRenderer.drawString(numLabel, (x1 + x2) / 2 - nw / 2, y1 + 16, TEXT_NUMBER);

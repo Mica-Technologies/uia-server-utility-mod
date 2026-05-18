@@ -297,6 +297,23 @@ public class PhoneCloudSavedData extends WorldSavedData {
             list.appendTag(d.writeNbt());
         }
         nbt.setTag("clouds", list);
+
+        // Persist desk-phone reservations so they survive a server restart: each entry
+        // in numberIndex whose owner is the DESK_PHONE sentinel is a number a placed
+        // block owns. Without persistence, the index repopulates only from `clouds` and
+        // a future player-number allocation could collide with a desk phone in an
+        // unloaded chunk.
+        NBTTagList reservations = new NBTTagList();
+        for (Map.Entry<String, UUID> entry : numberIndex.entrySet()) {
+            if (clouds.containsKey(entry.getValue())) {
+                continue; // covered by the `clouds` list already
+            }
+            NBTTagCompound r = new NBTTagCompound();
+            r.setString("number", entry.getKey());
+            r.setUniqueId("owner", entry.getValue());
+            reservations.appendTag(r);
+        }
+        nbt.setTag("reservations", reservations);
         return nbt;
     }
 
@@ -323,6 +340,23 @@ public class PhoneCloudSavedData extends WorldSavedData {
             clouds.put(d.ownerUuid, d);
             if (d.phoneNumber != null && !d.phoneNumber.isEmpty()) {
                 numberIndex.put(d.phoneNumber, d.ownerUuid);
+            }
+        }
+        // Load desk-phone reservations (entries owned by sentinel UUIDs, no matching
+        // cloud).
+        NBTTagList reservations = nbt.getTagList("reservations", Constants.NBT.TAG_COMPOUND);
+        for (int i = 0; i < reservations.tagCount(); i++) {
+            NBTTagCompound r = reservations.getCompoundTagAt(i);
+            if (!r.hasKey("number")) continue;
+            String number = r.getString("number");
+            UUID owner = r.hasUniqueId("owner") ? r.getUniqueId("owner") : new UUID(0L, 0L);
+            // Apply the same 7-digit migration to legacy desk-phone reservations.
+            if (number.length() == 8 && number.charAt(3) == '-') {
+                number = pickAreaCode() + "-" + number;
+                migrated = true;
+            }
+            if (!number.isEmpty()) {
+                numberIndex.put(number, owner);
             }
         }
         if (migrated) {
