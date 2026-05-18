@@ -4,11 +4,16 @@ import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
+import com.micatechnologies.minecraft.sum.atm.SumNetwork;
+import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
+import com.micatechnologies.minecraft.sum.favorites.PacketAddFavorite;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.client.util.ITooltipFlag;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -42,6 +47,11 @@ public class ItemAccountAccess extends Item {
     private static final String NBT_OWNER_UUID = "OwnerUUID";
     private static final String NBT_OWNER_NAME = "OwnerName";
 
+    /** Server-side cadence for the {@link #onUpdate} auto-rebind check (in ticks). */
+    private static final int AUTO_REBIND_CHECK_INTERVAL = 20;
+    /** NBT key for the tick counter that throttles auto-rebind checks per stack. */
+    private static final String NBT_REBIND_TIMER = "SumRebindTimer";
+
     private final boolean isPhone;
 
     public ItemAccountAccess(String registryPath, boolean isPhone) {
@@ -51,6 +61,11 @@ public class ItemAccountAccess extends Item {
         setMaxStackSize(1);
         setCreativeTab(SumTab.TAB);
         SumRegistry.registerItem(this);
+    }
+
+    /** Kind enum value for this item registration, used to look up the per-player roster. */
+    private PersonalItemsSavedData.Kind kind() {
+        return isPhone ? PersonalItemsSavedData.Kind.PHONE : PersonalItemsSavedData.Kind.DEBIT_CARD;
     }
 
     @Override
@@ -79,7 +94,7 @@ public class ItemAccountAccess extends Item {
         // Server-side: bind on first use, reject on owner mismatch. The GUI is displayed
         // client-side; we just mutate NBT and chat here.
         if (owner == null) {
-            setOwner(stack, playerId, player.getName());
+            bindToPlayer(stack, player);
             sendMessage(player, TextFormatting.GREEN,
                 "Bound to " + player.getName() + ". Right-click again to access your account.");
         } else if (!owner.equals(playerId)) {
@@ -88,6 +103,76 @@ public class ItemAccountAccess extends Item {
                 "This belongs to " + (ownerName != null ? ownerName : "another player") + ".");
         }
         return new ActionResult<>(EnumActionResult.SUCCESS, stack);
+    }
+
+    /**
+     * Server-tick hook that auto-rebinds an unowned stack to its current holder when the
+     * roster shows they already own a personal item of this kind. Solves the loss-of-access
+     * problem: a player who replaces their phone in their hotbar (or otherwise loses it)
+     * can spawn / {@code /give} / favorites-pull a fresh one and have it immediately resolve
+     * to their account, without having to track down the stranded original.
+     *
+     * <p>Throttled per-stack via an NBT timer so we touch the roster at most once per second
+     * per personal item in any player's inventory, not every tick.
+     */
+    @Override
+    public void onUpdate(ItemStack stack, World world, Entity entity, int slot, boolean isSelected) {
+        super.onUpdate(stack, world, entity, slot, isSelected);
+        if (world.isRemote || !(entity instanceof EntityPlayer)) {
+            return;
+        }
+        if (isOwned(stack)) {
+            return;
+        }
+
+        NBTTagCompound tag = stack.getTagCompound();
+        int timer = tag != null ? tag.getInteger(NBT_REBIND_TIMER) : 0;
+        if (timer > 0) {
+            if (tag == null) {
+                tag = new NBTTagCompound();
+                stack.setTagCompound(tag);
+            }
+            tag.setInteger(NBT_REBIND_TIMER, timer - 1);
+            return;
+        }
+        if (tag == null) {
+            tag = new NBTTagCompound();
+            stack.setTagCompound(tag);
+        }
+        tag.setInteger(NBT_REBIND_TIMER, AUTO_REBIND_CHECK_INTERVAL);
+
+        EntityPlayer player = (EntityPlayer) entity;
+        PersonalItemsSavedData data = PersonalItemsSavedData.get(world);
+        if (!data.hasBinding(player.getUniqueID(), kind())) {
+            return;
+        }
+
+        bindToPlayer(stack, player);
+        sendMessage(player, TextFormatting.GREEN,
+            "Re-bound your " + (isPhone ? "phone" : "debit card") + " to your account.");
+    }
+
+    /**
+     * Server-side bind path: stamp owner NBT, record the kind in the roster, and push the
+     * item to the player's client-side favorites so the player has an easy way to spawn a
+     * replacement next time they need one. Used by both the first-bind right-click and the
+     * auto-rebind tick path.
+     */
+    private void bindToPlayer(ItemStack stack, EntityPlayer player) {
+        UUID uuid = player.getUniqueID();
+        setOwner(stack, uuid, player.getName());
+
+        if (player.world.isRemote) {
+            return;
+        }
+        PersonalItemsSavedData.get(player.world).recordBinding(uuid, kind());
+
+        if (player instanceof EntityPlayerMP) {
+            FavoriteKey key = FavoriteKey.of(stack);
+            if (key != null) {
+                SumNetwork.CHANNEL.sendTo(new PacketAddFavorite(key), (EntityPlayerMP) player);
+            }
+        }
     }
 
     @Override

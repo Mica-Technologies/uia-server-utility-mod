@@ -3,6 +3,7 @@ package com.micatechnologies.minecraft.sum.atm;
 import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.economy.PacketBillChangerAction;
 import com.micatechnologies.minecraft.sum.economy.PacketSyncSumMoney;
+import com.micatechnologies.minecraft.sum.favorites.PacketAddFavorite;
 import com.micatechnologies.minecraft.sum.jobs.PacketJobAction;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudAction;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudFetchRequest;
@@ -52,6 +53,8 @@ public final class SumNetwork {
             PhoneCloudSync.class, 9, Side.CLIENT);
         CHANNEL.registerMessage(PhoneCloudAction.Handler.class,
             PhoneCloudAction.class, 10, Side.SERVER);
+        CHANNEL.registerMessage(PacketAddFavorite.Handler.class,
+            PacketAddFavorite.class, 11, Side.CLIENT);
         initialized = true;
     }
 }
