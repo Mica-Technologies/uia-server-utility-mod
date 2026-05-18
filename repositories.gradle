@@ -8,4 +8,27 @@ repositories {
         name 'Polyfrost Releases'
         url 'https://repo.polyfrost.org/releases'
     }
+
+    // CSM (City Super Mod) release artifacts on GitHub. SUM depends on CSM's
+    // fire-alarm API as a soft dependency, so we need its compiled classes on
+    // the compile classpath. The CI workflow used to `gh release download`
+    // this manually into ../minecraft-city-super-mod/build/libs; this Ivy repo
+    // lets Gradle resolve the same published jar against a pinned csmVersion
+    // (see gradle.properties) so first-time setup on a fresh checkout / CI
+    // works without any shell glue.
+    //
+    // Coordinate format: Mica-Technologies:minecraft-city-super-mod:<tag>
+    // Resolves to: https://github.com/.../releases/download/<tag>/minecraft-city-super-mod-<tag>.jar
+    ivy {
+        name 'CSM GitHub Releases'
+        url 'https://github.com/Mica-Technologies/minecraft-city-super-mod/releases/download/'
+        patternLayout {
+            artifact '[revision]/[artifact]-[revision].[ext]'
+        }
+        // GitHub releases don't ship Maven metadata; resolve from the artifact alone.
+        metadataSources { artifact() }
+        // Scope this repo to CSM only so we don't accidentally try to resolve
+        // unrelated deps via GitHub.
+        content { includeGroup 'Mica-Technologies' }
+    }
 }

@@ -50,3 +50,22 @@ if (project.hasProperty('enableJava17RunTasks') && enableJava17RunTasks.toBoolea
         java17PatchDependencies('ca.weblite:java-objc-bridge:1.1') { transitive = false }
     }
 }
+
+// OneConfig bootstrap wiring for runClient / runServer.
+//
+// The OneConfig-Bootstrap wrapper jar (declared as devOnlyNonPublishable in
+// dependencies.gradle) ships cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker
+// but its own META-INF/MANIFEST.MF is empty — it's designed to be embedded inside a
+// host mod whose manifest declares the TweakClass. End users get the wiring via the
+// standalone "OneConfig-Bootstrap" mod's manifest; here in dev we inject the same
+// tweaker name into runClient/runServer's --tweakClass launch args so LaunchWrapper
+// invokes the stage0 loader, which downloads the actual OneConfig binary into
+// run/client/OneConfig/Loader/ on first launch.
+//
+// Note: we deliberately do NOT put cc.polyfrost:oneconfig-1.12.2-forge on the dev
+// runtime classpath (see dependencies.gradle for the why) — its manifest references
+// a tweaker class that doesn't exist as an artifact, and GradleStart's classpath
+// scan would crash on it before we could even reach the OneConfig loader.
+minecraft {
+    extraTweakClasses.add('cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker')
+}

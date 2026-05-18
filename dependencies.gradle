@@ -40,8 +40,13 @@
 dependencies {
     // City Super Mod (CSM) - compile-only for soft dependency on fire alarm API.
     // The SUM mod works without CSM present; integration classes are only classloaded when
-    // Loader.isModLoaded("csm") returns true. Rebuild CSM before SUM if the API changes.
-    compileOnly fileTree(dir: '../minecraft-city-super-mod/build/libs', include: '*-dev.jar')
+    // Loader.isModLoaded("csm") returns true.
+    //
+    // Resolved via the GitHub Releases Ivy repo declared in repositories.gradle. The
+    // pinned version lives in gradle.properties as `csmVersion`. Bump it when SUM needs
+    // API surface from a newer CSM release. CI and fresh checkouts get the same binary
+    // with no manual `gh release download` shell glue.
+    compileOnly "Mica-Technologies:minecraft-city-super-mod:${csmVersion}"
 
     // OneConfig (Polyfrost) — config + HUD framework used for SUM's client-side preferences
     // and HUD layout management. Hard dependency at runtime; SUM users are already running
@@ -49,20 +54,30 @@ dependencies {
     // The 0.2.x alpha line is what EvergreenHUD 2.x for 1.12.2 pins, so we match it to avoid
     // version drift in the modpack. See repositories.gradle for the Polyfrost Maven URL.
     //
-    // Three artifacts at play:
-    //   - oneconfig-1.12.2-forge — the actual API (Config, BasicHud, annotations, etc).
-    //     compileOnly for our @HUD / @Switch / etc references; runtime-only for the dev
-    //     env so the classes resolve when launchwrapper instantiates HUD modules.
-    //   - oneconfig-wrapper-launchwrapper — the small "bootstrap" jar shipped to users
-    //     as OneConfig-Bootstrap. Contains the OneConfigTweaker class that
-    //     oneconfig-1.12.2-forge's MANIFEST.MF references as TweakClass. Without it on
-    //     the runtime classpath, launchwrapper finds the tweaker name in the OneConfig
-    //     manifest and crashes with ClassNotFoundException because the class lives over
-    //     here, not in the main jar. Pinned to match EvergreenHUD's pin so the modpack
-    //     ends up with one consistent OneConfig install rather than version drift.
-    //   - kotlin-stdlib / universalcraft — transitive deps of OneConfig; not declared
-    //     here, RFG pulls them via the compileOnly resolution.
+    // Two artifacts at play:
+    //   - oneconfig-1.12.2-forge — the API surface (Config, BasicHud, annotations, etc).
+    //     compileOnly ONLY. We deliberately do NOT put this on the dev runtime classpath:
+    //     its MANIFEST.MF declares TweakClass: cc.polyfrost.oneconfig.internal.plugin.asm
+    //     .OneConfigTweaker, and that class is NOT in the jar — OneConfig downloads its
+    //     "stage1" loader at runtime via the wrapper. If this jar is on the runClient
+    //     classpath, GradleStart's coremod scan reads the TweakClass entry, tells
+    //     LaunchWrapper to load it, and the launch crashes with ClassNotFoundException.
+    //     End users get the real OneConfig binary via OneConfig-Bootstrap's stage0 loader;
+    //     they never see a "main API jar" on disk at all.
+    //   - oneconfig-wrapper-launchwrapper — the stage0 bootstrap jar that users install
+    //     as "OneConfig-Bootstrap". Contains cc.polyfrost.oneconfig.loader.stage0
+    //     .LaunchWrapperTweaker, which downloads the actual OneConfig binary into
+    //     ./OneConfig/Loader/ on first launch. devOnlyNonPublishable so it's on both the
+    //     compile classpath (harmless, no clashing types) and the dev runClient classpath.
+    //     The tweaker name is wired into the runClient launch args from addon.gradle via
+    //     minecraft.extraTweakClasses since the wrapper jar's own MANIFEST is empty —
+    //     users get the same wiring via OneConfig-Bootstrap's own MANIFEST.
+    //   - kotlin-stdlib / universalcraft — transitive deps of OneConfig pulled in by the
+    //     compileOnly resolution.
+    //
+    // Bundling the wrapper into the published SUM jar (so end users don't also need
+    // OneConfig-Bootstrap installed separately) is task 14 — deferred; the UIA modpack
+    // already ships OneConfig-Bootstrap via EvergreenHUD.
     compileOnly 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
-    runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
-    runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
+    devOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
 }

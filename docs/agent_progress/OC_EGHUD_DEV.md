@@ -1,6 +1,8 @@
 # OneConfig + EvergreenHUD integration for SUM
 
-Status: thirteen commits land on `main`. All thirteen pass `./gradlew compileJava`. The most recent commit (`9757cea`) was intended to fix a `runClient` launch crash (`ClassNotFoundException: cc.polyfrost.oneconfig.internal.plugin.asm.OneConfigTweaker`) by adding the OneConfig bootstrap jar to the dev runtime classpath, **but the user reports the same crash still happens after that commit** — so the fix didn't fully land. Diagnosing that crash is the first thing to do next session.
+Status: OneConfig `runClient` launch crash is **RESOLVED**. The fix landed in a follow-up commit (see "Resolved crash" section below) that (a) removed `oneconfig-1.12.2-forge` from the dev runtime classpath, since its manifest declares a `TweakClass` that doesn't exist as an artifact (OneConfig downloads its stage1 loader at runtime), and (b) injected the wrapper's real tweaker (`cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker`) into the dev launch args via `minecraft.extraTweakClasses` in `addon.gradle`. Verified locally: `./gradlew runClient` and `runClient17` both successfully invoke the OneConfig stage0 loader, which downloads OneConfig into `run/client/OneConfig/Loader/` and progresses into FML mod loading without ClassNotFoundException.
+
+In the same session: CSM is now resolved as a regular Gradle dep via a GitHub Releases Ivy repo (`repositories.gradle`) pinned by `gradle.properties#csmVersion`, replacing the brittle sibling-checkout / `gh release download` setup. CI workflows were trimmed accordingly. See "Dependency layering" below.
 
 ---
 
@@ -54,6 +56,8 @@ The goal of this integration pass is to **replace the bespoke client systems wit
 | 11 | Add TPS HUD (SPacketTimeUpdate timing) | ✅ landed | `5f90ed2` |
 | 12 | Add 5 Custom Text HUD slots | ✅ landed | `5f90ed2` |
 | 13 | Add OneConfig launchwrapper bootstrap to dev runtime classpath | ⚠️ landed but still failing | `9757cea` |
+| 13b | Fix OneConfig runClient: gate main jar from runtime classpath + inject tweaker via `extraTweakClasses` | ✅ landed (this session) | (uncommitted at time of writing) |
+| 13c | CSM Ivy/GitHub-Releases dep (replaces sibling-checkout + CI `gh release download`) | ✅ landed (this session) | (uncommitted at time of writing) |
 | 14 | Bundle OneConfig wrapper into SUM jar (embed + manifest TweakClass entry) | ⏳ deferred | — |
 | 15 | Full HudList dynamic custom-text scaffolding | ⏳ deferred | — |
 | 16 | Server-config bridge (read-only OneConfig mirror of server settings) | ⏳ deferred | — |
@@ -142,23 +146,19 @@ db8bed0 Migrate pocket HUD to OneConfig + add OneConfig as a hard dep
 
 ---
 
-## Known crash (the blocker)
+## Resolved crash
 
-### Symptom
+### Symptom (what was happening before)
 
 ```
 [main/INFO] [LaunchWrapper]: Loading tweak class name cc.polyfrost.oneconfig.internal.plugin.asm.OneConfigTweaker
 [main/ERROR] [LaunchWrapper]: Unable to launch
 java.lang.ClassNotFoundException: cc.polyfrost.oneconfig.internal.plugin.asm.OneConfigTweaker
-    at java.net.URLClassLoader.findClass(URLClassLoader.java:387)
-    at java.lang.ClassLoader.loadClass(ClassLoader.java:419)
-    …
-    at net.minecraft.launchwrapper.Launch.launch(Launch.java:123)
 ```
 
-### Root cause
+### Actual root cause
 
-`oneconfig-1.12.2-forge-0.2.2-alpha228.jar`'s `META-INF/MANIFEST.MF`:
+The pre-fix `dependencies.gradle` put `oneconfig-1.12.2-forge` on the dev runtime classpath via `runtimeOnlyNonPublishable`. That jar's `META-INF/MANIFEST.MF` declares:
 
 ```
 TweakClass: cc.polyfrost.oneconfig.internal.plugin.asm.OneConfigTweaker
@@ -167,82 +167,62 @@ ForceLoadAsMod: true
 MixinConfigs: mixins.oneconfig.json
 ```
 
-GradleStart scans mod jars' manifests during launch and adds the `TweakClass` value as a `--tweakClass` arg. LaunchWrapper then tries to load the class. But the class isn't in `oneconfig-1.12.2-forge` — it lives in `oneconfig-wrapper-launchwrapper` (the "Bootstrap" jar Polyfrost ships to users separately).
+GradleStart (FG12 `GradleStartCommon.java:204-249`) walks `java.class.path` at launch, opens every jar's `META-INF/MANIFEST.MF`, and pushes any `TweakClass` value into the LaunchWrapper `--tweakClass` arg list. LaunchWrapper then tries to load the class.
 
-EvergreenHUD's docs make this explicit:
+**`OneConfigTweaker` does not exist in any published OneConfig artifact**:
 
-```groovy
-compileOnly('cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+')
-include('cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+')
-```
+| Artifact | Contains tweaker class? |
+|---|---|
+| `oneconfig-1.12.2-forge-0.2.2-alpha228.jar` | ❌ (declares it in manifest, doesn't ship it) |
+| `oneconfig-wrapper-launchwrapper-1.0.0-beta9..17.jar` | ❌ (ships `cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker` instead) |
 
-In Loom, `include` bundles the artifact into the mod jar. RFG's equivalent is `embed`.
+The OneConfig main jar's `TweakClass` entry refers to a class that gets downloaded at runtime by the wrapper's stage0 loader (into `./OneConfig/Loader/`). That class is never in any artifact on disk at build/launch time. Putting the main jar on the dev classpath ⇒ guaranteed crash.
 
-### What `9757cea` did
+### The fix
 
-Added the wrapper as `runtimeOnlyNonPublishable`:
+Two coordinated changes:
 
-```groovy
-runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
-```
+1. `dependencies.gradle` — keep `oneconfig-1.12.2-forge` as `compileOnly` only; remove it from `runtimeOnlyNonPublishable`. The OneConfig wrapper moves to `devOnlyNonPublishable` (compile + dev runtime, not published).
 
-`./gradlew dependencies --configuration runtimeClasspath` confirmed the artifact resolves and lands in `runtimeClasspath`:
-
-```
-+--- cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+ -> 1.0.0-beta17
-```
-
-And `build.gradle` line 515 declares `runtimeClasspath.extendsFrom(runtimeOnlyNonPublishable)`, so per the configuration graph, the wrapper should be on the runClient classpath.
-
-The user reports the same `ClassNotFoundException` still happens. **The wrapper is technically declared but is not being seen by LaunchWrapper at runtime.**
-
-### Debug ladder for next session — try in this order
-
-1. **Daemon + dependency-cache refresh.** IntelliJ was driving the failed run, and IntelliJ caches the Gradle project model. Run:
-   ```
-   ./gradlew --stop
-   ./gradlew --refresh-dependencies runClient
-   ```
-   If that succeeds, the fix was correct and the issue was a stale model. Tell the user to right-click the project in IntelliJ → "Reload Gradle Project".
-
-2. **Promote the wrapper to `devOnlyNonPublishable`.** `devOnlyNonPublishable` extends both `compileOnly` and `runtimeOnlyNonPublishable` (`build.gradle:513-514`), so it's strictly a superset of where the dep currently lands. Some RFG versions handle dev classpath differently for runtimeOnly-flavored configurations. Edit `dependencies.gradle`:
-   ```diff
-   - runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
-   + devOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
-   ```
-
-3. **Switch to `embed`.** `embed` extends `implementation`, which is unambiguously on the dev runtime classpath. This *also* bundles the wrapper into the published SUM jar (the path forward for task 14 anyway):
-   ```diff
-   - runtimeOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
-   + embed 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
-   ```
-   Note: `embed` puts the wrapper's *classes* in the SUM jar but doesn't merge its `MANIFEST.MF`. SUM's own manifest won't end up declaring `TweakClass`. For end-users, that may mean LaunchWrapper still doesn't auto-discover the tweaker from SUM's jar alone — but for the dev `runClient` case, the wrapper jar is on the classpath as a regular dependency (alongside `oneconfig-1.12.2-forge`), so its own manifest is what GradleStart reads. So this *should* fix the dev case even before we solve the user-facing bundling.
-
-4. **Inspect what LaunchWrapper's classpath actually contains.** If 1-3 all fail, add this to `build.gradle` temporarily (inside `tasks.named('runClient').configure { … }`) to log the classpath:
    ```groovy
-   doFirst {
-       println "runClient classpath:"
-       classpath.each { println "  " + it }
+   compileOnly 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
+   devOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
+   ```
+
+2. `addon.gradle` — inject the wrapper's real tweaker name into the dev launch args via the RFG `MinecraftExtension`. The wrapper jar's own `MANIFEST.MF` is empty (it's designed to be embedded in a host mod whose jar manifest declares the tweaker), so the dev environment has nothing to discover via GradleStart's scan. `extraTweakClasses.add(...)` solves it:
+
+   ```groovy
+   minecraft {
+       extraTweakClasses.add('cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker')
    }
    ```
-   Look for `oneconfig-wrapper-launchwrapper-1.0.0-beta17.jar`. If absent, the configuration wiring isn't reaching the task; if present, the class loader can't see it for some other reason (path encoding, signed jar, etc.).
 
-5. **Sanity check: verify the wrapper jar actually contains the tweaker class.** It should — the bootstrap is supposed to ship it — but verify with:
-   ```
-   unzip -l ~/.gradle/caches/modules-2/files-2.1/cc.polyfrost/oneconfig-wrapper-launchwrapper/1.0.0-beta17/*/oneconfig-wrapper-launchwrapper-1.0.0-beta17.jar | grep OneConfigTweaker
-   ```
+### Verified launch sequence (dev)
 
-### Once runClient launches
+```
+GradleStart: Extra: [..., --tweakClass, cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker]
+LaunchWrapper: Loading tweak class name cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker
+Attempting to load Polyfrost certificate.
+OneConfig has detected the version 1.12.2.
+Updating OneConfig Loader...
+Updated OneConfig Loader!
+OneConfigLoader: Downloading new version of OneConfig... (17477.086KB)
+OneConfigLoader: Download finished successfully
+Updated OneConfig Jar!
+[mixin]: SpongePowered MIXIN Subsystem Version=0.8.7 ... Env=CLIENT
+[FML]: Forge Mod Loader version 14.23.5.2847 for Minecraft 1.12.2 loading
+[FML]: Searching .../run/mods for mods
+```
 
-The CSM-mod side bug fixes from earlier in the session are unaffected. The HUD code is structurally correct — it compiles cleanly and uses OneConfig's documented APIs. Once the bootstrap reaches LaunchWrapper, OneConfig should initialize and the SUM page should appear in the OneConfig GUI (R-SHIFT or the SUM keybind).
+Subsequent runs skip the download (cached at `run/client/OneConfig/Loader/`). Mac arm64 dev should use `runClient17` (lwjgl3ify) — `runClient` works on Windows/x86_64 but hits lwjgl2 security-seal errors on Apple Silicon.
+
+### Benign "Mod will NOT work" message
+
+Stage0 logs `Not able to determine current file. Mod will NOT work` twice during dev launch. This is the loader trying to find what jar IT was loaded from — in dev it's loaded from the build classpath, not a single jar in `mods/`. End users (with OneConfig-Bootstrap installed as a real mod jar) don't see this. It does not block functionality; OneConfig still bootstraps and loads.
 
 ---
 
 ## What remains
-
-### Must-fix (the blocker)
-
-- [ ] **Resolve the `OneConfigTweaker` ClassNotFoundException** via the debug ladder above. Until this works, no OneConfig feature in SUM can be user-tested.
 
 ### Deferred (in priority order)
 

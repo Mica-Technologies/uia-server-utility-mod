@@ -21,23 +21,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Fetch CSM jar for compile classpath
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # SUM has a compileOnly dep on CSM (see dependencies.gradle). Locally
-          # Alex builds CSM as a sibling checkout; on CI we grab the latest CSM
-          # release jar so CsmFireAlarmQuery resolves on the compile classpath.
-          mkdir -p ../minecraft-city-super-mod/build/libs
-          gh release download \
-            --repo Mica-Technologies/minecraft-city-super-mod \
-            --pattern 'minecraft-city-super-mod-*.jar' \
-            --dir ../minecraft-city-super-mod/build/libs
-          # Rename so it matches the *-dev.jar filter in dependencies.gradle.
-          for jar in ../minecraft-city-super-mod/build/libs/minecraft-city-super-mod-*.jar; do
-            mv "$jar" "${jar%.jar}-dev.jar"
-          done
-          ls -la ../minecraft-city-super-mod/build/libs/
+      # CSM is now resolved as a regular Gradle dependency against the GitHub Releases
+      # Ivy repo declared in repositories.gradle, pinned to gradle.properties#csmVersion.
+      # No manual `gh release download` step needed.
 
       - name: Assemble mod with Gradle
         run: ./gradlew build -Dhttp.socketTimeout=60000 -Dhttp.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.http.connectionTimeout=60000
