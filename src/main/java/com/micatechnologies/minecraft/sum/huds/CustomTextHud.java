@@ -24,7 +24,7 @@ public class CustomTextHud extends SingleTextHud {
         // separates title and value with a colon — we suppress that for free-form
         // text). Title can be re-added via the per-HUD options if the user wants a
         // prefix.
-        super("", true, 5, 5);
+        super("", false, 5, 5);
     }
 
     @Override

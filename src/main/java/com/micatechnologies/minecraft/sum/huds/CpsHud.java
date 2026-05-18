@@ -7,7 +7,7 @@ import cc.polyfrost.oneconfig.hud.SingleTextHud;
 public class CpsHud extends SingleTextHud {
 
     public CpsHud() {
-        super("CPS:", true, 5, 5);
+        super("CPS:", false, 5, 5);
     }
 
     @Override

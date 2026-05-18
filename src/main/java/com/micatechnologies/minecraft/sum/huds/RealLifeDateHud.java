@@ -21,7 +21,7 @@ public class RealLifeDateHud extends SingleTextHud {
     };
 
     public RealLifeDateHud() {
-        super("Date:", true, 5, 5);
+        super("Date:", false, 5, 5);
     }
 
     @Override

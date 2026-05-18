@@ -9,7 +9,7 @@ import net.minecraft.client.entity.EntityPlayerSP;
 public class GameModeHud extends SingleTextHud {
 
     public GameModeHud() {
-        super("Mode:", true, 5, 5);
+        super("Mode:", false, 5, 5);
     }
 
     @Override

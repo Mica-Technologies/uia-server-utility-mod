@@ -25,7 +25,7 @@ public class TpsHud extends SingleTextHud {
     private transient String tpsText = "—";
 
     public TpsHud() {
-        super("TPS:", true, 5, 5);
+        super("TPS:", false, 5, 5);
         EventManager.INSTANCE.register(this);
     }
 

@@ -7,7 +7,7 @@ import cc.polyfrost.oneconfig.hud.SingleTextHud;
 public class PlaceCountHud extends SingleTextHud {
 
     public PlaceCountHud() {
-        super("Placed:", true, 5, 5);
+        super("Placed:", false, 5, 5);
     }
 
     @Override

@@ -11,7 +11,7 @@ import net.minecraft.world.World;
 public class DayCounterHud extends SingleTextHud {
 
     public DayCounterHud() {
-        super("Day:", true, 5, 5);
+        super("Day:", false, 5, 5);
     }
 
     @Override

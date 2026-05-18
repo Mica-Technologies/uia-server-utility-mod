@@ -1,10 +1,15 @@
 package com.micatechnologies.minecraft.sum.pocket;
 
 import cc.polyfrost.oneconfig.config.Config;
+import cc.polyfrost.oneconfig.config.annotations.Button;
+import cc.polyfrost.oneconfig.config.annotations.Dropdown;
 import cc.polyfrost.oneconfig.config.annotations.HUD;
 import cc.polyfrost.oneconfig.config.annotations.Switch;
 import cc.polyfrost.oneconfig.config.data.Mod;
 import cc.polyfrost.oneconfig.config.data.ModType;
+import com.google.gson.GsonBuilder;
+import com.micatechnologies.minecraft.sum.huds.presets.HudPresets;
+import java.lang.reflect.Modifier;
 import com.micatechnologies.minecraft.sum.huds.ArmourHud;
 import com.micatechnologies.minecraft.sum.huds.BiomeHud;
 import com.micatechnologies.minecraft.sum.huds.BlockAboveHud;
@@ -15,6 +20,7 @@ import com.micatechnologies.minecraft.sum.huds.CustomTextHud;
 import com.micatechnologies.minecraft.sum.huds.DayCounterHud;
 import com.micatechnologies.minecraft.sum.huds.DirectionHud;
 import com.micatechnologies.minecraft.sum.huds.FpsHud;
+import com.micatechnologies.minecraft.sum.huds.FtiHud;
 import com.micatechnologies.minecraft.sum.huds.GameModeHud;
 import com.micatechnologies.minecraft.sum.huds.HeightLimitHud;
 import com.micatechnologies.minecraft.sum.huds.MemoryHud;
@@ -49,8 +55,11 @@ import com.micatechnologies.minecraft.sum.huds.YawHud;
 public class SumOneConfig extends Config {
 
     /** Singleton — referenced by {@code SumClientProxy.preInit} so the static-initializer
-     *  fires once at startup; subsequent code reads HUD/option fields directly. */
-    public static SumOneConfig INSTANCE;
+     *  fires once at startup; subsequent code reads HUD/option fields directly.
+     *  {@code transient} is REQUIRED: OneConfig's Gson exclusion strategy only filters
+     *  {@code TRANSIENT}, not {@code STATIC}, so without this the self-reference causes
+     *  infinite recursion in {@code Config#save()} → StackOverflowError on first launch. */
+    public static transient SumOneConfig INSTANCE;
 
     /**
      * Pocket HUD module — three filtered slots (phone / debit card / bills) painted as a
@@ -131,6 +140,9 @@ public class SumOneConfig extends Config {
     @HUD(name = "TPS", category = "HUDs", subcategory = "Performance")
     public TpsHud tpsHud = new TpsHud();
 
+    @HUD(name = "Frame Time", category = "HUDs", subcategory = "Performance")
+    public FtiHud ftiHud = new FtiHud();
+
     // Counter HUDs — backed by HudStateTracker (registered separately in
     // SumClientProxy).
 
@@ -180,10 +192,69 @@ public class SumOneConfig extends Config {
      * so existing installs keep their setting on the first OneConfig boot.
      */
     @Switch(name = "Favorites Star Overlay", category = "Favorites")
-    public static boolean favoritesStarOverlay = true;
+    public boolean favoritesStarOverlay = true;
+
+    // === HUD Presets ===
+    // Two one-click systems: a "Style Preset" controls how each HUD looks (font scale,
+    // background, brackets, etc.), and a "Layout Preset" controls which HUDs are on
+    // and where they sit on screen. They're orthogonal — choosing a style does not
+    // disturb the layout, and choosing a layout does not disturb the style. After
+    // applying, the user can still drag individual HUDs / tweak their per-HUD options
+    // freely; another preset apply is what overwrites those tweaks.
+    //
+    // CRITICAL: the option literals in the @Dropdown(options=...) below MUST stay
+    // identical in order to HudPresets.STYLE_NAMES / LAYOUT_NAMES. HudPresets's
+    // static initialiser asserts the lengths match; the per-string ordering you have
+    // to keep aligned by hand.
+
+    @Dropdown(name = "Style Preset", category = "Presets", subcategory = "Style",
+        options = {
+            "Default", "Minimal Brackets", "Clean Professional", "Stylish Glass",
+            "Compact Light", "Retro Terminal", "Realistic Game HUD", "High Contrast"
+        })
+    public int stylePresetIndex = 0;
+
+    @Button(name = "Apply Style", text = "Apply", category = "Presets",
+        subcategory = "Style")
+    public void applyStylePreset() {
+        HudPresets.applyStyle(stylePresetIndex, this);
+    }
+
+    @Dropdown(name = "Layout Preset", category = "Presets", subcategory = "Layout",
+        options = {
+            "Off (All Hidden)", "Vanilla+", "Survival Essentials", "Speedrunner",
+            "PvP Focus", "Builder", "Explorer", "Performance Watcher", "Time Tracker",
+            "Minimal Top", "Server Op", "Urban Builder", "City Explorer", "Architect",
+            "Cityscape Photographer"
+        })
+    public int layoutPresetIndex = 0;
+
+    @Button(name = "Apply Layout", text = "Apply", category = "Presets",
+        subcategory = "Layout")
+    public void applyLayoutPreset() {
+        HudPresets.applyLayout(layoutPresetIndex, this);
+    }
 
     public SumOneConfig() {
         super(new Mod("Server Utility Mod", ModType.UTIL_QOL), "sum.json");
         INSTANCE = this;
+        // OneConfig's Config base does NOT auto-initialize; without this call, the @HUD
+        // fields below are never scanned, the mod card never appears in the OneConfig
+        // GUI, and the HUD editor has nothing to drag. See Config#preload() docs.
+        initialize();
+    }
+
+    /**
+     * Restore Gson's default {@code STATIC | TRANSIENT} field-exclusion mask. OneConfig's
+     * base {@link Config#addGsonOptions} drops the {@code STATIC} half, which causes Gson
+     * to walk into static helper constants of HUD subclasses ({@code DateTimeFormatter},
+     * lookup arrays, etc.) during {@link Config#save()} — some of which contain internal
+     * back-references that trigger an infinite recursion / StackOverflowError. Excluding
+     * static fields again here is the targeted fix.
+     */
+    @Override
+    protected GsonBuilder addGsonOptions(GsonBuilder builder) {
+        return super.addGsonOptions(builder)
+            .excludeFieldsWithModifiers(Modifier.STATIC, Modifier.TRANSIENT);
     }
 }

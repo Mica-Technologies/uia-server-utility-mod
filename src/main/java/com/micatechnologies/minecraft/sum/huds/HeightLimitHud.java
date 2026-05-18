@@ -17,7 +17,7 @@ public class HeightLimitHud extends SingleTextHud {
     public boolean absolute = false;
 
     public HeightLimitHud() {
-        super("Height Limit:", true, 5, 5);
+        super("Height Limit:", false, 5, 5);
     }
 
     @Override
