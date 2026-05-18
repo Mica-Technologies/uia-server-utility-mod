@@ -10,24 +10,38 @@ import cc.polyfrost.oneconfig.config.data.ModType;
 import com.google.gson.GsonBuilder;
 import com.micatechnologies.minecraft.sum.huds.presets.HudPresets;
 import java.lang.reflect.Modifier;
+import com.micatechnologies.minecraft.sum.huds.ActiveEffectsHud;
 import com.micatechnologies.minecraft.sum.huds.ArmourHud;
+import com.micatechnologies.minecraft.sum.huds.BankBalanceHud;
 import com.micatechnologies.minecraft.sum.huds.BiomeHud;
 import com.micatechnologies.minecraft.sum.huds.BlockAboveHud;
+import com.micatechnologies.minecraft.sum.huds.BorderDistanceHud;
 import com.micatechnologies.minecraft.sum.huds.ClickCounterHud;
 import com.micatechnologies.minecraft.sum.huds.CoordsHud;
 import com.micatechnologies.minecraft.sum.huds.CpsHud;
 import com.micatechnologies.minecraft.sum.huds.CustomTextHud;
 import com.micatechnologies.minecraft.sum.huds.DayCounterHud;
 import com.micatechnologies.minecraft.sum.huds.DirectionHud;
+import com.micatechnologies.minecraft.sum.huds.DurabilityHud;
 import com.micatechnologies.minecraft.sum.huds.FpsHud;
 import com.micatechnologies.minecraft.sum.huds.FtiHud;
 import com.micatechnologies.minecraft.sum.huds.GameModeHud;
+import com.micatechnologies.minecraft.sum.huds.HealthHud;
 import com.micatechnologies.minecraft.sum.huds.HeightLimitHud;
+import com.micatechnologies.minecraft.sum.huds.HungerHud;
+import com.micatechnologies.minecraft.sum.huds.JobsHud;
+import com.micatechnologies.minecraft.sum.huds.LightLevelHud;
+import com.micatechnologies.minecraft.sum.huds.LookingAtBlockHud;
+import com.micatechnologies.minecraft.sum.huds.LoyaltyHud;
 import com.micatechnologies.minecraft.sum.huds.MemoryHud;
+import com.micatechnologies.minecraft.sum.huds.NearestRoamerHud;
+import com.micatechnologies.minecraft.sum.huds.PhoneNumberHud;
 import com.micatechnologies.minecraft.sum.huds.PingHud;
 import com.micatechnologies.minecraft.sum.huds.PitchHud;
 import com.micatechnologies.minecraft.sum.huds.PlaceCountHud;
 import com.micatechnologies.minecraft.sum.huds.PlaytimeHud;
+import com.micatechnologies.minecraft.sum.huds.PlotInfoHud;
+import com.micatechnologies.minecraft.sum.huds.PocketTextHud;
 import com.micatechnologies.minecraft.sum.huds.RealLifeDateHud;
 import com.micatechnologies.minecraft.sum.huds.ResourcePackHud;
 import com.micatechnologies.minecraft.sum.huds.SaturationHud;
@@ -35,6 +49,8 @@ import com.micatechnologies.minecraft.sum.huds.ServerIpHud;
 import com.micatechnologies.minecraft.sum.huds.SpeedHud;
 import com.micatechnologies.minecraft.sum.huds.TimeHud;
 import com.micatechnologies.minecraft.sum.huds.TpsHud;
+import com.micatechnologies.minecraft.sum.huds.WalletHud;
+import com.micatechnologies.minecraft.sum.huds.XpHud;
 import com.micatechnologies.minecraft.sum.huds.YawHud;
 
 /**
@@ -112,6 +128,12 @@ public class SumOneConfig extends Config {
     @HUD(name = "Height Limit", category = "HUDs", subcategory = "Information")
     public HeightLimitHud heightLimitHud = new HeightLimitHud();
 
+    @HUD(name = "Looking-At Block", category = "HUDs", subcategory = "Information")
+    public LookingAtBlockHud lookingAtBlockHud = new LookingAtBlockHud();
+
+    @HUD(name = "Light Level", category = "HUDs", subcategory = "Information")
+    public LightLevelHud lightLevelHud = new LightLevelHud();
+
     // Player-state HUDs
 
     @HUD(name = "Pitch", category = "HUDs", subcategory = "Player")
@@ -129,6 +151,21 @@ public class SumOneConfig extends Config {
     @HUD(name = "Armor Durability", category = "HUDs", subcategory = "Player")
     public ArmourHud armourHud = new ArmourHud();
 
+    @HUD(name = "Health", category = "HUDs", subcategory = "Player")
+    public HealthHud healthHud = new HealthHud();
+
+    @HUD(name = "Hunger", category = "HUDs", subcategory = "Player")
+    public HungerHud hungerHud = new HungerHud();
+
+    @HUD(name = "Experience", category = "HUDs", subcategory = "Player")
+    public XpHud xpHud = new XpHud();
+
+    @HUD(name = "Active Effects", category = "HUDs", subcategory = "Player")
+    public ActiveEffectsHud activeEffectsHud = new ActiveEffectsHud();
+
+    @HUD(name = "Tool Durability", category = "HUDs", subcategory = "Player")
+    public DurabilityHud durabilityHud = new DurabilityHud();
+
     // Performance HUDs
 
     @HUD(name = "Memory", category = "HUDs", subcategory = "Performance")
@@ -142,6 +179,42 @@ public class SumOneConfig extends Config {
 
     @HUD(name = "Frame Time", category = "HUDs", subcategory = "Performance")
     public FtiHud ftiHud = new FtiHud();
+
+    // SUM-specific HUDs — read from SUM's own subsystems (money capability, phone
+    // cloud, pocket inventory, roamer entities, world border). These are the HUDs
+    // no other mod could produce because the source data only exists inside SUM.
+
+    @HUD(name = "Wallet", category = "HUDs", subcategory = "SUM")
+    public WalletHud walletHud = new WalletHud();
+
+    @HUD(name = "Phone Number", category = "HUDs", subcategory = "SUM")
+    public PhoneNumberHud phoneNumberHud = new PhoneNumberHud();
+
+    @HUD(name = "Pocket (text)", category = "HUDs", subcategory = "SUM")
+    public PocketTextHud pocketTextHud = new PocketTextHud();
+
+    @HUD(name = "Nearest Roamer", category = "HUDs", subcategory = "SUM")
+    public NearestRoamerHud nearestRoamerHud = new NearestRoamerHud();
+
+    @HUD(name = "Border Distance", category = "HUDs", subcategory = "SUM")
+    public BorderDistanceHud borderDistanceHud = new BorderDistanceHud();
+
+    // Snapshot-driven SUM HUDs — read from PlayerStatusTracker.latest, which is
+    // populated every 2 s by an S→C PacketSyncPlayerStatus (channel id 14). These
+    // are the HUDs whose source data lives in server-only saved-data so they need
+    // the snapshot bridge to be visible client-side at all.
+
+    @HUD(name = "Bank Balance", category = "HUDs", subcategory = "SUM")
+    public BankBalanceHud bankBalanceHud = new BankBalanceHud();
+
+    @HUD(name = "Plot Info", category = "HUDs", subcategory = "SUM")
+    public PlotInfoHud plotInfoHud = new PlotInfoHud();
+
+    @HUD(name = "Jobs Available", category = "HUDs", subcategory = "SUM")
+    public JobsHud jobsHud = new JobsHud();
+
+    @HUD(name = "Loyalty", category = "HUDs", subcategory = "SUM")
+    public LoyaltyHud loyaltyHud = new LoyaltyHud();
 
     // Counter HUDs — backed by HudStateTracker (registered separately in
     // SumClientProxy).
@@ -225,7 +298,7 @@ public class SumOneConfig extends Config {
             "Off (All Hidden)", "Vanilla+", "Survival Essentials", "Speedrunner",
             "PvP Focus", "Builder", "Explorer", "Performance Watcher", "Time Tracker",
             "Minimal Top", "Server Op", "Urban Builder", "City Explorer", "Architect",
-            "Cityscape Photographer"
+            "Cityscape Photographer", "Explorer 2 (SUM)", "Combat Pro"
         })
     public int layoutPresetIndex = 0;
 

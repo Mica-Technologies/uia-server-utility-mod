@@ -177,6 +177,24 @@ public class GuiSumPhone extends GuiScreen {
         }
     }
 
+    /** Last cloud snapshot the client has received from the server, or {@code null} if
+     *  nothing has arrived yet this session. Exposed so HUD modules (phone number,
+     *  unread badges, etc.) can render without needing to open the phone GUI first. */
+    public static PhoneCloudData getLastCloud() {
+        return lastCloud;
+    }
+
+    /** One-shot client→server request for a fresh cloud snapshot. Safe to call any time
+     *  the local player exists and is on a SUM-aware server; the server replies with a
+     *  {@link com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudSync} packet which
+     *  feeds {@link #receiveCloud}. Used by HudStateTracker to prime
+     *  {@link #lastCloud} on world join so phone HUDs have data without the user opening
+     *  the phone first. */
+    public static void requestCloudSync() {
+        com.micatechnologies.minecraft.sum.atm.SumNetwork.CHANNEL.sendToServer(
+            new com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudFetchRequest());
+    }
+
     // ---------------------------------------------------------------------------------------
     // Button construction
     // ---------------------------------------------------------------------------------------

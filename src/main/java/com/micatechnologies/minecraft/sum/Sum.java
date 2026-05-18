@@ -75,6 +75,8 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new BeachesHandler());
         MinecraftForge.EVENT_BUS.register(new LoyaltyHandler());
         MinecraftForge.EVENT_BUS.register(new BorderHandler());
+        MinecraftForge.EVENT_BUS.register(
+            new com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();

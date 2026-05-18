@@ -4,6 +4,7 @@ import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.economy.PacketBillChangerAction;
 import com.micatechnologies.minecraft.sum.economy.PacketSyncSumMoney;
 import com.micatechnologies.minecraft.sum.favorites.PacketAddFavorite;
+import com.micatechnologies.minecraft.sum.huds.snapshot.PacketSyncPlayerStatus;
 import com.micatechnologies.minecraft.sum.jobs.PacketJobAction;
 import com.micatechnologies.minecraft.sum.pocket.PacketOpenPocketGui;
 import com.micatechnologies.minecraft.sum.pocket.PacketSyncPocket;
@@ -61,6 +62,8 @@ public final class SumNetwork {
             PacketSyncPocket.class, 12, Side.CLIENT);
         CHANNEL.registerMessage(PacketOpenPocketGui.Handler.class,
             PacketOpenPocketGui.class, 13, Side.SERVER);
+        CHANNEL.registerMessage(PacketSyncPlayerStatus.Handler.class,
+            PacketSyncPlayerStatus.class, 14, Side.CLIENT);
         initialized = true;
     }
 }
