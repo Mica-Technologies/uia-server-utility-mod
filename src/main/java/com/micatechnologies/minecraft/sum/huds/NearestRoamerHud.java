@@ -24,7 +24,7 @@ public class NearestRoamerHud extends SingleTextHud {
     public int radius = 16;
 
     public NearestRoamerHud() {
-        super("Roamer:", false, 5, 5);
+        super("Roamer", false, 5, 5);
     }
 
     @Override

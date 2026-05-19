@@ -12,7 +12,7 @@ import net.minecraft.client.resources.IResourcePack;
 public class ResourcePackHud extends SingleTextHud {
 
     public ResourcePackHud() {
-        super("Pack:", false, 5, 5);
+        super("Pack", false, 5, 5);
     }
 
     @Override

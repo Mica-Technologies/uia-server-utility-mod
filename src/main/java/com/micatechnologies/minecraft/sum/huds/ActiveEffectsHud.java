@@ -20,7 +20,7 @@ public class ActiveEffectsHud extends SingleTextHud {
     public boolean showDuration = false;
 
     public ActiveEffectsHud() {
-        super("Effects:", false, 5, 5);
+        super("Effects", false, 5, 5);
     }
 
     @Override

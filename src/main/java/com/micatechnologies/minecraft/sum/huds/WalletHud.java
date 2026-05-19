@@ -14,7 +14,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class WalletHud extends SingleTextHud {
 
     public WalletHud() {
-        super("Wallet:", false, 5, 5);
+        super("Wallet", false, 5, 5);
     }
 
     @Override

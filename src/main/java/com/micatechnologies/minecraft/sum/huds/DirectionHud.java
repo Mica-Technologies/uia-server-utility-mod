@@ -17,7 +17,7 @@ public class DirectionHud extends SingleTextHud {
     public boolean longNames = false;
 
     public DirectionHud() {
-        super("Facing:", false, 5, 5);
+        super("Facing", false, 5, 5);
     }
 
     @Override

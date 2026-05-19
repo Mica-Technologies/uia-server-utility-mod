@@ -18,7 +18,7 @@ import net.minecraft.item.ItemStack;
 public class PocketTextHud extends SingleTextHud {
 
     public PocketTextHud() {
-        super("Pocket:", false, 5, 5);
+        super("Pocket", false, 5, 5);
     }
 
     @Override

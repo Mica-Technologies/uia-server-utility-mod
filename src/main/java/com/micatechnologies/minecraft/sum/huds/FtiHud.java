@@ -12,7 +12,7 @@ import net.minecraft.client.Minecraft;
 public class FtiHud extends SingleTextHud {
 
     public FtiHud() {
-        super("FTI:", false, 5, 5);
+        super("FTI", false, 5, 5);
     }
 
     @Override

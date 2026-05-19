@@ -11,7 +11,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class SaturationHud extends SingleTextHud {
 
     public SaturationHud() {
-        super("Saturation:", false, 5, 5);
+        super("Saturation", false, 5, 5);
     }
 
     @Override

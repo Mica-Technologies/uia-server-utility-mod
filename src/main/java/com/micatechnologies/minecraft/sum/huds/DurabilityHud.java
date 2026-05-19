@@ -18,7 +18,7 @@ public class DurabilityHud extends SingleTextHud {
     public boolean showPercent = true;
 
     public DurabilityHud() {
-        super("Tool:", false, 5, 5);
+        super("Tool", false, 5, 5);
     }
 
     @Override

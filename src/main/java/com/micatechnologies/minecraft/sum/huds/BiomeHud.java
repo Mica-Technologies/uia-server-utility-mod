@@ -13,7 +13,7 @@ import net.minecraft.world.biome.Biome;
 public class BiomeHud extends SingleTextHud {
 
     public BiomeHud() {
-        super("Biome:", false, 5, 5);
+        super("Biome", false, 5, 5);
     }
 
     @Override

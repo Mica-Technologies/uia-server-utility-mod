@@ -7,7 +7,7 @@ import cc.polyfrost.oneconfig.hud.SingleTextHud;
 public class PlaytimeHud extends SingleTextHud {
 
     public PlaytimeHud() {
-        super("Played:", false, 5, 5);
+        super("Played", false, 5, 5);
     }
 
     @Override

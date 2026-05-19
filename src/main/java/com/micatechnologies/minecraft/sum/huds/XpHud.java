@@ -18,7 +18,7 @@ public class XpHud extends SingleTextHud {
     public boolean showProgress = true;
 
     public XpHud() {
-        super("XP:", false, 5, 5);
+        super("XP", false, 5, 5);
     }
 
     @Override

@@ -16,7 +16,7 @@ import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudData;
 public class PhoneNumberHud extends SingleTextHud {
 
     public PhoneNumberHud() {
-        super("Phone:", false, 5, 5);
+        super("Phone", false, 5, 5);
     }
 
     @Override

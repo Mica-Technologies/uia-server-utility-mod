@@ -23,7 +23,7 @@ public class TimeHud extends SingleTextHud {
     private static final DateTimeFormatter FMT_12 = DateTimeFormatter.ofPattern("hh:mm a");
 
     public TimeHud() {
-        super("Time:", false, 5, 5);
+        super("Time", false, 5, 5);
     }
 
     @Override

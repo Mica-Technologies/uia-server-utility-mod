@@ -15,7 +15,7 @@ public class SpeedHud extends SingleTextHud {
     public int unit = 0;
 
     public SpeedHud() {
-        super("Speed:", false, 5, 5);
+        super("Speed", false, 5, 5);
     }
 
     @Override

@@ -13,7 +13,7 @@ import com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker;
 public class BankBalanceHud extends SingleTextHud {
 
     public BankBalanceHud() {
-        super("Bank:", false, 5, 5);
+        super("Bank", false, 5, 5);
     }
 
     @Override

@@ -12,7 +12,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class HungerHud extends SingleTextHud {
 
     public HungerHud() {
-        super("Food:", false, 5, 5);
+        super("Food", false, 5, 5);
     }
 
     @Override

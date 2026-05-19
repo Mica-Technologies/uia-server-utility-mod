@@ -12,7 +12,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class HealthHud extends SingleTextHud {
 
     public HealthHud() {
-        super("HP:", false, 5, 5);
+        super("HP", false, 5, 5);
     }
 
     @Override
