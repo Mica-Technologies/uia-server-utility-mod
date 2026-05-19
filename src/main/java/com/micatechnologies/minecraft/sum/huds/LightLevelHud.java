@@ -22,7 +22,7 @@ public class LightLevelHud extends SingleTextHud {
     public boolean skyLight = false;
 
     public LightLevelHud() {
-        super("Light:", false, 5, 5);
+        super("Light", false, 5, 5);
     }
 
     @Override

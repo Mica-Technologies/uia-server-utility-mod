@@ -13,7 +13,7 @@ import com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker;
 public class JobsHud extends SingleTextHud {
 
     public JobsHud() {
-        super("Jobs:", false, 5, 5);
+        super("Jobs", false, 5, 5);
     }
 
     @Override

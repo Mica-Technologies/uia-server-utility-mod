@@ -20,6 +20,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.event.GuiContainerEvent;
+import net.minecraftforge.client.event.GuiOpenEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -56,6 +57,14 @@ public class FavoritesClientHandler {
 
     private Map<ResourceLocation, Set<Integer>> favoritesByItem = Collections.emptyMap();
     private int favoritesCacheVersion = -1;
+
+    /** When non-null, the next {@code InitGuiEvent.Post} for this exact GUI instance
+     *  triggers an auto-switch to the favorites tab. Filled in by {@link #onGuiOpen}
+     *  on every creative-inventory open while the user has favorites stored, then
+     *  cleared on apply (or on the next open that isn't a match). Tracking the
+     *  specific instance means screen-resize re-inits don't yank the user back to
+     *  the favorites tab after they've navigated elsewhere. */
+    private GuiContainerCreative pendingFavoritesAutoSwitch;
 
     public static void registerKeybinds() {
         ClientRegistry.registerKeyBinding(TOGGLE);
@@ -105,6 +114,46 @@ public class FavoritesClientHandler {
             Sum.LOGGER.error("Failed to switch to favorites tab", e);
             return false;
         }
+    }
+
+    /**
+     * Marks the just-opened creative inventory for an auto-switch to the favorites
+     * tab. The actual switch happens in {@link #onInitGui} once the GUI has
+     * finished initialising — calling {@code setCurrentCreativeTab} earlier (e.g.
+     * here in {@code GuiOpenEvent}, which fires BEFORE {@code setWorldAndResolution})
+     * runs against an unprepared container and either no-ops or leaves the GUI in
+     * an inconsistent state. Skips if the user has no favorites, since switching
+     * to an empty tab would be more annoying than helpful.
+     */
+    @SubscribeEvent
+    public void onGuiOpen(GuiOpenEvent event) {
+        if (!(event.getGui() instanceof GuiContainerCreative)) {
+            return;
+        }
+        if (FavoritesStore.size() == 0) {
+            return;
+        }
+        pendingFavoritesAutoSwitch = (GuiContainerCreative) event.getGui();
+    }
+
+    /**
+     * Applies the pending auto-switch from {@link #onGuiOpen} once vanilla's
+     * {@code initGui} has run. The instance-equality check (vs. setting a generic
+     * boolean) keeps this from re-applying on screen-resize re-inits, which would
+     * yank the user back to favorites every time they alt-tab or change window
+     * size after navigating away from the favorites tab.
+     */
+    @SubscribeEvent
+    public void onInitGui(GuiScreenEvent.InitGuiEvent.Post event) {
+        if (pendingFavoritesAutoSwitch == null) {
+            return;
+        }
+        if (event.getGui() != pendingFavoritesAutoSwitch) {
+            return;
+        }
+        GuiContainerCreative target = pendingFavoritesAutoSwitch;
+        pendingFavoritesAutoSwitch = null;
+        selectFavoritesTab(target);
     }
 
     @SubscribeEvent

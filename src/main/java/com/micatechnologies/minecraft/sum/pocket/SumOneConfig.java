@@ -78,12 +78,16 @@ public class SumOneConfig extends Config {
     public static transient SumOneConfig INSTANCE;
 
     /**
-     * Pocket HUD module — three filtered slots (phone / debit card / bills) painted as a
-     * compact icon row. Position, scale, and the standard OneConfig background/border
-     * knobs are managed by the inherited {@link cc.polyfrost.oneconfig.hud.BasicHud}.
+     * Favorites preview HUD — top three SUM favorites painted as a compact icon row
+     * with the favorites-tab keybind letter in the upper-right corner. Position,
+     * scale, and the standard OneConfig background/border knobs are managed by the
+     * inherited {@link cc.polyfrost.oneconfig.hud.BasicHud}.
+     *
+     * <p>Field name is historical — this used to be a pocket-inventory preview.
+     * Kept as {@code pocketHud} so user-saved positions migrate transparently.</p>
      */
-    @HUD(name = "Pocket HUD",
-         category = "Pocket",
+    @HUD(name = "Favorites HUD",
+         category = "Favorites",
          subcategory = "HUD")
     public PocketHud pocketHud = new PocketHud();
 

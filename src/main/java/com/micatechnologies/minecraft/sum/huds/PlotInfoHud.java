@@ -21,7 +21,7 @@ public class PlotInfoHud extends SingleTextHud {
     public boolean showOwner = true;
 
     public PlotInfoHud() {
-        super("Plot:", false, 5, 5);
+        super("Plot", false, 5, 5);
     }
 
     @Override

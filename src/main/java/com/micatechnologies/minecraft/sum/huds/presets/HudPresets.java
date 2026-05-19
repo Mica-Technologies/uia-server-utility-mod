@@ -153,13 +153,13 @@ public final class HudPresets {
 
         // Vanilla+ — coords + FPS, top-left.
         HudLayout.builder("Vanilla+")
-            .column(0f, 10f, Direction.DOWN, "coordsHud", "fpsHud")
+            .column(0f, 1f, Direction.DOWN, "coordsHud", "fpsHud")
             .build(),
 
         // Survival Essentials — left column with the always-relevant survival info,
         // now expanded to include the vanilla-gap HUDs (Health, Hunger, XP, Effects).
         HudLayout.builder("Survival Essentials")
-            .column(0f, 10f, Direction.DOWN,
+            .column(0f, 1f, Direction.DOWN,
                 "coordsHud", "biomeHud", "timeHud", "dayCounterHud",
                 "healthHud", "hungerHud", "xpHud", "saturationHud",
                 "armourHud", "activeEffectsHud")
@@ -167,9 +167,9 @@ public final class HudPresets {
 
         // Speedrunner — splits-relevant info distributed for at-a-glance reading.
         HudLayout.builder("Speedrunner")
-            .place("coordsHud", 960f, 10f)
-            .column(0f, 10f, Direction.DOWN, "timeHud", "playtimeHud")
-            .column(1920f, 10f, Direction.DOWN, "fpsHud", "pingHud")
+            .place("coordsHud", 960f, 1f)
+            .column(0f, 1f, Direction.DOWN, "timeHud", "playtimeHud")
+            .column(1920f, 1f, Direction.DOWN, "fpsHud", "pingHud")
             .build(),
 
         // PvP Focus — combat-relevant info, kept out of the center crosshair. Bottom-
@@ -177,17 +177,17 @@ public final class HudPresets {
         // bottom and the rest stack above it. Health + Effects + Tool added so a PvP
         // player has every critical combat readout at a glance.
         HudLayout.builder("PvP Focus")
-            .column(0f, 1080f, Direction.UP,
+            .column(0f, 1077f, Direction.UP,
                 "cpsHud", "saturationHud", "hungerHud", "armourHud",
                 "durabilityHud", "activeEffectsHud", "healthHud")
-            .column(1920f, 1080f, Direction.UP,
+            .column(1920f, 1077f, Direction.UP,
                 "directionHud", "fpsHud", "pingHud")
             .build(),
 
         // Builder — survival builder focus (block above, height limit for tall builds),
         // plus light level (mob-spawn checks) and looking-at-block (block ID lookup).
         HudLayout.builder("Builder")
-            .column(0f, 10f, Direction.DOWN,
+            .column(0f, 1f, Direction.DOWN,
                 "coordsHud", "directionHud", "blockAboveHud", "heightLimitHud",
                 "lightLevelHud", "lookingAtBlockHud")
             .build(),
@@ -198,38 +198,38 @@ public final class HudPresets {
         // 5-row right column reaches higher than the 4-row left column without us
         // having to math out a separate anchor y for each.
         HudLayout.builder("Explorer")
-            .place("coordsHud", 960f, 10f)
-            .column(0f, 1080f, Direction.UP,
+            .place("coordsHud", 960f, 1f)
+            .column(0f, 1077f, Direction.UP,
                 "dayCounterHud", "timeHud", "directionHud", "speedHud")
-            .column(1920f, 1080f, Direction.UP,
+            .column(1920f, 1077f, Direction.UP,
                 "fpsHud", "ftiHud", "tpsHud", "memoryHud", "playtimeHud")
             .build(),
 
         // Performance Watcher — diagnostics stack bottom-right, nothing else.
         HudLayout.builder("Performance Watcher")
-            .column(1920f, 1080f, Direction.UP,
+            .column(1920f, 1077f, Direction.UP,
                 "memoryHud", "pingHud", "tpsHud", "ftiHud", "fpsHud")
             .build(),
 
         // Time Tracker — clocks and dates in the top-right, for long sessions / streams.
         HudLayout.builder("Time Tracker")
-            .column(1920f, 10f, Direction.DOWN,
+            .column(1920f, 1f, Direction.DOWN,
                 "realLifeDateHud", "timeHud", "dayCounterHud", "playtimeHud")
             .build(),
 
         // Minimal Top — only what's strictly needed: coords + fps centred at the top.
         HudLayout.builder("Minimal Top")
-            .place("coordsHud", 900f, 10f)
-            .place("fpsHud", 1100f, 10f)
+            .place("coordsHud", 900f, 1f)
+            .place("fpsHud", 1100f, 1f)
             .build(),
 
         // Server Op — admin-focused: server identity + health up top. Snapshot HUDs
         // (jobs available, plot info) on the right give an at-a-glance "what's
         // happening on this server" readout.
         HudLayout.builder("Server Op")
-            .column(0f, 10f, Direction.DOWN,
+            .column(0f, 1f, Direction.DOWN,
                 "serverIpHud", "tpsHud", "pingHud")
-            .column(1920f, 10f, Direction.DOWN,
+            .column(1920f, 1f, Direction.DOWN,
                 "playtimeHud", "jobsHud", "plotInfoHud")
             .build(),
 
@@ -238,9 +238,9 @@ public final class HudPresets {
         // Urban Builder — coords centred up top; block above + height limit on the left
         // for vertical-build reference; date + game mode on the right.
         HudLayout.builder("Urban Builder")
-            .column(960f, 10f, Direction.DOWN, "coordsHud", "directionHud")
-            .column(0f, 10f, Direction.DOWN, "blockAboveHud", "heightLimitHud")
-            .column(1920f, 10f, Direction.DOWN, "gameModeHud", "realLifeDateHud")
+            .column(960f, 1f, Direction.DOWN, "coordsHud", "directionHud")
+            .column(0f, 1f, Direction.DOWN, "blockAboveHud", "heightLimitHud")
+            .column(1920f, 1f, Direction.DOWN, "gameModeHud", "realLifeDateHud")
             .build(),
 
         // City Explorer — wandering a server city: nav info top-centre, RP info (wallet,
@@ -248,13 +248,13 @@ public final class HudPresets {
         // + jobs on the right. Heavy on SUM-specific HUDs since the layout's whole
         // purpose is server-city RP.
         HudLayout.builder("City Explorer")
-            .place("coordsHud", 870f, 10f)
-            .place("directionHud", 1060f, 10f)
-            .column(0f, 1080f, Direction.UP,
+            .place("coordsHud", 870f, 1f)
+            .place("directionHud", 1060f, 1f)
+            .column(0f, 1077f, Direction.UP,
                 "nearestRoamerHud", "plotInfoHud", "pocketTextHud",
                 "phoneNumberHud", "bankBalanceHud", "walletHud",
                 "biomeHud", "timeHud", "dayCounterHud")
-            .column(1920f, 1080f, Direction.UP,
+            .column(1920f, 1077f, Direction.UP,
                 "loyaltyHud", "jobsHud", "playtimeHud",
                 "serverIpHud", "borderDistanceHud")
             .build(),
@@ -263,7 +263,7 @@ public final class HudPresets {
         // on the left, everything else suppressed so the viewport is uncluttered.
         // Light level + looking-at-block added for precision-build lookups.
         HudLayout.builder("Architect")
-            .column(0f, 10f, Direction.DOWN,
+            .column(0f, 1f, Direction.DOWN,
                 "coordsHud", "directionHud", "heightLimitHud",
                 "blockAboveHud", "lookingAtBlockHud", "lightLevelHud", "gameModeHud")
             .build(),
@@ -272,8 +272,8 @@ public final class HudPresets {
         // line bottom-centre and the real-life date top-right; user is expected to pair
         // this with the Realistic Game HUD style for the smallest possible footprint.
         HudLayout.builder("Cityscape Photographer")
-            .place("coordsHud", 870f, 1080f)
-            .place("realLifeDateHud", 1920f, 10f)
+            .place("coordsHud", 870f, 1077f)
+            .place("realLifeDateHud", 1920f, 1f)
             .build(),
 
         // Explorer 2 (SUM) — the comprehensive city-RP layout, intended as the modpack
@@ -282,16 +282,16 @@ public final class HudPresets {
         // Top-center: coords + facing direction. Top-right: SUM-specific HUDs
         // including the icon-based PocketHud, plus wallet/bank/phone/plot/jobs.
         HudLayout.builder("Explorer 2 (SUM)")
-            .column(960f, 10f, Direction.DOWN, "coordsHud", "directionHud")
-            .column(0f, 10f, Direction.DOWN,
+            .column(960f, 1f, Direction.DOWN, "coordsHud", "directionHud")
+            .column(0f, 1f, Direction.DOWN,
                 "healthHud", "hungerHud", "xpHud", "activeEffectsHud",
                 "durabilityHud", "plotInfoHud")
-            .column(1920f, 10f, Direction.DOWN,
+            .column(1920f, 1f, Direction.DOWN,
                 "walletHud", "bankBalanceHud", "phoneNumberHud", "pocketTextHud",
                 "jobsHud", "loyaltyHud", "pocketHud")
-            .column(0f, 1080f, Direction.UP,
+            .column(0f, 1077f, Direction.UP,
                 "dayCounterHud", "timeHud", "biomeHud", "speedHud")
-            .column(1920f, 1080f, Direction.UP,
+            .column(1920f, 1077f, Direction.UP,
                 "fpsHud", "ftiHud", "tpsHud", "memoryHud", "pingHud", "playtimeHud")
             .build(),
 
@@ -300,12 +300,12 @@ public final class HudPresets {
         // armour/saturation/cps right, ping/fps top-right for connection-quality
         // checks during fights.
         HudLayout.builder("Combat Pro")
-            .column(0f, 1080f, Direction.UP,
+            .column(0f, 1077f, Direction.UP,
                 "activeEffectsHud", "durabilityHud", "armourHud",
                 "hungerHud", "healthHud")
-            .column(1920f, 1080f, Direction.UP,
+            .column(1920f, 1077f, Direction.UP,
                 "cpsHud", "saturationHud", "directionHud")
-            .column(1920f, 10f, Direction.DOWN, "pingHud", "fpsHud")
+            .column(1920f, 1f, Direction.DOWN, "pingHud", "fpsHud")
             .build()
     };
 

@@ -18,7 +18,7 @@ import net.minecraft.entity.player.EntityPlayer;
 public class BorderDistanceHud extends SingleTextHud {
 
     public BorderDistanceHud() {
-        super("Border:", false, 5, 5);
+        super("Border", false, 5, 5);
     }
 
     @Override

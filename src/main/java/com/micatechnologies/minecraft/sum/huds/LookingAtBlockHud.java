@@ -14,7 +14,7 @@ import net.minecraft.util.math.RayTraceResult;
 public class LookingAtBlockHud extends SingleTextHud {
 
     public LookingAtBlockHud() {
-        super("Block:", false, 5, 5);
+        super("Block", false, 5, 5);
     }
 
     @Override

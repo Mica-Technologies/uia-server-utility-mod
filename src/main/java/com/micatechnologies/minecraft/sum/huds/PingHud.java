@@ -13,7 +13,7 @@ import net.minecraft.client.network.NetworkPlayerInfo;
 public class PingHud extends SingleTextHud {
 
     public PingHud() {
-        super("Ping:", false, 5, 5);
+        super("Ping", false, 5, 5);
     }
 
     @Override

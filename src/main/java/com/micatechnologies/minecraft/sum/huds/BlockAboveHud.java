@@ -16,7 +16,7 @@ import net.minecraft.world.World;
 public class BlockAboveHud extends SingleTextHud {
 
     public BlockAboveHud() {
-        super("Above:", false, 5, 5);
+        super("Above", false, 5, 5);
     }
 
     @Override

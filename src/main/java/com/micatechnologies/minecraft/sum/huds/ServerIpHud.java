@@ -12,7 +12,7 @@ import net.minecraft.client.multiplayer.ServerData;
 public class ServerIpHud extends SingleTextHud {
 
     public ServerIpHud() {
-        super("Server:", false, 5, 5);
+        super("Server", false, 5, 5);
     }
 
     @Override

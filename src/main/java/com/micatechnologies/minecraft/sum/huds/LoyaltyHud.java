@@ -17,7 +17,7 @@ import com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker;
 public class LoyaltyHud extends SingleTextHud {
 
     public LoyaltyHud() {
-        super("Loyalty:", false, 5, 5);
+        super("Loyalty", false, 5, 5);
     }
 
     @Override
