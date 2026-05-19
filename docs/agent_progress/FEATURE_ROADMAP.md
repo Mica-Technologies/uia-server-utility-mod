@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Sections A, B, C, and Section D core (D1–D5) all complete as of 2026-05-08.** Latest HEAD is `6866ebc`. Shipped this session: full Section C (C1–C9) + a slate of bug fixes + full Section B (TR/ST/SV/BC/MX/JB) + Section D core (D1–D5: data model, wand + admin commands, buy/sell, protection events, trust/transfer) + the storm-shelter sign preference enhancement (signed shelters preferred over auto-discovered when reachable inside the same building) + the storm-shelter sign converted to wall-mounted + `/sum help` paginated command + several playtest-driven bug fixes (bill render, role auto-name, phone/card second-click, plot wand corner-A capture). The plots system is fully functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration are deferred polish that can land later if Alex wants the in-GUI experience.
+Status: **Sections A, B, C, Section D core (D1–D5), and Section E (HUD / OneConfig integration) all complete as of 2026-05-18.** Latest HEAD is `f1dc77c`. Shipped across the 2026-05-08 sprint and the 2026-05-17/18 HUD sprint: full Section C (C1–C9), full Section B (TR/ST/SV/BC/MX/JB), Section D core (D1–D5: data model, wand + admin commands, buy/sell, protection events, trust/transfer), Section E (E1–E7: OneConfig migration of the pocket HUD, 23 ported EvergreenHUD elements + TPS + 5 custom-text slots, 16 new HUDs covering vanilla gaps + SUM-specific data + a server-status snapshot bridge, 8 visual style presets + 17 layout presets with responsive row pitch and edge-flush positioning, and the favorites-tab auto-jump on creative inventory open) + the storm-shelter sign enhancements + `/sum help` paginated command + several playtest-driven bug fixes. The plots system is fully functional via chat commands; D6 browser GUI, D7 rental flow, and D8 EconomyInc-plot migration are deferred polish that can land later if Alex wants the in-GUI experience.
 
 ---
 
@@ -8,17 +8,18 @@ Status: **Sections A, B, C, and Section D core (D1–D5) all complete as of 2026
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm picking up the SUM mod after a feature-completion sprint. **As of HEAD `6866ebc` (2026-05-08): Sections A, B, C, and Section D core (D1–D5) are all shipped. The mod has every headline feature originally planned: bank/ATM kit, full SUM-native economy that can replace EconomyInc, six server-utility blocks/items (TR/ST/SV/BC/MX/JB), and a working land-claim plots system with protection. The only deferred items are D6 plot-browser GUI, D7 rental flow, and D8 EconomyInc-plot migration; those are polish that can land later if Alex asks. Most of the new surface still needs in-game playtesting (see "Testing status" section below).**
+> I'm picking up the SUM mod after Sections A–E all shipped. **As of HEAD `f1dc77c` (2026-05-18): Sections A, B, C, Section D core (D1–D5), and Section E (full HUD / OneConfig integration) are all complete and functional.** The mod has every headline feature planned plus a complete HUD system: bank/ATM kit, full SUM-native economy that can replace EconomyInc, six server-utility blocks/items (TR/ST/SV/BC/MX/JB), a working land-claim plots system with protection, and a OneConfig-backed HUD with ~30 elements, 8 style presets, 17 layout presets including the modpack-default "Explorer 2 (SUM)", and a favorites preview HUD that doubles as a keybind reminder. Deferred items: D6 plot-browser GUI, D7 rental flow, D8 EconomyInc-plot migration. **The 2026-05-17/18 HUD sprint is essentially feature-complete; only minor visual tweaks remain.**
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
 > **Read first, in this order:**
 >
 > 1. `docs/agent_progress/FEATURE_ROADMAP.md` — this doc. Status snapshot, phase tables, testing checklists, and the Section D research at the end (which is now mostly built).
-> 2. `docs/ECONOMYINC_MIGRATION.md` — admin-facing doc for the C9 migration command and the EconomyInc-removal procedure.
-> 3. `docs/agent_progress/PLAYER_FAVORITES_MENU.md` — older feature, useful only for commit-cadence/wiring conventions if needed.
-> 4. `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` — older Roamer-perf doc; useful background for any new Roamer roles or AI work.
-> 5. `CLAUDE.md` and the project memory under `~/.claude/projects/E--gitRepos-uia-server-utility-mod/memory/`. **Standing prefs:** never `git push`; include `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` on every commit; JDK at `~/.jdks/azul-17.0.18`; no real usernames in committed files (use `<username>` placeholder); LDW2 fork at `E:\gitRepos\LDW2` is a separate repo for weather/snow work — don't touch it.
+> 2. `docs/agent_progress/OC_EGHUD_DEV.md` — OneConfig/EvergreenHUD/HUD-system session handoff. Background on the OneConfig integration and earlier HUD work.
+> 3. `docs/ECONOMYINC_MIGRATION.md` — admin-facing doc for the C9 migration command and the EconomyInc-removal procedure.
+> 4. `docs/agent_progress/PLAYER_FAVORITES_MENU.md` — older feature, useful only for commit-cadence/wiring conventions if needed.
+> 5. `docs/agent_progress/NPC_OPTIMIZE_PLAN.md` — older Roamer-perf doc; useful background for any new Roamer roles or AI work.
+> 6. `CLAUDE.md` and the project memory under `~/.claude/projects/E--gitRepos-uia-server-utility-mod/memory/`. **Standing prefs:** never `git push`; include `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` on every commit; JDK at `~/.jdks/azul-17.0.18`; no real usernames in committed files (use `<username>` placeholder); LDW2 fork at `E:\gitRepos\LDW2` is a separate repo for weather/snow work — don't touch it.
 >
 > **Reuse, don't rebuild.** Reusable infrastructure available in the codebase right now:
 >
@@ -77,6 +78,17 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - `/sum plots <create|delete|list|info|buy|sell|trust|untrust|transfer>` (mixed; create/delete are op).
 > - `/sum reloadconfig` (op).
 >
+> *HUD / OneConfig (`.huds`, `.huds.presets`, `.huds.snapshot`, `.pocket`, `.mixin` packages):*
+> - `SumOneConfig` (in `.pocket`): root `@Config` entry point. Holds every `@HUD`-annotated field; loaded once at client preInit. Constructor MUST call `initialize()` and the `INSTANCE` static MUST be `transient` (OneConfig's Gson exclusion only filters TRANSIENT, not STATIC, so a non-transient self-reference → StackOverflow on save). Overrides `addGsonOptions` to restore Gson's default `STATIC|TRANSIENT` exclusion. **The `@HUD(name=..., category=..., subcategory=...)` strings show up in the OneConfig UI; field names are what the JSON keys off (rename ≠ free, breaks user-saved positions).**
+> - ~30 HUD classes in `.huds` extending OneConfig's `SingleTextHud` (text) or `BasicHud` (graphical). Categories: Information, Player, Performance, Counters, SUM (the unique-to-SUM ones), Custom Text, Favorites. **All titles use bare strings without trailing colons** — OneConfig auto-appends `": "` when rendering, so `"HP"` → `"HP: 20.0"`; `"HP:"` produced `"HP:: 20.0"`.
+> - `PocketHud` (in `.pocket`, class name historical): repurposed as the **favorites preview HUD**. Renders top 3 from `FavoritesStore.snapshot()` as item icons via `FavoriteKey.resolveStack()`, with an inline `Z: ` keybind label (configurable via `FavoritesClientHandler.JUMP`). Icons and label both scaled via `GlStateManager.scale` so they fit the slot frame at any HUD scale.
+> - `HudPresets` (in `.huds.presets`): 8 style presets (Default, Minimal Brackets, Clean Professional, Stylish Glass, Compact Light, Retro Terminal, Realistic Game HUD, High Contrast) + 17 layout presets including the modpack-default **Explorer 2 (SUM)**. `applyStyle` mutates the `protected` style fields via reflection across `Hud`/`BasicHud`/`TextHud`/`SingleTextHud`. `applyLayout` walks each `HudLayout.Column` row-by-row, advancing the cursor by a `computeRowPitch(hud)` derived from the live scale/padding/border — that's what makes layouts responsive to the current style. Always calls `position.setSize(0, 0)` before `setPosition(x, y, 1920f, 1080f)` so OneConfig's anchor math computes against width=0 (otherwise stored offset uses the last-rendered width and HUDs drift on re-apply). `applyStyle` auto-reflows the current layout at the end so a style change instantly re-spaces rows without a second click.
+> - `HudStyle` / `HudLayout` / `HudLayout.Column`: immutable data classes. **Crucial:** the `screenHeight` arg to `Position.setPosition` MUST be `1080f` (the reference frame), NOT the cursor value — confusing the two flushes all bottom-anchored HUDs to the screen bottom.
+> - `huds.snapshot.*` (PlayerStatusSnapshot, PacketSyncPlayerStatus, PlayerStatusTracker): server→client bridge for HUDs whose data lives in server-only saved-data (bank balance, plot info, jobs count, loyalty progress). Pushed every 40 ticks (2s) per online player; also on `PlayerLoggedInEvent` so HUDs have data on first frame. Packet ID 14 on `SumNetwork`.
+> - `FavoritesClientHandler` (in `.favorites`): `selectFavoritesTab(gui)` reflectively calls `GuiContainerCreative#setCurrentCreativeTab`. Subscribers: existing JUMP-keybind (`Z`) handler + new `GuiOpenEvent` / `InitGuiEvent.Post` pair that auto-switches to favorites tab whenever the user opens creative inventory AND `FavoritesStore.size() > 0`. Instance-tracked via `pendingFavoritesAutoSwitch` so screen-resize re-inits don't yank the user back.
+> - `mixin.SumCoreMod`: IFMLLoadingPlugin that registers `mixins.sum.json` with MixinBooter. **Required for dev**: MixinBooter only auto-discovers configs via jar MANIFEST attributes; without this coremod, no SUM mixin loads in `runClient`/`runServer`. `coreModClass=mixin.SumCoreMod` in `buildscript.properties` wires it up both for the production jar (via FMLCorePlugin manifest entry) and dev launches (via `-Dfml.coreMods.load` JVM arg). **Add new mixins via mixins.sum.json; the coremod ensures they apply.**
+> - `mixin.MixinWorldServer` + `mixin.MixinNetHandlerPlayServer`: existing server-side mixins (chunk tick mods, movement-tolerance loosening). Now work in dev too thanks to SumCoreMod.
+>
 > *Texture generators (Python + PIL, idempotent):*
 > - `tools/atm_textures/generate.py` — ATM block textures
 > - `tools/bank_textures/generate.py` — bank lobby block textures
@@ -107,6 +119,11 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - **Section D6/D7/D8 deferred.** Plots system is functional via chat; only pursue these if Alex green-lights.
 > - **Bills coexistence:** when EconomyInc is loaded, ATM produces EconomyInc bills (compat); deposits accept both. When EconomyInc is absent, SUM owns everything.
 > - **Storm-shelter sign behavior: signed shelters preferred for already-indoor roamers** within 48h/6v range, with a path-stays-inside check (tolerates 2 consecutive sky-exposed nodes for doorways/skylights). No claim limit on signed shelters — designed to attract a crowd.
+> - **HUD: OneConfig-backed, not bespoke.** All HUD persistence, drag-to-reposition UX, and per-HUD knobs go through OneConfig. Don't reinvent the storage / editor.
+> - **HUD layout presets are a fixed catalog** (17 layouts, 8 styles in `HudPresets.LAYOUTS`/`STYLES`). User-saved-layouts are NOT implemented — was discussed as a future expansion but punted. Re-litigate only if Alex asks.
+> - **Pocket-inventory integration into vanilla GuiInventory was scrapped.** Mixin-based slot injection was unreliable (mixin's drawGuiContainerBackgroundLayer @Inject silently fails to bind in some configurations). The replacement: auto-switch to favorites tab in creative inventory, and `PocketHud` repurposed as a favorites-preview HUD with inline keybind label. The pocket inventory itself (3-slot capability + `GuiPocket` via P key + `PocketTextHud` for text readout) still exists.
+> - **Bank balance "tally" semantics:** `BankBalanceHud` sums bill values across all safe-deposit boxes the player owns in their current dimension. Non-bill items in those boxes don't contribute. (`SafeDepositSavedData.totalBillValueFor(uuid)` is the helper.)
+> - **Snapshot-driven SUM HUDs lag by up to 2 s** (push cadence). Acceptable for plot/balance/jobs/loyalty since they change slowly. Don't try to make them realtime — the bridge is per-online-player and 2 s × 50 players is already 25 packets/sec.
 >
 > **Known fixed bugs (don't reintroduce):**
 > - `7c74d4e` Safe deposit box wiped items on reopen — fixed via `initialized` flag in `InventorySafeDeposit`.
@@ -116,6 +133,13 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - `03f715d` Phone/card 2nd right-click did nothing — `player.openGui` silently drops the OPEN_GUI packet when invoked from `Item.onItemRightClick` in 1.12.2. Use `Sum.proxy.openAccountAccessGui` (direct `displayGuiScreen`) instead.
 > - `25e1bf8` Plot wand reported "Corner B" on both clicks — `LeftClickBlock` event is unreliable in 1.12.2 (client cancel suppresses server packet). Switched to sneak+right-click for corner A.
 > - `6866ebc` Storm-shelter sign converted to wall-mounted; AI heuristic loosened (range 24→48, dropped claim check on signed shelters, path tolerance 0→2 consecutive sky-exposed nodes) so a crowd in an airport lobby actually converges on the bathroom sign.
+> - `ebea593` OneConfig save StackOverflow #1 — `SumOneConfig` was missing the `initialize()` call in its constructor (OneConfig's `Config` base does NOT auto-init; HUDs never registered, mod card never appeared in editor).
+> - `ebea593` OneConfig save StackOverflow #2 — `INSTANCE` static field caused self-reference recursion in Gson serialization. Fix: `public static transient SumOneConfig INSTANCE`. OneConfig's exclusion strategy only filters TRANSIENT, not STATIC.
+> - `ebea593` OneConfig save StackOverflow #3 — static `DateTimeFormatter` constants in HUD subclasses (RealLifeDateHud, TimeHud) hit Gson recursion via internal printer/parser back-references. Fix: `SumOneConfig.addGsonOptions` overridden to restore Gson's default `STATIC|TRANSIENT` exclusion. Also moved `favoritesStarOverlay` from static to instance.
+> - `f1dc77c` (this session) Layout-apply bottom-flush bug — `HudPresets.applyLayout` was passing `screenHeight=1077` (instead of 1080) to `Position.setPosition` due to a wildcard batch replace that hit the reference-screen arg. With cursor = screenHeight, stored offset became 0 and bottom HUDs rendered flush against the screen edge regardless of margin.
+> - `f1dc77c` HUD title double colons — OneConfig's `SingleTextHud.getCompleteText` auto-appends `": "`, so titles like `"HP:"` rendered as `"HP:: 20.0"`. Stripped trailing colons from all 30 HUD constructor titles.
+> - `f1dc77c` Mixin config not loading in dev — MixinBooter only auto-discovers from jar MANIFEST attributes. Dev launches had no manifest, so no SUM mixin EVER applied in dev. Fix: `SumCoreMod` IFMLLoadingPlugin + `coreModClass` in buildscript.properties.
+> - `f1dc77c` Favorites HUD icons overflowed at small style scales (Realistic Game HUD 0.4×). `renderItemAndEffectIntoGUI` always paints 16×16; wrapped with `GlStateManager.scale` to size to the slot frame.
 >
 > **Watch out for:** Alex maintains a separate Weather 2 Remastered fork at `E:\gitRepos\LDW2` for weather/snow features — *not* this repo. The repo working tree should be clean at `6866ebc`; if you find unfamiliar uncommitted WIP, preserve it (`git restore --staged` anything not yours before committing).
 
@@ -185,6 +209,27 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | `/sum help` paginated command (7 pages, anyone can run) | ✅ shipped | `af0b3b6` |
 | Plot wand corner-A capture fix (sneak+right-click) | ✅ shipped | `25e1bf8` |
 
+### Section E — HUD / OneConfig integration (✅ COMPLETE)
+
+| Phase | Goal | Status | Commit |
+|---|---|---|---|
+| E1 | OneConfig as a required-after dep + migrate the bespoke pocket HUD to a OneConfig `BasicHud` + delete native pocket-HUD scaffolding | ✅ shipped | `db8bed0` |
+| E2 | Port 23 EvergreenHUD elements (Information / Player / Performance / Counters) + `HudStateTracker` for stateful counters | ✅ shipped | `a58e274`, `5f90ed2` |
+| E3 | TPS HUD (SPacketTimeUpdate timing) + 5 fixed custom-text slots | ✅ shipped | `5f90ed2` |
+| E4 | OneConfig launch + Gson save crashes fixed; 8 visual style presets (`HudStyle`) with reflection-based apply across protected style fields | ✅ shipped | `ebea593` |
+| E5 | 17 layout presets (`HudLayout` with column anchors + Direction.UP/DOWN); responsive row pitch computed live from style; auto-reflow on style change; edge-flush positioning (left x=0, right x=1920, top y=1, bottom y=1077) | ✅ shipped | `ebea593`, `5c27963` |
+| E6 | 7 vanilla-gap HUDs (Health, Hunger, XP, Active Effects, Tool Durability, Light Level, Looking-At Block); 5 client-side SUM HUDs (Wallet, Phone Number, Pocket Text, Nearest Roamer, Border Distance); snapshot-bridge infrastructure (PlayerStatusSnapshot + PacketSyncPlayerStatus + PlayerStatusTracker) for 4 server-only SUM HUDs (Bank Balance, Plot Info, Jobs Available, Loyalty); 2 new layouts (Explorer 2 SUM as the modpack default, Combat Pro); FtiHud | ✅ shipped | `37570e1` |
+| E7 | Dev-mode mixin coremod (`SumCoreMod`); favorites-tab auto-jump on creative inventory open; PocketHud repurposed as favorites preview with inline keybind label + scale-aware icon/text rendering; double-colon HUD title fix; bottom-edge regression fix | ✅ shipped | `f1dc77c` |
+
+**Pocket inventory + favorites integration** — what shipped vs. what was scrapped during E7:
+
+| Approach | Outcome |
+|---|---|
+| Inject pocket slots into vanilla `ContainerPlayer` via mixin + extend `GuiInventory` width | ❌ scrapped — mixin's `drawGuiContainerBackgroundLayer` injection silently failed to bind despite the constructor injection working. Replaced by the simpler tab-jump + favorites-preview HUD. Files deleted: `MixinContainerPlayer`, `MixinGuiInventory`, `AccessorContainer`, `AccessorGuiContainer`. |
+| Auto-jump to favorites tab when opening creative inventory | ✅ shipped — `FavoritesClientHandler` subscribes to `GuiOpenEvent` + `InitGuiEvent.Post`. Skips when `FavoritesStore` is empty. Instance-tracked so screen resize doesn't yank user back. |
+| PocketHud → favorites preview HUD with inline keybind label | ✅ shipped — `Z: [icon][icon][icon]` layout. Icons + label scaled via `GlStateManager.scale` so they fit at any HUD scale. |
+| Pocket inventory itself (3-slot capability + GuiPocket via P key) | ✅ kept as-is — `PocketTextHud` provides a text readout for layouts that want the pocket info without icons. |
+
 Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day), L (≥500 LOC, full day or more).
 
 ---
@@ -213,6 +258,18 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **BC business cards**: right-click air to personalize; right-click another player to give a copy; anvil-rename for title.
 - [x] **SV sleep voting**: threshold-met → night skips. Weather is intentionally left alone (server-controlled).
 - [x] **C6 bill changer**: bundle requires ≥64 bills of one denom; unbundle splits a packet back into 64. Logic was already correct; GUI now shows a `$N` total under each slot so a 64-stack of bills can't be mistaken for a single bill.
+- [x] **E1–E5 HUD foundation**: OneConfig loads, SUM mod card appears in the editor, all 25 originally-ported HUDs render, drag-to-reposition works, style presets apply visually, layout presets apply with responsive row spacing.
+- [x] **E5 edge alignment**: right-side HUDs flush at screen right edge; left-side HUDs flush at x=0; bottom-anchored columns flush at y=1077 (3px breathing room from screen bottom); top-anchored at y=1.
+- [x] **E5 auto-reflow**: applying a style preset on top of a chosen layout re-spaces rows to match the new scale automatically.
+- [x] **E6 vanilla-gap HUDs**: Health, Hunger, XP, Active Effects, Tool Durability, Light Level, Looking-At Block all render and update correctly.
+- [x] **E6 SUM HUDs (client-side)**: Wallet ($balance from `ISumMoney` capability), Phone Number (`GuiSumPhone.getLastCloud` via auto-fetch on world join), Pocket Text, Nearest Roamer, Border Distance all working.
+- [x] **E6 snapshot bridge**: PlayerStatusTracker pushes every 2s + on login; Bank Balance / Plot Info / Jobs Available / Loyalty HUDs all populate within 2s of spawn.
+- [x] **E6 Explorer 2 (SUM)** layout — modpack default, all positions correct.
+- [x] **E7 favorites tab auto-jump**: opening creative inventory (E key) with favorites present jumps straight to the favorites tab; screen resize doesn't yank back when user navigates away.
+- [x] **E7 Favorites HUD (repurposed PocketHud)**: shows top 3 favorites with inline `Z: ` keybind label; icons scale correctly at all style scales including Realistic Game HUD 0.4×.
+- [x] **E7 HUD title double-colon fix**: all titles render as `"HP: 20.0"` instead of `"HP:: 20.0"` (verified after deleting stale sum.json).
+- [x] **E7 bottom-edge regression fix**: bottom-anchored layout HUDs now show a small visual margin from the screen bottom (was flush regardless of margin tweak before).
+- [x] **E7 dev-mode mixin loading**: `SumCoreMod` registers mixins.sum.json with MixinBooter on dev launch; existing server-side mixins (WorldServer, NetHandlerPlayServer) now apply in `runClient`/`runServer` as well.
 
 ### Bugs found in playtest and fixed this session
 
@@ -221,6 +278,8 @@ Effort scale: XS (≤50 LOC, <1h), S (~100 LOC, 1–2h), M (~300 LOC, half-day),
 - [x] **`03f715d`** — phone/card second right-click did nothing; bypassed broken `player.openGui` path.
 - [x] **`25e1bf8`** — plot wand reported "Corner B" on both clicks; switched to sneak+right-click for corner A.
 - [x] **`6866ebc`** — storm-shelter sign too restrictive (most roamers stayed in the lobby); widened range, dropped claim check, loosened path-stays-inside; also converted to wall-mounted.
+- [x] **`ebea593`** — three back-to-back OneConfig save StackOverflows fixed in one commit (missing initialize() call, non-transient INSTANCE self-reference, static helper fields recursing via Gson). Without these, the SUM mod card never appeared in OneConfig and editing any HUD crashed the client.
+- [x] **`f1dc77c`** — HUD title double colons (`"HP::"`), mixin config silently not loading in dev, bottom-anchor regression (cursor and reference-screen-height merged into the same value), and pocket-into-inventory mixin path that turned out unreliable — all addressed in one omnibus cleanup, replaced with the favorites-tab auto-jump pivot.
 
 ### Unverified — needs in-game testing
 
@@ -240,8 +299,8 @@ Plots system (D1–D5, all need real testing):
 
 Storm shelter sign (post-`6866ebc`):
 
-- [ ] **Wall placement**: place the sign on a wall (4 facings). Should mount flush, no longer a floor plaque.
-- [ ] **Multi-roamer convergence**: with the looser AI (range 48, no claim check, path tolerance 2), a designated bathroom sign in a large building should attract MULTIPLE roamers from the lobby during a storm — not just one.
+- [x] **Wall placement**: place the sign on a wall (4 facings). Should mount flush, no longer a floor plaque.
+- [x] **Multi-roamer convergence**: with the looser AI (range 48, no claim check, path tolerance 2), a designated bathroom sign in a large building should attract MULTIPLE roamers from the lobby during a storm — not just one.
 
 Section B (still unverified end-to-end):
 
