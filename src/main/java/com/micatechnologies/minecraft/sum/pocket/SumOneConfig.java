@@ -235,11 +235,16 @@ public class SumOneConfig extends Config {
     @HUD(name = "Session Playtime", category = "HUDs", subcategory = "Counters")
     public PlaytimeHud playtimeHud = new PlaytimeHud();
 
-    // Five fixed custom-text slots. Each is independently positioned, scaled, and
+    // Ten fixed custom-text slots. Each is independently positioned, scaled, and
     // shown/hidden via OneConfig's standard HUD UI; the @Text option on each lets the
-    // user paint whatever string they want. A fixed-N pattern (rather than the upstream
-    // dynamic HudList) keeps the OneConfig wire-up simple without porting a custom
-    // option type.
+    // user paint whatever string they want — including %placeholder% tokens like
+    // %player%, %x%, %y%, %z%, %dim%, %biome%, %server%, %time%, %realtime%, %date%,
+    // %fps%, %direction%. See TextPlaceholders for the full catalog.
+    //
+    // A fixed-N pattern (rather than the upstream dynamic HudList) keeps the OneConfig
+    // wire-up simple — no custom option type for dynamic-sized lists. With placeholder
+    // substitution, ten slots cover ~all realistic use cases since one slot can render
+    // arbitrarily many live values.
 
     @HUD(name = "Custom Text 1", category = "HUDs", subcategory = "Custom Text")
     public CustomTextHud customText1 = new CustomTextHud();
@@ -256,6 +261,21 @@ public class SumOneConfig extends Config {
     @HUD(name = "Custom Text 5", category = "HUDs", subcategory = "Custom Text")
     public CustomTextHud customText5 = new CustomTextHud();
 
+    @HUD(name = "Custom Text 6", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText6 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 7", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText7 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 8", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText8 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 9", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText9 = new CustomTextHud();
+
+    @HUD(name = "Custom Text 10", category = "HUDs", subcategory = "Custom Text")
+    public CustomTextHud customText10 = new CustomTextHud();
+
     // === Migrated client preferences ===
     // Server-side configuration (roamer walkable blocks, roadrunner multipliers, world
     // border, etc.) intentionally stays in the Forge Configuration file because OneConfig
@@ -270,6 +290,23 @@ public class SumOneConfig extends Config {
      */
     @Switch(name = "Favorites Star Overlay", category = "Favorites")
     public boolean favoritesStarOverlay = true;
+
+    // === Server Config Viewer ===
+    // Read-only mirror of the server's sum.cfg state. The server pushes a snapshot on
+    // PlayerLoggedInEvent (see ServerConfigBridge); the client caches it in
+    // ServerConfigMirror; this button opens GuiServerConfigViewer to display it.
+    //
+    // Why a Button + GuiScreen instead of @Info fields: OneConfig's @Info text is
+    // resolved at compile time (annotation literal), so we can't surface dynamic
+    // server-side values through it. Custom GuiScreen avoids the limitation while
+    // keeping the entry point inside OneConfig where admins look first.
+
+    @Button(name = "Open Server Config Viewer", text = "Open",
+        category = "Server Config", subcategory = "Mirror")
+    public void openServerConfigViewer() {
+        net.minecraft.client.Minecraft.getMinecraft().displayGuiScreen(
+            new com.micatechnologies.minecraft.sum.serverconfig.GuiServerConfigViewer());
+    }
 
     // === HUD Presets ===
     // Two one-click systems: a "Style Preset" controls how each HUD looks (font scale,
