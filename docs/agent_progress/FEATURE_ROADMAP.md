@@ -1,6 +1,6 @@
 # SUM feature roadmap — bank/ATM kit + other server-utility ideas
 
-Status: **Sections A, B, C, Section D (D1–D6), and Section E (HUD / OneConfig integration) all complete as of 2026-05-20.** Shipped across the 2026-05-08 sprint, the 2026-05-17/18 HUD sprint, and the 2026-05-20 housekeeping pass: full Section C (C1–C9), full Section B (TR/ST/SV/BC/MX/JB), Section D core (D1–D6: data model, wand + admin commands, buy/sell, protection events, trust/transfer, plot-browser GUI with click-to-buy), Section E (E1–E7: OneConfig migration of the pocket HUD, 23 ported EvergreenHUD elements + TPS + 5 custom-text slots, 16 new HUDs covering vanilla gaps + SUM-specific data + a server-status snapshot bridge, 8 visual style presets + 17 layout presets with responsive row pitch and edge-flush positioning, and the favorites-tab auto-jump on creative inventory open) + the storm-shelter sign enhancements + `/sum help` paginated command + the OneConfig wrapper now bundled into SUM's jar (Task 14) + several playtest-driven bug fixes. D7 rental flow is the only remaining deferred polish. D8 (EconomyInc-plot migration) was dropped — Alex never used EconomyInc plots, so there's nothing to migrate.
+Status: **Sections A, B, C, Section D (D1–D6), and Section E (HUD / OneConfig integration) all complete as of 2026-05-20.** Shipped across the 2026-05-08 sprint, the 2026-05-17/18 HUD sprint, and the 2026-05-20 housekeeping pass: full Section C (C1–C9), full Section B (TR/ST/SV/BC/MX/JB), Section D core (D1–D6: data model, wand + admin commands, buy/sell, protection events, trust/transfer, plot-browser GUI with click-to-buy), Section E (E1–E7: OneConfig migration of the pocket HUD, 23 ported EvergreenHUD elements + TPS + 5 custom-text slots, 16 new HUDs covering vanilla gaps + SUM-specific data + a server-status snapshot bridge, 8 visual style presets + 17 layout presets with responsive row pitch and edge-flush positioning, and the favorites-tab auto-jump on creative inventory open) + the storm-shelter sign enhancements + `/sum help` paginated command + the OneConfig wrapper now bundled into SUM's jar (Task 14) + several playtest-driven bug fixes. **All planned code is shipped.** D7 (rental flow) and D8 (EconomyInc-plot migration) were both dropped — neither matched a real need.
 
 ---
 
@@ -8,7 +8,7 @@ Status: **Sections A, B, C, Section D (D1–D6), and Section E (HUD / OneConfig 
 
 Paste this verbatim to a future Claude Code session to pick up where we left off:
 
-> I'm picking up the SUM mod after Sections A–E all shipped. **As of HEAD `f1dc77c` (2026-05-18): Sections A, B, C, Section D core (D1–D5), and Section E (full HUD / OneConfig integration) are all complete and functional.** The mod has every headline feature planned plus a complete HUD system: bank/ATM kit, full SUM-native economy that can replace EconomyInc, six server-utility blocks/items (TR/ST/SV/BC/MX/JB), a working land-claim plots system with protection, and a OneConfig-backed HUD with ~30 elements, 8 style presets, 17 layout presets including the modpack-default "Explorer 2 (SUM)", and a favorites preview HUD that doubles as a keybind reminder. Deferred items: D6 plot-browser GUI, D7 rental flow. (D8 EconomyInc-plot migration was dropped — never used upstream.) **The 2026-05-17/18 HUD sprint is essentially feature-complete; only minor visual tweaks remain.**
+> I'm picking up the SUM mod after Sections A–E all shipped. **As of the 2026-05-20 housekeeping pass: Sections A, B, C, Section D (D1–D6), and Section E (full HUD / OneConfig integration) are all complete and functional.** The mod has every headline feature planned plus a complete HUD system: bank/ATM kit, full SUM-native economy that can replace EconomyInc, six server-utility blocks/items (TR/ST/SV/BC/MX/JB), a working land-claim plots system with protection + plot browser GUI, and a OneConfig-backed HUD with ~30 elements + custom-text placeholders, 8 style presets, 17 layout presets including the modpack-default "Explorer 2 (SUM)", a favorites preview HUD, and a read-only server-config mirror viewer. **All planned code is shipped.** D7 (rental flow) and D8 (EconomyInc-plot migration) were both dropped — neither matched a real need. What remains is in-game playtest of the plot system + a couple of MERGE_MASTER_PLAN items that block on dedicated-server / modpack-side work.
 >
 > Working directory is `E:\gitRepos\uia-server-utility-mod`. 1.12.2 Forge, mod ID `sum`, package `com.micatechnologies.minecraft.sum`. Build with `JAVA_HOME="C:/Users/<username>/.jdks/azul-17.0.18" ./gradlew build`.
 >
@@ -116,7 +116,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 > - **Plot pricing: flat dollar.** Per-block formulas are a polish.
 > - **Plot Y bounds: full column** by default (y=0..255). Custom 3D claims supported by direct construction but the wand UX is full-column.
 > - **Plot wand gesture: sneak+right-click for corner A, right-click for corner B** — left-click was tried and abandoned due to a 1.12.2 client-cancel-suppresses-server-packet bug.
-> - **Section D6/D7 deferred.** Plots system is functional via chat; only pursue these if Alex green-lights. (D8 EconomyInc-plot migration was dropped — never used upstream.)
+> - **Section D6 shipped; D7/D8 dropped.** Plots system is fully built — chat commands, plot wand, protection events, and the `/sum plots gui` browser. D7 rental flow was dropped (no real need); D8 EconomyInc-plot migration was dropped (never used upstream).
 > - **Bills coexistence:** when EconomyInc is loaded, ATM produces EconomyInc bills (compat); deposits accept both. When EconomyInc is absent, SUM owns everything.
 > - **Storm-shelter sign behavior: signed shelters preferred for already-indoor roamers** within 48h/6v range, with a path-stays-inside check (tolerates 2 consecutive sky-exposed nodes for doorways/skylights). No claim limit on signed shelters — designed to attract a crowd.
 > - **HUD: OneConfig-backed, not bespoke.** All HUD persistence, drag-to-reposition UX, and per-HUD knobs go through OneConfig. Don't reinvent the storage / editor.
@@ -187,7 +187,7 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | MX | Mailbox + postal system | M | ✅ shipped | `2c7d263` |
 | JB | Job board (bulletin-board block for player-listed jobs) | L | ✅ shipped | `5fca248` |
 
-### Section D — Plots system (D1–D6 shipped; D7 deferred; D8 dropped)
+### Section D — Plots system (D1–D6 shipped; D7 and D8 dropped)
 
 | Phase | Goal | Status | Commit |
 |---|---|---|---|
@@ -196,10 +196,9 @@ Paste this verbatim to a future Claude Code session to pick up where we left off
 | D3 | `/sum plots buy/sell` — currency via `EconomyBridge` | ✅ shipped | `20d6e16` |
 | D4 | `PlotsProtectionHandler` events: BlockBreak/Place/LivingDestroyBlock/ExplosionDetonate | ✅ shipped | `fdf6393` |
 | D5 | `/sum plots trust/untrust/transfer` permissions | ✅ shipped | `5bd9474` |
-| D6 | Plot-browser GUI (`/sum plots gui`) | ✅ shipped | (this session) |
-| D7 | Optional rental flow + auto-balance-deduction | ☐ deferred | — |
+| D6 | Plot-browser GUI (`/sum plots gui`) | ✅ shipped | `cf241e5` |
 
-D8 (EconomyInc plots migration command) was dropped: Alex never used EconomyInc plots, so there's nothing to migrate.
+D7 (rental flow) and D8 (EconomyInc plots migration) were both dropped: D7 had no real need (chat-driven plot management is sufficient), and Alex never used EconomyInc plots so D8 had nothing to migrate.
 
 **Roamer / storm-shelter enhancements** — landed alongside Section D, not strictly part of it:
 
@@ -764,7 +763,7 @@ Resolved 2026-05-07 via the AskUserQuestion interface:
 
 ---
 
-## Section D — Plots system (D1–D6 SHIPPED; D7 deferred; D8 dropped)
+## Section D — Plots system (D1–D6 SHIPPED; D7 and D8 dropped)
 
 Status: **Core plots system is shipped and live in code as of 2026-05-08.** The D1–D5 commits implement: data model + per-dimension persistence (`c930136`), wand + admin commands (`db55bf6`, with corner-A fix in `25e1bf8`), buy/sell (`20d6e16`), protection events (`fdf6393`), and trust/transfer (`5bd9474`). What follows is the **original research spec** kept for reference; it largely matches what shipped, but design decisions made during implementation are noted inline.
 
@@ -875,9 +874,8 @@ C1 is shipped (✅), so the currency dependency is already satisfied — Section
 | D4 | Protection: BreakEvent/PlaceEvent/InteractEvent listeners + chunk index. | M | D1 |
 | D5 | `/sum plots trust/untrust/transfer` permissions + non-owner trusted-builder support. | S | D4 |
 | D6 | Plot browser GUI (`/sum plots gui`). | M | D3 |
-| D7 | Optional rental flow + auto-balance-deduction. | M | D5 |
 
-**Total effort for D1–D6**: ~5 days. **D7** adds ~1 day. D8 (EconomyInc plots migration) was dropped — Alex never used EconomyInc plots upstream.
+**Total effort for D1–D6**: ~5 days. D7 (rental flow) was dropped (no real need); D8 (EconomyInc plots migration) was dropped (Alex never used EconomyInc plots upstream).
 
 ### Open questions for Section D
 
@@ -963,7 +961,7 @@ This session shipped the rest of Sections C, B, and the core of D. Phase log in 
 ## Where things stand
 
 - **All four roadmap sections shipped** for everything that was originally planned. SUM is a feature-complete server-utility + economy mod.
-- **D6 plot-browser GUI shipped** in the 2026-05-20 pass; **D7 rental flow** is the only remaining deferred polish. (D8 EconomyInc-plot migration was dropped — never used upstream.)
+- **D6 plot-browser GUI shipped** in the 2026-05-20 pass. **D7 (rental flow) and D8 (EconomyInc-plot migration) were both dropped** — neither matched a real need.
 - **Most surface still needs in-game testing**. Verified-in-playtest items are listed in the "Testing status" section. Untested items are flagged with `[ ]`. Highest-priority untested: C1 standalone path (without EconomyInc loaded), `/sum help` pages, plot system end-to-end, storm-shelter sign multi-roamer convergence post-`6866ebc`.
 - **Working directory is clean at `6866ebc`**.
 
@@ -972,9 +970,8 @@ This session shipped the rest of Sections C, B, and the core of D. Phase log in 
 Roughly in priority order:
 
 1. **Playtest the remaining unverified items.** Anything with `[ ]` in the Testing status checklist. Bug-fix commits from playtest reports are the highest-leverage work. The D6 plot-browser GUI in particular hasn't been in-game tested yet — `/sum plots gui` should open a `GuiPlotBrowser` listing FOR_SALE plots in the current dim with a working Buy button per row.
-2. **D7 rental flow** (optional): time-bounded ownership with auto-balance-deduction. ~M effort. Niche — only if a server actually needs it.
-3. **Polish passes**: real art for any of the placeholder textures; in-GUI passcode entry for vault doors; postal-worker Roamer role for MX; cash-register decorative block; etc.
+2. **Polish passes**: real art for any of the placeholder textures; in-GUI passcode entry for vault doors; postal-worker Roamer role for MX; cash-register decorative block; etc.
 
-(D8 EconomyInc-plots migration was on the original roadmap but dropped — Alex never used EconomyInc plots, so there's nothing to migrate.)
+(D7 rental flow and D8 EconomyInc-plots migration were on the original roadmap but both dropped — D7 has no real need, and Alex never used EconomyInc plots upstream so D8 has nothing to migrate.)
 
 Section A through D core is done. The mod doesn't need anything else to be useful — what's left is polish.
