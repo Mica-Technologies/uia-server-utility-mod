@@ -39,6 +39,35 @@ if (project.hasProperty('usesMixins') && usesMixins.toBoolean()) {
     }
 }
 
+// OneConfig bootstrap manifest entries for the published jar.
+//
+// The OneConfig wrapper jar is embedded into SUM's jar via `embed` in
+// dependencies.gradle, so the wrapper's tweaker class
+// (cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker) ends up inside
+// SUM's META-INF/.../ classpath at runtime. For FML / LaunchWrapper to actually
+// invoke that tweaker on production launches, SUM's MANIFEST.MF needs to declare
+// it via TweakClass + TweakOrder. The wrapper's own jar manifest is empty
+// (it's designed to be embedded into a host mod), so without this block end
+// users would install SUM and nothing would bootstrap OneConfig.
+//
+// In dev launches the SUM jar isn't on the classpath (we run from build outputs),
+// so this manifest entry is ignored there — dev wiring continues via
+// minecraft.extraTweakClasses below.
+//
+// ForceLoadAsMod is already set to true by the GTNH buildscript's
+// getManifestAttributes() (since containsMixinsAndOrCoreModOnly=false), so we
+// don't re-set it here.
+afterEvaluate {
+    tasks.named('jar').configure {
+        manifest {
+            attributes(
+                    'TweakClass': 'cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker',
+                    'TweakOrder': '0'
+            )
+        }
+    }
+}
+
 // ARM macOS (Apple Silicon) support for runClient17/runClient21:
 // MC 1.12.2 bundles JNA 4.4.0 and java-objc-bridge 1.0.0, both x86_64-only.
 // Override with arm64-compatible versions via java17PatchDependencies
