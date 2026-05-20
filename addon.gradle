@@ -57,13 +57,27 @@ if (project.hasProperty('usesMixins') && usesMixins.toBoolean()) {
 // ForceLoadAsMod is already set to true by the GTNH buildscript's
 // getManifestAttributes() (since containsMixinsAndOrCoreModOnly=false), so we
 // don't re-set it here.
-afterEvaluate {
-    tasks.named('jar').configure {
-        manifest {
-            attributes(
-                    'TweakClass': 'cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker',
-                    'TweakOrder': '0'
-            )
+// Only apply the TweakClass MANIFEST entries when building a publishable jar — NOT when
+// the dev run tasks are in the task graph. In a dev launch the SUM jar lives on the run
+// classpath, so any tweaker declared in its MANIFEST is read by GradleStart and added as
+// a "cascading tweaker." Combined with the SumCoreMod FMLCorePlugin entry on the same jar,
+// this confuses FML's coremod scanner: FMLSanityChecker.injectData ends up calling
+// FMLDeobfuscatingRemapper.setup at a point where it crashes inside Guava's BiMap with
+// `RegularImmutableBiMap does not implement BiMap`. Dev runs already wire the tweaker
+// via `minecraft.extraTweakClasses` in this file, so they don't need the MANIFEST entry
+// at all. Published jars (./gradlew build, CI) still get it.
+boolean isDevRun = project.gradle.startParameter.taskNames.any {
+    it.contains('runClient') || it.contains('runServer')
+}
+if (!isDevRun) {
+    afterEvaluate {
+        tasks.named('jar').configure {
+            manifest {
+                attributes(
+                        'TweakClass': 'cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker',
+                        'TweakOrder': '0'
+                )
+            }
         }
     }
 }
