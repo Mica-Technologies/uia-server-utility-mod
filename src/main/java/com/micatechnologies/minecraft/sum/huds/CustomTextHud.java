@@ -5,14 +5,15 @@ import cc.polyfrost.oneconfig.hud.SingleTextHud;
 
 /**
  * User-defined text widget. Each instance owns one editable text field; the user types
- * whatever they want into the OneConfig UI and the HUD paints it. SUM registers five
- * of these so a player can run up to five custom strings on screen without us porting
- * EvergreenHUD's full dynamic HudList framework. Empty {@link #text} means the HUD
- * draws an empty line (effectively hidden).
+ * whatever they want into the OneConfig UI and the HUD paints it. The text supports
+ * {@code %placeholder%} tokens via {@link TextPlaceholders} so a single slot can render
+ * dynamic strings like {@code "%player% @ %x%, %z% (%biome%)"} without composing
+ * multiple HUDs. SUM registers ten of these so a player can run up to ten such strings
+ * on screen.
  *
  * <p>Modeled on EvergreenHUD's CustomTexts element — minus the "add more slots" UI,
  * which would require a custom OneConfig option type to surface dynamically-sized
- * lists.</p>
+ * lists. With placeholders, 10 fixed slots is plenty.</p>
  */
 public class CustomTextHud extends SingleTextHud {
 
@@ -30,8 +31,9 @@ public class CustomTextHud extends SingleTextHud {
     @Override
     protected String getText(boolean example) {
         if (example) {
-            return text == null || text.isEmpty() ? "Your custom text" : text;
+            String src = text == null || text.isEmpty() ? "Your custom text" : text;
+            return TextPlaceholders.applyExample(src);
         }
-        return text == null ? "" : text;
+        return TextPlaceholders.apply(text == null ? "" : text);
     }
 }

@@ -13,6 +13,7 @@ import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudFetchRequest;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudSync;
 import com.micatechnologies.minecraft.sum.plots.PacketOpenPlotBrowser;
 import com.micatechnologies.minecraft.sum.plots.PacketPlotAction;
+import com.micatechnologies.minecraft.sum.serverconfig.PacketSyncServerConfig;
 import com.micatechnologies.minecraft.sum.shop.PacketShopBuy;
 import com.micatechnologies.minecraft.sum.shop.PacketShopOwnerAction;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
@@ -70,6 +71,8 @@ public final class SumNetwork {
             PacketOpenPlotBrowser.class, 15, Side.CLIENT);
         CHANNEL.registerMessage(PacketPlotAction.Handler.class,
             PacketPlotAction.class, 16, Side.SERVER);
+        CHANNEL.registerMessage(PacketSyncServerConfig.Handler.class,
+            PacketSyncServerConfig.class, 17, Side.CLIENT);
         initialized = true;
     }
 }

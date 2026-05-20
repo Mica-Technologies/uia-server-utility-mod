@@ -378,12 +378,24 @@ public class SumConfig {
         return beachesInfiniteBucketWater;
     }
 
+    public static boolean isBeachesRealisticErosion() {
+        return beachesRealisticErosion;
+    }
+
+    public static Set<String> getBeachesAffectedBlockNames() {
+        return beachesAffectedBlockNames;
+    }
+
     public static boolean isBorderEnabled() {
         return borderEnabled;
     }
 
     public static BorderEntry getBorderForDim(int dimId) {
         return borderEntries.get(dimId);
+    }
+
+    public static Map<Integer, BorderEntry> getAllBorderEntries() {
+        return borderEntries;
     }
 
     private static Map<Integer, BorderEntry> parseBorderEntries(String[] entries) {
