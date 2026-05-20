@@ -62,22 +62,23 @@ dependencies {
     //     "stage1" loader at runtime via the wrapper. If this jar is on the runClient
     //     classpath, GradleStart's coremod scan reads the TweakClass entry, tells
     //     LaunchWrapper to load it, and the launch crashes with ClassNotFoundException.
-    //     End users get the real OneConfig binary via OneConfig-Bootstrap's stage0 loader;
+    //     End users get the real OneConfig binary via the wrapper's stage0 loader;
     //     they never see a "main API jar" on disk at all.
-    //   - oneconfig-wrapper-launchwrapper — the stage0 bootstrap jar that users install
-    //     as "OneConfig-Bootstrap". Contains cc.polyfrost.oneconfig.loader.stage0
-    //     .LaunchWrapperTweaker, which downloads the actual OneConfig binary into
-    //     ./OneConfig/Loader/ on first launch. devOnlyNonPublishable so it's on both the
-    //     compile classpath (harmless, no clashing types) and the dev runClient classpath.
-    //     The tweaker name is wired into the runClient launch args from addon.gradle via
-    //     minecraft.extraTweakClasses since the wrapper jar's own MANIFEST is empty —
-    //     users get the same wiring via OneConfig-Bootstrap's own MANIFEST.
+    //   - oneconfig-wrapper-launchwrapper — the stage0 bootstrap jar. Contains
+    //     cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker, which downloads the
+    //     actual OneConfig binary into ./OneConfig/Loader/ on first launch. EMBEDDED into
+    //     SUM's published jar so end users don't need to install OneConfig-Bootstrap as a
+    //     separate mod — installing SUM alone is enough. The `embed` configuration is
+    //     defined in build.gradle: it extends `implementation` (so the wrapper is on both
+    //     the compile and dev runtime classpaths) AND its contents are zip-tree-unpacked
+    //     into the SUM jar at jar-task time. The TweakClass / TweakOrder MANIFEST entries
+    //     that point FML at this tweaker are added to SUM's jar manifest in addon.gradle.
+    //     The wrapper jar's own MANIFEST is empty, so in dev we additionally inject the
+    //     tweaker name into runClient/runServer launch args via `minecraft.extraTweakClasses`
+    //     in addon.gradle (dev loads SUM from build outputs, not the packed jar, so SUM's
+    //     manifest TweakClass entry only kicks in for production installs).
     //   - kotlin-stdlib / universalcraft — transitive deps of OneConfig pulled in by the
     //     compileOnly resolution.
-    //
-    // Bundling the wrapper into the published SUM jar (so end users don't also need
-    // OneConfig-Bootstrap installed separately) is task 14 — deferred; the UIA modpack
-    // already ships OneConfig-Bootstrap via EvergreenHUD.
     compileOnly 'cc.polyfrost:oneconfig-1.12.2-forge:0.2.2-alpha+'
-    devOnlyNonPublishable 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
+    embed 'cc.polyfrost:oneconfig-wrapper-launchwrapper:1.0.0-beta+'
 }

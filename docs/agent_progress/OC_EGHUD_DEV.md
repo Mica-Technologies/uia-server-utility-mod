@@ -58,7 +58,7 @@ The goal of this integration pass is to **replace the bespoke client systems wit
 | 13 | Add OneConfig launchwrapper bootstrap to dev runtime classpath | ⚠️ landed but still failing | `9757cea` |
 | 13b | Fix OneConfig runClient: gate main jar from runtime classpath + inject tweaker via `extraTweakClasses` | ✅ landed (this session) | (uncommitted at time of writing) |
 | 13c | CSM Ivy/GitHub-Releases dep (replaces sibling-checkout + CI `gh release download`) | ✅ landed (this session) | (uncommitted at time of writing) |
-| 14 | Bundle OneConfig wrapper into SUM jar (embed + manifest TweakClass entry) | ⏳ deferred | — |
+| 14 | Bundle OneConfig wrapper into SUM jar (embed + manifest TweakClass entry) | ✅ landed | (this commit) |
 | 15 | Full HudList dynamic custom-text scaffolding | ⏳ deferred | — |
 | 16 | Server-config bridge (read-only OneConfig mirror of server settings) | ⏳ deferred | — |
 
@@ -226,15 +226,7 @@ Stage0 logs `Not able to determine current file. Mod will NOT work` twice during
 
 ### Deferred (in priority order)
 
-- [ ] **Task 14 — Bundle the OneConfig bootstrap inside SUM's published jar** (`embed` + merge `TweakClass` / `TweakOrder` / `ForceLoadAsMod` manifest entries into SUM's `META-INF/MANIFEST.MF`). Goal: a user installing SUM alone, without separately installing OneConfig-Bootstrap, gets OneConfig features. EvergreenHUD does this; copying their pattern is the obvious approach.
-
-  RFG's path: extend `getManifestAttributes()` in `build.gradle` to add:
-  ```groovy
-  attributes['TweakClass'] = 'cc.polyfrost.oneconfig.internal.plugin.asm.OneConfigTweaker'
-  attributes['TweakOrder'] = '0'
-  attributes['ForceLoadAsMod'] = 'true'
-  ```
-  …and switch the wrapper from `runtimeOnlyNonPublishable` to `embed` so its classes ship in the SUM jar. Test that LaunchWrapper picks up the tweaker via SUM's manifest when OneConfig-Bootstrap isn't installed separately.
+- [x] **Task 14 — Bundle the OneConfig bootstrap inside SUM's published jar.** ✅ Shipped. `oneconfig-wrapper-launchwrapper` switched from `devOnlyNonPublishable` to `embed` in `dependencies.gradle`, so the wrapper classes (LaunchWrapperTweaker + OneConfigWrapperBase + SSLStore + ssl/polyfrost.der) are unpacked into SUM's published jar via the `embed` configuration's `zipTree` mechanism. `addon.gradle` appends `TweakClass: cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker` and `TweakOrder: 0` to SUM's `META-INF/MANIFEST.MF` via an `afterEvaluate` jar-task config block — same pattern already used for the `MixinConfigs` attribute. `ForceLoadAsMod=true` is already set by the GTNH buildscript's `getManifestAttributes()` (since `containsMixinsAndOrCoreModOnly=false`), so it's not re-set. `extraTweakClasses` in addon.gradle continues to handle dev launches (which load SUM from build outputs, not the packed jar, so the manifest entry is ignored in dev). End users installing SUM alone now get OneConfig auto-bootstrapped without a separate OneConfig-Bootstrap install. **Important nit:** the doc's earlier sketch referenced `cc.polyfrost.oneconfig.internal.plugin.asm.OneConfigTweaker` as the TweakClass, but that class lives in the main OneConfig jar (which the wrapper downloads at runtime, not present at build time). The class actually shipping inside SUM after embedding is `LaunchWrapperTweaker`, so that's what the manifest now declares.
 
 - [ ] **Task 15 — Full HudList dynamic custom-text scaffolding.** Replace the five fixed `CustomTextHud` slots with EvergreenHUD's "add as many as you want" UI. Requires porting their `HudList` framework + a custom OneConfig option type for dynamic-sized lists. Five slots covers ~all realistic UIA use cases so this is low priority.
 
