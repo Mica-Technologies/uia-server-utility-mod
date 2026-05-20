@@ -11,6 +11,8 @@ import com.micatechnologies.minecraft.sum.pocket.PacketSyncPocket;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudAction;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudFetchRequest;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudSync;
+import com.micatechnologies.minecraft.sum.plots.PacketOpenPlotBrowser;
+import com.micatechnologies.minecraft.sum.plots.PacketPlotAction;
 import com.micatechnologies.minecraft.sum.shop.PacketShopBuy;
 import com.micatechnologies.minecraft.sum.shop.PacketShopOwnerAction;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
@@ -64,6 +66,10 @@ public final class SumNetwork {
             PacketOpenPocketGui.class, 13, Side.SERVER);
         CHANNEL.registerMessage(PacketSyncPlayerStatus.Handler.class,
             PacketSyncPlayerStatus.class, 14, Side.CLIENT);
+        CHANNEL.registerMessage(PacketOpenPlotBrowser.Handler.class,
+            PacketOpenPlotBrowser.class, 15, Side.CLIENT);
+        CHANNEL.registerMessage(PacketPlotAction.Handler.class,
+            PacketPlotAction.class, 16, Side.SERVER);
         initialized = true;
     }
 }

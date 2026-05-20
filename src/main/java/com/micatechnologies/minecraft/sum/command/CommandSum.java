@@ -953,7 +953,7 @@ public class CommandSum extends CommandBase {
     private void handlePlots(ICommandSender sender, String[] args) {
         if (args.length < 2) {
             sendMessage(sender, TextFormatting.RED,
-                "Usage: /sum plots <create|delete|list|info|buy|sell|trust|untrust|transfer>");
+                "Usage: /sum plots <create|delete|list|info|buy|sell|trust|untrust|transfer|gui>");
             return;
         }
         String action = args[1].toLowerCase();
@@ -987,10 +987,33 @@ public class CommandSum extends CommandBase {
             case "transfer":
                 handlePlotsTransfer(sender, args);
                 break;
+            case "gui":
+            case "browse":
+                handlePlotsGui(sender);
+                break;
             default:
                 sendMessage(sender, TextFormatting.RED, "Unknown plots action.");
                 break;
         }
+    }
+
+    private void handlePlotsGui(ICommandSender sender) {
+        if (!(sender instanceof EntityPlayerMP)) {
+            sendMessage(sender, TextFormatting.RED, "Only players can open the plot browser.");
+            return;
+        }
+        EntityPlayerMP player = (EntityPlayerMP) sender;
+        SumPlotsWorldSavedData data = SumPlotsWorldSavedData.get(player.world);
+        java.util.List<com.micatechnologies.minecraft.sum.plots.PlotSnapshot> snapshots =
+            new java.util.ArrayList<>();
+        for (SumPlot p : data.getPlotsForSale()) {
+            if (p.getDimensionId() == player.dimension) {
+                snapshots.add(com.micatechnologies.minecraft.sum.plots.PlotSnapshot.from(p));
+            }
+        }
+        com.micatechnologies.minecraft.sum.atm.SumNetwork.CHANNEL.sendTo(
+            new com.micatechnologies.minecraft.sum.plots.PacketOpenPlotBrowser(snapshots),
+            player);
     }
 
     private void handlePlotsCreate(ICommandSender sender, String[] args) {
@@ -1380,6 +1403,7 @@ public class CommandSum extends CommandBase {
             h("/sum plots list [near]", "List plots in this dimension; 'near' filters to ~64 blocks of you."),
             h("/sum plots info <id>", "Show name, owner, status, corners, volume, price, trust count."),
             h("/sum plots buy <id>", "Buy a FOR_SALE plot in this dimension; deducts the listed price."),
+            h("/sum plots gui", "Open the plot browser: scroll FOR_SALE plots in this dimension and click Buy."),
             h("/sum plots sell <id> <price>", "Re-list your owned plot at a chosen price (FOR_SALE again)."),
             h("/sum plots trust <id> <player>", "Owner adds a trusted builder (bypasses your protection)."),
             h("/sum plots untrust <id> <player>", "Remove a trusted builder."),
@@ -1482,6 +1506,10 @@ public class CommandSum extends CommandBase {
         }
         if (args.length == 2 && "vault".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, "unlock", "setcode", "info", "disown");
+        }
+        if (args.length == 2 && "plots".equalsIgnoreCase(args[0])) {
+            return getListOfStringsMatchingLastWord(args,
+                "create", "delete", "list", "info", "buy", "sell", "trust", "untrust", "transfer", "gui");
         }
         if (args.length == 2 && "rmroamerblock".equalsIgnoreCase(args[0])) {
             return getListOfStringsMatchingLastWord(args, SumConfig.getRoamerWalkableBlocks());
