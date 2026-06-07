@@ -8,6 +8,7 @@ import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.huds.HudStateTracker;
+import com.micatechnologies.minecraft.sum.music.NowPlayingTracker;
 import com.micatechnologies.minecraft.sum.pocket.PocketKeybinds;
 import com.micatechnologies.minecraft.sum.pocket.SumOneConfig;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
@@ -46,6 +47,9 @@ public class SumClientProxy implements SumProxy {
         // need a real event subscriber to keep their counters fresh — HUD modules are
         // managed by OneConfig and can't subscribe to events themselves.
         MinecraftForge.EVENT_BUS.register(new HudStateTracker());
+        // Feeds the Now Playing HUD — captures music/record sounds via PlaySoundEvent and
+        // polls SoundHandler to notice when they finish (no stop event exists).
+        MinecraftForge.EVENT_BUS.register(new NowPlayingTracker());
         PocketKeybinds.register();
         MinecraftForge.EVENT_BUS.register(new PocketKeybinds());
     }
