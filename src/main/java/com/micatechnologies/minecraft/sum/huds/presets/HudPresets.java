@@ -121,6 +121,27 @@ public final class HudPresets {
             false, new OneColor(255, 255, 255))
     };
 
+    /** Index of {@code name} in {@link #STYLE_NAMES}, or 0 (Default) if missing.
+     *  Lets callers pin a default preset by name instead of a brittle index literal. */
+    public static int styleIndexOf(String name) {
+        for (int i = 0; i < STYLE_NAMES.length; i++) {
+            if (STYLE_NAMES[i].equals(name)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /** Index of {@code name} in {@link #LAYOUT_NAMES}, or 0 (Off) if missing. */
+    public static int layoutIndexOf(String name) {
+        for (int i = 0; i < LAYOUT_NAMES.length; i++) {
+            if (LAYOUT_NAMES[i].equals(name)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
     // -----------------------------------------------------------------------------
     // Layouts
     // -----------------------------------------------------------------------------
