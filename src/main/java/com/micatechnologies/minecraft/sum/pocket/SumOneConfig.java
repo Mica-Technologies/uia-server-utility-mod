@@ -6,6 +6,7 @@ import cc.polyfrost.oneconfig.config.annotations.Dropdown;
 import cc.polyfrost.oneconfig.config.annotations.HUD;
 import cc.polyfrost.oneconfig.config.annotations.Number;
 import cc.polyfrost.oneconfig.config.annotations.Switch;
+import cc.polyfrost.oneconfig.config.core.ConfigUtils;
 import cc.polyfrost.oneconfig.config.data.Mod;
 import cc.polyfrost.oneconfig.config.data.ModType;
 import com.google.gson.GsonBuilder;
@@ -362,12 +363,17 @@ public class SumOneConfig extends Config {
     // static initialiser asserts the lengths match; the per-string ordering you have
     // to keep aligned by hand.
 
+    // The Alto modpack ships SUM with "Realistic Game HUD" style + "Explorer 2 (SUM)"
+    // layout as the out-of-box experience; both presets are auto-applied once on a
+    // true first boot (no saved sum.json) by the constructor below. Defaults are
+    // resolved by preset NAME so reordering the catalogs can't silently repoint them.
+
     @Dropdown(name = "Style Preset", category = "Presets", subcategory = "Style",
         options = {
             "Default", "Minimal Brackets", "Clean Professional", "Stylish Glass",
             "Compact Light", "Retro Terminal", "Realistic Game HUD", "High Contrast"
         })
-    public int stylePresetIndex = 0;
+    public int stylePresetIndex = HudPresets.styleIndexOf("Realistic Game HUD");
 
     @Button(name = "Apply Style", text = "Apply", category = "Presets",
         subcategory = "Style")
@@ -382,7 +388,7 @@ public class SumOneConfig extends Config {
             "Minimal Top", "Server Op", "Urban Builder", "City Explorer", "Architect",
             "Cityscape Photographer", "Explorer 2 (SUM)", "Combat Pro"
         })
-    public int layoutPresetIndex = 0;
+    public int layoutPresetIndex = HudPresets.layoutIndexOf("Explorer 2 (SUM)");
 
     @Button(name = "Apply Layout", text = "Apply", category = "Presets",
         subcategory = "Layout")
@@ -393,10 +399,23 @@ public class SumOneConfig extends Config {
     public SumOneConfig() {
         super(new Mod("Server Utility Mod", ModType.UTIL_QOL), "sum.json");
         INSTANCE = this;
+        // First-boot detection MUST happen before initialize(): when no saved config
+        // exists, initialize() immediately save()s one, so the file's absence is only
+        // observable here. ConfigUtils.getProfileFile is the same resolver initialize()
+        // uses internally, so the two can't disagree about the path.
+        boolean firstBoot = !ConfigUtils.getProfileFile(configFile).exists();
         // OneConfig's Config base does NOT auto-initialize; without this call, the @HUD
         // fields below are never scanned, the mod card never appears in the OneConfig
         // GUI, and the HUD editor has nothing to drag. See Config#preload() docs.
         initialize();
+        if (firstBoot) {
+            // Fresh install: apply the modpack-standard presets (see the Presets section
+            // above) so players boot into the Alto default HUD without touching the GUI.
+            // Both calls save(); existing installs never reach here, so user-customized
+            // layouts/styles are never clobbered by an update.
+            HudPresets.applyStyle(stylePresetIndex, this);
+            HudPresets.applyLayout(layoutPresetIndex, this);
+        }
     }
 
     /**
