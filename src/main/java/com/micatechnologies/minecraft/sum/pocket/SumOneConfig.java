@@ -4,6 +4,7 @@ import cc.polyfrost.oneconfig.config.Config;
 import cc.polyfrost.oneconfig.config.annotations.Button;
 import cc.polyfrost.oneconfig.config.annotations.Dropdown;
 import cc.polyfrost.oneconfig.config.annotations.HUD;
+import cc.polyfrost.oneconfig.config.annotations.Number;
 import cc.polyfrost.oneconfig.config.annotations.Switch;
 import cc.polyfrost.oneconfig.config.data.Mod;
 import cc.polyfrost.oneconfig.config.data.ModType;
@@ -35,6 +36,7 @@ import com.micatechnologies.minecraft.sum.huds.LookingAtBlockHud;
 import com.micatechnologies.minecraft.sum.huds.LoyaltyHud;
 import com.micatechnologies.minecraft.sum.huds.MemoryHud;
 import com.micatechnologies.minecraft.sum.huds.NearestRoamerHud;
+import com.micatechnologies.minecraft.sum.huds.NowPlayingHud;
 import com.micatechnologies.minecraft.sum.huds.PhoneNumberHud;
 import com.micatechnologies.minecraft.sum.huds.PingHud;
 import com.micatechnologies.minecraft.sum.huds.PitchHud;
@@ -122,6 +124,9 @@ public class SumOneConfig extends Config {
 
     @HUD(name = "Resource Pack", category = "HUDs", subcategory = "Information")
     public ResourcePackHud resourcePackHud = new ResourcePackHud();
+
+    @HUD(name = "Now Playing", category = "HUDs", subcategory = "Information")
+    public NowPlayingHud nowPlayingHud = new NowPlayingHud();
 
     @HUD(name = "Game Mode", category = "HUDs", subcategory = "Information")
     public GameModeHud gameModeHud = new GameModeHud();
@@ -290,6 +295,42 @@ public class SumOneConfig extends Config {
      */
     @Switch(name = "Favorites Star Overlay", category = "Favorites")
     public boolean favoritesStarOverlay = true;
+
+    // === Music ===
+    // Knobs for MixinMusicTickerMusicType (client mixin on MusicTicker$MusicType). Vanilla
+    // waits 10-20 MINUTES between survival music tracks — with the Alto pack's 21-track
+    // in-game soundtrack most songs would effectively never play. Values are seconds;
+    // MusicDelays converts to ticks. Defaults mirror vanilla, so flipping the switch on
+    // changes nothing until a delay is actually edited. Music is pure client state, so
+    // these belong here rather than in the server's Forge config.
+
+    @Switch(name = "Custom Music Delays", category = "Music", subcategory = "Delays",
+        description = "Override how long Minecraft waits between background music tracks.")
+    public boolean musicDelaysEnabled = false;
+
+    @Number(name = "In-Game Min Delay (Seconds)", min = 0, max = 3600, step = 5,
+        category = "Music", subcategory = "Delays")
+    public int gameMusicMinDelaySeconds = 600;
+
+    @Number(name = "In-Game Max Delay (Seconds)", min = 0, max = 3600, step = 5,
+        category = "Music", subcategory = "Delays")
+    public int gameMusicMaxDelaySeconds = 1200;
+
+    @Number(name = "Creative Min Delay (Seconds)", min = 0, max = 3600, step = 5,
+        category = "Music", subcategory = "Delays")
+    public int creativeMusicMinDelaySeconds = 60;
+
+    @Number(name = "Creative Max Delay (Seconds)", min = 0, max = 3600, step = 5,
+        category = "Music", subcategory = "Delays")
+    public int creativeMusicMaxDelaySeconds = 180;
+
+    @Number(name = "Menu Min Delay (Seconds)", min = 0, max = 3600, step = 5,
+        category = "Music", subcategory = "Delays")
+    public int menuMusicMinDelaySeconds = 1;
+
+    @Number(name = "Menu Max Delay (Seconds)", min = 0, max = 3600, step = 5,
+        category = "Music", subcategory = "Delays")
+    public int menuMusicMaxDelaySeconds = 30;
 
     // === Server Config Viewer ===
     // Read-only mirror of the server's sum.cfg state. The server pushes a snapshot on

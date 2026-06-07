@@ -200,7 +200,7 @@ public final class HudPresets {
         HudLayout.builder("Explorer")
             .place("coordsHud", 960f, 1f)
             .column(0f, 1077f, Direction.UP,
-                "dayCounterHud", "timeHud", "directionHud", "speedHud")
+                "dayCounterHud", "timeHud", "directionHud", "speedHud", "nowPlayingHud")
             .column(1920f, 1077f, Direction.UP,
                 "fpsHud", "ftiHud", "tpsHud", "memoryHud", "playtimeHud")
             .build(),
@@ -256,7 +256,7 @@ public final class HudPresets {
                 "biomeHud", "timeHud", "dayCounterHud")
             .column(1920f, 1077f, Direction.UP,
                 "loyaltyHud", "jobsHud", "playtimeHud",
-                "serverIpHud", "borderDistanceHud")
+                "serverIpHud", "borderDistanceHud", "nowPlayingHud")
             .build(),
 
         // Architect — precision-build mode. Detailed coords + height limit + block-above
@@ -290,7 +290,7 @@ public final class HudPresets {
                 "walletHud", "bankBalanceHud", "phoneNumberHud", "pocketTextHud",
                 "jobsHud", "loyaltyHud", "pocketHud")
             .column(0f, 1077f, Direction.UP,
-                "dayCounterHud", "timeHud", "biomeHud", "speedHud")
+                "dayCounterHud", "timeHud", "biomeHud", "speedHud", "nowPlayingHud")
             .column(1920f, 1077f, Direction.UP,
                 "fpsHud", "ftiHud", "tpsHud", "memoryHud", "pingHud", "playtimeHud")
             .build(),
