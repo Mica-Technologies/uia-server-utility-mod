@@ -33,6 +33,7 @@ public class PhoneCloudAction implements IMessage {
     public static final byte ACTION_REMOVE_CONTACT = 2;
     public static final byte ACTION_MARK_READ      = 3;
     public static final byte ACTION_UPDATE_NOTES   = 4;
+    public static final byte ACTION_SEND_MONEY     = 5;
 
     public static final long SEND_COOLDOWN_MS = 5_000L;
 
@@ -43,6 +44,7 @@ public class PhoneCloudAction implements IMessage {
     private String text;        // payload for SEND_MESSAGE
     private String playerName;  // payload for ADD_CONTACT
     private List<String> notes; // payload for UPDATE_NOTES
+    private double amount;      // payload for SEND_MONEY
 
     public PhoneCloudAction() {}
 
@@ -87,6 +89,15 @@ public class PhoneCloudAction implements IMessage {
         return a;
     }
 
+    /** Build a SEND_MONEY transfer to another player (both must be online). */
+    public static PhoneCloudAction sendMoney(UUID target, double amount) {
+        PhoneCloudAction a = new PhoneCloudAction();
+        a.action = ACTION_SEND_MONEY;
+        a.targetUuid = target;
+        a.amount = amount;
+        return a;
+    }
+
     @Override
     public void fromBytes(ByteBuf buf) {
         this.action = buf.readByte();
@@ -101,6 +112,10 @@ public class PhoneCloudAction implements IMessage {
             case ACTION_REMOVE_CONTACT:
             case ACTION_MARK_READ:
                 this.targetUuid = new UUID(buf.readLong(), buf.readLong());
+                break;
+            case ACTION_SEND_MONEY:
+                this.targetUuid = new UUID(buf.readLong(), buf.readLong());
+                this.amount = buf.readDouble();
                 break;
             case ACTION_UPDATE_NOTES: {
                 int count = Math.min(buf.readByte() & 0xFF,
@@ -133,6 +148,11 @@ public class PhoneCloudAction implements IMessage {
             case ACTION_MARK_READ:
                 buf.writeLong(targetUuid.getMostSignificantBits());
                 buf.writeLong(targetUuid.getLeastSignificantBits());
+                break;
+            case ACTION_SEND_MONEY:
+                buf.writeLong(targetUuid.getMostSignificantBits());
+                buf.writeLong(targetUuid.getLeastSignificantBits());
+                buf.writeDouble(amount);
                 break;
             case ACTION_UPDATE_NOTES: {
                 int count = notes == null ? 0 : Math.min(notes.size(),
@@ -179,6 +199,9 @@ public class PhoneCloudAction implements IMessage {
                 case ACTION_MARK_READ:
                     data.markThreadRead(player.getUniqueID(), msg.targetUuid);
                     pushSync(player, data);
+                    break;
+                case ACTION_SEND_MONEY:
+                    handleSendMoney(player, msg);
                     break;
                 case ACTION_UPDATE_NOTES:
                     cloud.notes.clear();
@@ -239,6 +262,37 @@ public class PhoneCloudAction implements IMessage {
                 tell(recipient, TextFormatting.AQUA,
                     "[phone] " + sender.getName() + ": " + truncate(text, 80));
             }
+        }
+
+        private void handleSendMoney(EntityPlayerMP sender, PhoneCloudAction msg) {
+            if (msg.targetUuid == null) {
+                tell(sender, TextFormatting.RED, "No recipient selected.");
+                return;
+            }
+            MinecraftServer server = sender.getServer();
+            if (server == null) return;
+            EntityPlayerMP recipient = server.getPlayerList().getPlayerByUUID(msg.targetUuid);
+            if (recipient == null) {
+                tell(sender, TextFormatting.RED,
+                    "That player is offline — they must be online to receive a payment.");
+                return;
+            }
+            com.micatechnologies.minecraft.sum.economy.MoneyTransfer.Result result =
+                com.micatechnologies.minecraft.sum.economy.MoneyTransfer.transfer(
+                    sender, recipient, msg.amount);
+            if (!result.ok) {
+                tell(sender, TextFormatting.RED, result.error);
+                return;
+            }
+            tell(sender, TextFormatting.GREEN,
+                "Paid $" + money(result.credited) + " to " + recipient.getName()
+                    + (result.fee > 0.0 ? " ($" + money(result.fee) + " fee)" : "") + ".");
+            tell(recipient, TextFormatting.GREEN,
+                "Received $" + money(result.credited) + " from " + sender.getName() + ".");
+        }
+
+        private static String money(double v) {
+            return String.format(java.util.Locale.ROOT, "%.2f", v);
         }
 
         private void handleAddContact(EntityPlayerMP player, PhoneCloudSavedData data,
