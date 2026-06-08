@@ -68,10 +68,11 @@ public class GuiSumPhone extends GuiScreen {
     private static final int BADGE_BG = 0xFFD04050;
 
     // --- App enum ---------------------------------------------------------------------------
-    private enum App { HOME, BANKING, NOTES, CALCULATOR, WEATHER, CONTACTS, MESSAGES }
+    private enum App { HOME, BANKING, NOTES, CALCULATOR, WEATHER, CONTACTS, MESSAGES, PAY }
     private enum NotesMode    { LIST, EDIT }
     private enum ContactsMode { LIST, DETAIL, NEW }
     private enum MessagesMode { THREAD_LIST, THREAD_VIEW, NEW_PICK }
+    private enum PayMode      { PICK, ENTER }
 
     // --- Button IDs -------------------------------------------------------------------------
     private static final int BTN_BACK = 1;
@@ -84,6 +85,7 @@ public class GuiSumPhone extends GuiScreen {
     private static final int BTN_CONTACTS_DELETE = 23;
     private static final int BTN_MESSAGES_NEW = 30;
     private static final int BTN_MESSAGES_SEND = 31;
+    private static final int BTN_PAY_SUBMIT = 40;
 
     // Tile IDs use the same space as button IDs but live on TileRegion objects (we render
     // them ourselves rather than using vanilla 3D buttons).
@@ -123,6 +125,13 @@ public class GuiSumPhone extends GuiScreen {
     private MessagesMode messagesMode = MessagesMode.THREAD_LIST;
     private UUID currentPartner;
     private final PhoneTextField composeInput = new PhoneTextField(Message.MAX_TEXT_LENGTH, false);
+
+    private PayMode payMode = PayMode.PICK;
+    private Contact payTarget;
+    private final PhoneTextField payAmountInput = new PhoneTextField(10, false);
+    /** Transient client-side validation message shown on the Pay entry screen. Server-side
+     *  outcomes (success / insufficient funds / offline) arrive as chat lines. */
+    private String payStatus = "";
 
     // Cursor blink, shared across editors
     private boolean cursorOn = true;
@@ -222,6 +231,7 @@ public class GuiSumPhone extends GuiScreen {
             case CALCULATOR: addCalculatorKeys(); break;
             case CONTACTS:   addContactsButtons(); break;
             case MESSAGES:   addMessagesButtons(); break;
+            case PAY:        addPayButtons(); break;
             default:         break;
         }
     }
@@ -233,6 +243,7 @@ public class GuiSumPhone extends GuiScreen {
         if (currentApp == App.WEATHER) return false;
         if (currentApp == App.CONTACTS && contactsMode == ContactsMode.LIST) return false;
         if (currentApp == App.MESSAGES && messagesMode == MessagesMode.THREAD_LIST) return false;
+        if (currentApp == App.PAY && payMode == PayMode.PICK) return false;
         return true;
     }
 
@@ -241,42 +252,45 @@ public class GuiSumPhone extends GuiScreen {
     // ---------------------------------------------------------------------------------------
 
     private void addHomeTiles() {
-        // The screen is 12 (status bar) + 12 (title) + 12 (number) = 36 of header, then the
-        // grid, then we must stop before the bottom chrome at PHONE_H - CHROME_BOTTOM (= 196
-        // for a 224-tall phone). With three 42-tall rows + two 4-gap, the grid is 134 tall —
-        // fits between y=56 and y=190 with a 6px margin to the home-button chrome.
-        int tileW = 50, tileH = 42;
+        // Two-column grid placed below the "My #:" line. Tiles are 32 tall so up to four rows
+        // (eight apps) fit between y≈56 and the bottom chrome at PHONE_H - CHROME_BOTTOM (196).
+        // The personal phone shows seven apps (Banking..Pay); the desk phone drops Banking and
+        // Pay (no wallet) for five.
+        int tileW = 50, tileH = 32;
         int colGap = 8, rowGap = 4;
         int gridW = tileW * 2 + colGap;
         int leftX = guiLeft + (PHONE_W - gridW) / 2;
         int topY = guiTop + CHROME_TOP + 42; // 4px clear of the "My #:" line
 
-        int idx = 0;
-        if (enableBanking) {
-            addAppTile(idx++, leftX, topY, tileW, tileH, App.BANKING, "sum.phone.app.banking");
-            addAppTile(idx++, leftX + tileW + colGap, topY, tileW, tileH, App.NOTES, "sum.phone.app.notes");
-        } else {
-            // Desk phone: no banking. Bump Notes into the first slot, slide the others up.
-            addAppTile(idx++, leftX, topY, tileW, tileH, App.NOTES, "sum.phone.app.notes");
-            addAppTile(idx++, leftX + tileW + colGap, topY, tileW, tileH, App.CALCULATOR, "sum.phone.app.calculator");
-        }
+        List<App> apps = new ArrayList<>();
+        if (enableBanking) apps.add(App.BANKING);
+        apps.add(App.NOTES);
+        apps.add(App.CALCULATOR);
+        apps.add(App.WEATHER);
+        apps.add(App.MESSAGES);
+        apps.add(App.CONTACTS);
+        if (enableBanking) apps.add(App.PAY);   // needs the wallet, so personal phone only
 
-        int row2Y = topY + tileH + rowGap;
-        if (enableBanking) {
-            addAppTile(idx++, leftX, row2Y, tileW, tileH, App.CALCULATOR, "sum.phone.app.calculator");
-            addAppTile(idx++, leftX + tileW + colGap, row2Y, tileW, tileH, App.WEATHER, "sum.phone.app.weather");
-        } else {
-            addAppTile(idx++, leftX, row2Y, tileW, tileH, App.WEATHER, "sum.phone.app.weather");
-            addAppTile(idx++, leftX + tileW + colGap, row2Y, tileW, tileH, App.MESSAGES, "sum.phone.app.messages");
+        for (int idx = 0; idx < apps.size(); idx++) {
+            int col = idx % 2;
+            int row = idx / 2;
+            int x = leftX + col * (tileW + colGap);
+            int y = topY + row * (tileH + rowGap);
+            App app = apps.get(idx);
+            addAppTile(idx, x, y, tileW, tileH, app, appI18nKey(app));
         }
+    }
 
-        int row3Y = row2Y + tileH + rowGap;
-        if (enableBanking) {
-            addAppTile(idx++, leftX, row3Y, tileW, tileH, App.MESSAGES, "sum.phone.app.messages");
-            addAppTile(idx++, leftX + tileW + colGap, row3Y, tileW, tileH, App.CONTACTS, "sum.phone.app.contacts");
-        } else {
-            addAppTile(idx++, leftX, row3Y, tileW, tileH, App.CONTACTS, "sum.phone.app.contacts");
-            // Last slot empty on desk phone (5 apps fit).
+    private static String appI18nKey(App app) {
+        switch (app) {
+            case BANKING:    return "sum.phone.app.banking";
+            case NOTES:      return "sum.phone.app.notes";
+            case CALCULATOR: return "sum.phone.app.calculator";
+            case WEATHER:    return "sum.phone.app.weather";
+            case MESSAGES:   return "sum.phone.app.messages";
+            case CONTACTS:   return "sum.phone.app.contacts";
+            case PAY:        return "sum.phone.app.pay";
+            default:         return "";
         }
     }
 
@@ -572,6 +586,69 @@ public class GuiSumPhone extends GuiScreen {
     }
 
     // ---------------------------------------------------------------------------------------
+    // Pay app
+    // ---------------------------------------------------------------------------------------
+
+    private void addPayButtons() {
+        if (payMode == PayMode.PICK) {
+            // Reuse the contacts list as a payee picker.
+            List<Contact> list = cloud != null ? cloud.contacts : new ArrayList<>();
+            int rowH = 18;
+            int rowsTop = guiTop + CHROME_TOP + 32;
+            int rowX = guiLeft + SCREEN_PAD_X + 4;
+            int rowW = PHONE_W - 2 * SCREEN_PAD_X - 8;
+            for (int i = 0; i < Math.min(7, list.size()); i++) {
+                tiles.add(new TileRegion(4200 + i,
+                    rowX, rowsTop + i * (rowH + 2), rowW, rowH,
+                    TileKind.PAY_PICK_ROW, null, String.valueOf(i)));
+            }
+        } else { // ENTER
+            int btnW = 50, btnH = 14;
+            int y = guiTop + PHONE_H - CHROME_BOTTOM - btnH - 4;
+            this.buttonList.add(new GuiButton(BTN_PAY_SUBMIT,
+                guiLeft + (PHONE_W - btnW) / 2, y, btnW, btnH,
+                I18n.format("sum.phone.pay.send")));
+        }
+    }
+
+    private void startPay(Contact target) {
+        payTarget = target;
+        payAmountInput.setValue("");
+        payStatus = "";
+        payMode = PayMode.ENTER;
+        rebuildButtons();
+    }
+
+    private void submitPay() {
+        if (payTarget == null) return;
+        double amount;
+        try {
+            amount = Double.parseDouble(payAmountInput.getValue().trim());
+        } catch (NumberFormatException e) {
+            payStatus = I18n.format("sum.phone.pay.bad_amount");
+            return;
+        }
+        if (amount <= 0.0) {
+            payStatus = I18n.format("sum.phone.pay.bad_amount");
+            return;
+        }
+        // Server validates funds / online status and replies with a chat line either way.
+        SumNetwork.CHANNEL.sendToServer(PhoneCloudAction.sendMoney(payTarget.targetUuid, amount));
+        payAmountInput.setValue("");
+        payStatus = "";
+        payTarget = null;
+        payMode = PayMode.PICK;
+        rebuildButtons();
+    }
+
+    /** Best-effort client-side wallet read for display only; the server is authoritative. */
+    private String formatBalance() {
+        double balance = com.micatechnologies.minecraft.sum.economy.EconomyBridge.getBalance(player);
+        if (Double.isNaN(balance)) return "—";
+        return "$" + String.format(Locale.ROOT, "%.2f", balance);
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Drawing
     // ---------------------------------------------------------------------------------------
 
@@ -607,6 +684,7 @@ public class GuiSumPhone extends GuiScreen {
             case WEATHER:    drawWeather(sX1, contentTop, sX2, sY2); break;
             case CONTACTS:   drawContacts(sX1, contentTop, sX2, sY2); break;
             case MESSAGES:   drawMessages(sX1, contentTop, sX2, sY2); break;
+            case PAY:        drawPay(sX1, contentTop, sX2, sY2); break;
             case BANKING:    /* hand-off to GuiSumAtm; never visible */ break;
         }
 
@@ -893,6 +971,42 @@ public class GuiSumPhone extends GuiScreen {
         return partner.toString().substring(0, 8);
     }
 
+    private void drawPay(int x1, int y1, int x2, int y2) {
+        if (payMode == PayMode.PICK) {
+            this.fontRenderer.drawString(I18n.format("sum.phone.pay.title"),
+                x1 + 4, y1 + 4, TEXT_TITLE);
+            if (cloud == null || cloud.contacts.isEmpty()) {
+                String hint = I18n.format("sum.phone.pay.empty");
+                int hw = this.fontRenderer.getStringWidth(hint);
+                this.fontRenderer.drawString(hint, (x1 + x2) / 2 - hw / 2, y1 + 60, TEXT_DIM);
+            }
+            return;
+        }
+        // ENTER
+        this.fontRenderer.drawString(I18n.format("sum.phone.pay.send_title"),
+            x1 + 36, y1 + 4, TEXT_TITLE);
+        String name = payTarget != null && payTarget.displayName != null
+            ? payTarget.displayName : "?";
+        this.fontRenderer.drawString(I18n.format("sum.phone.pay.to", name),
+            x1 + 4, y1 + 22, TEXT_LIGHT);
+        this.fontRenderer.drawString(I18n.format("sum.phone.pay.balance", formatBalance()),
+            x1 + 4, y1 + 34, TEXT_DIM);
+
+        // Amount field with a "$" prefix.
+        this.fontRenderer.drawString("$", x1 + 4, y1 + 52, TEXT_NUMBER);
+        int fieldX1 = x1 + 14;
+        int fieldX2 = x2 - 4;
+        int fieldY1 = y1 + 48;
+        int fieldY2 = fieldY1 + 16;
+        drawRect(fieldX1, fieldY1, fieldX2, fieldY2, EDITOR_BG);
+        payAmountInput.renderSingleLine(this.fontRenderer,
+            fieldX1 + 3, fieldY1, fieldX2 - 3, fieldY2, cursorOn);
+
+        if (!payStatus.isEmpty()) {
+            this.fontRenderer.drawString(payStatus, x1 + 4, y1 + 70, TEXT_ERROR);
+        }
+    }
+
     private void drawTile(TileRegion r, int mouseX, int mouseY) {
         boolean hover = mouseX >= r.x && mouseX < r.x + r.w
                      && mouseY >= r.y && mouseY < r.y + r.h;
@@ -946,7 +1060,8 @@ public class GuiSumPhone extends GuiScreen {
                 break;
             }
             case CONTACT_ROW:
-            case CONTACT_PICK_ROW: {
+            case CONTACT_PICK_ROW:
+            case PAY_PICK_ROW: {
                 int idx = Integer.parseInt(r.label);
                 if (cloud == null || idx >= cloud.contacts.size()) break;
                 Contact c = cloud.contacts.get(idx);
@@ -994,6 +1109,7 @@ public class GuiSumPhone extends GuiScreen {
             case WEATHER:    color = 0xFF8AB8E0; glyph = "*"; break;
             case MESSAGES:   color = 0xFF7AA070; glyph = "M"; break;
             case CONTACTS:   color = 0xFFB880D0; glyph = "C"; break;
+            case PAY:        color = 0xFF6EC07A; glyph = "P"; break;
             default:         color = 0xFF555555; glyph = "?"; break;
         }
         drawRect(gx, gy, gx + gw, gy + gh, color);
@@ -1049,6 +1165,13 @@ public class GuiSumPhone extends GuiScreen {
                 }
                 return;
             }
+            case PAY_PICK_ROW: {
+                int idx = Integer.parseInt(r.label);
+                if (cloud != null && idx < cloud.contacts.size()) {
+                    startPay(cloud.contacts.get(idx));
+                }
+                return;
+            }
             case THREAD_ROW:
                 openThread(UUID.fromString(r.label));
                 return;
@@ -1061,6 +1184,8 @@ public class GuiSumPhone extends GuiScreen {
         notesMode = NotesMode.LIST;
         contactsMode = ContactsMode.LIST;
         messagesMode = MessagesMode.THREAD_LIST;
+        payMode = PayMode.PICK;
+        payTarget = null;
         rebuildButtons();
     }
 
@@ -1078,6 +1203,10 @@ public class GuiSumPhone extends GuiScreen {
         } else if (currentApp == App.MESSAGES && messagesMode != MessagesMode.THREAD_LIST) {
             messagesMode = MessagesMode.THREAD_LIST;
             currentPartner = null;
+        } else if (currentApp == App.PAY && payMode == PayMode.ENTER) {
+            payMode = PayMode.PICK;
+            payTarget = null;
+            payStatus = "";
         } else {
             // For any other sub-state, fall back to home.
             currentApp = App.HOME;
@@ -1094,6 +1223,7 @@ public class GuiSumPhone extends GuiScreen {
         if (app == App.NOTES) { notesMode = NotesMode.LIST; editingNoteIndex = -1; }
         if (app == App.CONTACTS) { contactsMode = ContactsMode.LIST; selectedContact = null; }
         if (app == App.MESSAGES) { messagesMode = MessagesMode.THREAD_LIST; currentPartner = null; }
+        if (app == App.PAY) { payMode = PayMode.PICK; payTarget = null; payStatus = ""; }
         currentApp = app;
         rebuildButtons();
     }
@@ -1116,6 +1246,7 @@ public class GuiSumPhone extends GuiScreen {
                 rebuildButtons();
                 return;
             case BTN_MESSAGES_SEND:         sendComposed(); return;
+            case BTN_PAY_SUBMIT:            submitPay(); return;
         }
     }
 
@@ -1136,6 +1267,18 @@ public class GuiSumPhone extends GuiScreen {
                 return;
             }
             if (composeInput.handleKey(typedChar, keyCode)) return;
+        } else if (currentApp == App.PAY && payMode == PayMode.ENTER) {
+            if (keyCode == Keyboard.KEY_RETURN || keyCode == Keyboard.KEY_NUMPADENTER) {
+                submitPay();
+                return;
+            }
+            // Allow only digits and a decimal point as printable input; let control keys
+            // (backspace, arrows, delete) fall through to the field handler.
+            boolean printable = typedChar >= 0x20 && typedChar != 127;
+            if (printable && !(Character.isDigit(typedChar) || typedChar == '.')) {
+                return;
+            }
+            if (payAmountInput.handleKey(typedChar, keyCode)) return;
         }
         super.keyTyped(typedChar, keyCode);
     }
@@ -1261,7 +1404,7 @@ public class GuiSumPhone extends GuiScreen {
 
     private enum TileKind {
         HOME_BUTTON, APP_TILE, CALC_KEY, NOTE_ROW,
-        CONTACT_ROW, CONTACT_PICK_ROW, THREAD_ROW
+        CONTACT_ROW, CONTACT_PICK_ROW, PAY_PICK_ROW, THREAD_ROW
     }
 
     private static class TileRegion {
