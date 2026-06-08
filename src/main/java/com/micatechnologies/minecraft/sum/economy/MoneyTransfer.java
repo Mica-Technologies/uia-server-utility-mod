@@ -1,0 +1,107 @@
+package com.micatechnologies.minecraft.sum.economy;
+
+import com.micatechnologies.minecraft.sum.SumConfig;
+import java.util.Locale;
+import net.minecraft.entity.player.EntityPlayer;
+
+/**
+ * Atomic player-to-player money transfer, routed through {@link EconomyBridge} so it works with
+ * either the EconomyInc backend or SUM's own capability. Shared by the {@code /pay} command and
+ * (in future) the phone "Pay" app so the validation, rounding, fee, and rollback logic live in
+ * one place.
+ *
+ * <p>Both participants must be online — the bridge operates on the live capability instance, so
+ * there is no offline-credit path. The sender is charged the full {@code amount}; the recipient
+ * receives {@code amount} minus the configured {@link SumConfig#getPayFeePercent() fee}, which
+ * vanishes as a money sink.
+ */
+public final class MoneyTransfer {
+
+    private MoneyTransfer() {}
+
+    /** Outcome of a transfer attempt. On failure, {@link #error} carries a user-facing reason. */
+    public static final class Result {
+        public final boolean ok;
+        public final String error;
+        public final double amount;    // total charged from the sender
+        public final double credited;  // amount actually received by the recipient (amount - fee)
+        public final double fee;
+
+        private Result(boolean ok, String error, double amount, double credited, double fee) {
+            this.ok = ok;
+            this.error = error;
+            this.amount = amount;
+            this.credited = credited;
+            this.fee = fee;
+        }
+
+        static Result fail(String error) {
+            return new Result(false, error, 0.0, 0.0, 0.0);
+        }
+
+        static Result success(double amount, double credited, double fee) {
+            return new Result(true, null, amount, credited, fee);
+        }
+    }
+
+    /**
+     * Validates and performs the transfer. Charges the sender first; if crediting the recipient
+     * fails, the sender is refunded so no money is created or destroyed.
+     */
+    public static Result transfer(EntityPlayer from, EntityPlayer to, double rawAmount) {
+        if (!SumConfig.isPayEnabled()) {
+            return Result.fail("Player-to-player payments are disabled on this server.");
+        }
+        if (from == null || to == null) {
+            return Result.fail("Invalid payment participants.");
+        }
+        if (from == to || from.getUniqueID().equals(to.getUniqueID())) {
+            return Result.fail("You can't pay yourself.");
+        }
+        if (!EconomyBridge.isAvailable()) {
+            return Result.fail("No economy backend is loaded.");
+        }
+        if (Double.isNaN(rawAmount) || Double.isInfinite(rawAmount)) {
+            return Result.fail("Amount is not a valid number.");
+        }
+        double amount = roundToCents(rawAmount);
+        if (amount <= 0.0) {
+            return Result.fail("Amount must be greater than $0.00.");
+        }
+
+        double balance = EconomyBridge.getBalance(from);
+        if (Double.isNaN(balance)) {
+            return Result.fail("You don't have a balance handler attached.");
+        }
+        if (balance < amount) {
+            return Result.fail("Insufficient funds. Need $" + money(amount)
+                + ", have $" + money(balance) + ".");
+        }
+
+        double feePercent = SumConfig.getPayFeePercent();
+        double fee = feePercent > 0.0 ? roundToCents(amount * feePercent / 100.0) : 0.0;
+        if (fee > amount) {
+            fee = amount;
+        }
+        double credited = amount - fee;
+
+        // Charge the sender first; EconomyBridge refuses to overdraft, so a false here means abort.
+        if (!EconomyBridge.adjustBalance(from, -amount)) {
+            return Result.fail("Payment failed — your balance could not be charged.");
+        }
+        // Credit the recipient; refund the sender on failure so the books stay balanced.
+        if (credited > 0.0 && !EconomyBridge.adjustBalance(to, credited)) {
+            EconomyBridge.adjustBalance(from, amount);
+            return Result.fail("Payment failed — the recipient could not be credited. You were refunded.");
+        }
+        return Result.success(amount, credited, fee);
+    }
+
+    private static double roundToCents(double v) {
+        return Math.floor(v * 100.0 + 0.5) / 100.0;
+    }
+
+    private static String money(double v) {
+        return String.format(Locale.ROOT, "%.2f", v);
+    }
+}

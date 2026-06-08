@@ -219,6 +219,53 @@ public class SumConfig {
             + "Default 50. The required count is rounded up so 50% on a server of 3 needs 2.";
     private static final int FIELD_DEFAULT_SLEEP_VOTE_THRESHOLD = 50;
 
+    private static final String CATEGORY_PAY = "pay";
+
+    private static final String FIELD_KEY_PAY_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_PAY_ENABLED =
+        "When true, players can transfer money to each other with /pay <player> <amount>. Both "
+            + "players must be online. Set false to disable the command.";
+    private static final boolean FIELD_DEFAULT_PAY_ENABLED = true;
+
+    private static final String FIELD_KEY_PAY_FEE_PERCENT = "feePercent";
+    private static final String FIELD_DESCRIPTION_PAY_FEE_PERCENT =
+        "Percentage (0-100) skimmed off each /pay transfer as a money sink. The sender is charged "
+            + "the full amount; the recipient receives the amount minus this fee. 0 (default) = no "
+            + "fee, a pure transfer.";
+    private static final double FIELD_DEFAULT_PAY_FEE_PERCENT = 0.0;
+
+    private static final String CATEGORY_AFK = "afk";
+
+    private static final String FIELD_KEY_AFK_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_AFK_ENABLED =
+        "Master toggle for AFK tracking. When true, players who don't move, look around, or chat "
+            + "for 'thresholdSeconds' are flagged AFK, which other features (sleep vote, pauser) "
+            + "can react to.";
+    private static final boolean FIELD_DEFAULT_AFK_ENABLED = true;
+
+    private static final String FIELD_KEY_AFK_THRESHOLD = "thresholdSeconds";
+    private static final String FIELD_DESCRIPTION_AFK_THRESHOLD =
+        "Seconds of no movement, rotation, or chat before a player is flagged AFK. Default 300 (5 minutes).";
+    private static final int FIELD_DEFAULT_AFK_THRESHOLD = 300;
+
+    private static final String FIELD_KEY_AFK_EXCLUDE_SLEEP = "excludeFromSleepVote";
+    private static final String FIELD_DESCRIPTION_AFK_EXCLUDE_SLEEP =
+        "When true, AFK players are removed from the sleep-vote head count, so one idle player "
+            + "can't block the night skip. Requires the sleep_vote feature to be enabled.";
+    private static final boolean FIELD_DEFAULT_AFK_EXCLUDE_SLEEP = true;
+
+    private static final String FIELD_KEY_AFK_ANNOUNCE = "announce";
+    private static final String FIELD_DESCRIPTION_AFK_ANNOUNCE =
+        "When true, a chat message is broadcast when a player goes AFK or returns.";
+    private static final boolean FIELD_DEFAULT_AFK_ANNOUNCE = true;
+
+    private static final String FIELD_KEY_AFK_PAUSE_ALL = "pauseWorldWhenAllAfk";
+    private static final String FIELD_DESCRIPTION_AFK_PAUSE_ALL =
+        "When true, the server pauser also freezes the world while every online player is AFK "
+            + "(not just when the server is empty). Requires the pauser feature to be enabled. Off "
+            + "by default since some servers want AFK farms to keep running.";
+    private static final boolean FIELD_DEFAULT_AFK_PAUSE_ALL = false;
+
     private static String[] roamerWalkableBlocks;
     private static Set<String> roamerWalkableBlockSet;
     // Resolved lazily on first use. Block instances aren't available at preInit, since the block
@@ -253,6 +300,15 @@ public class SumConfig {
 
     private static boolean borderEnabled;
     private static Map<Integer, BorderEntry> borderEntries = Collections.emptyMap();
+
+    private static boolean payEnabled;
+    private static double payFeePercent;
+
+    private static boolean afkEnabled;
+    private static int afkThresholdSeconds;
+    private static boolean afkExcludeFromSleepVote;
+    private static boolean afkAnnounce;
+    private static boolean afkPauseWorldWhenAllAfk;
 
     private static Configuration config;
 
@@ -356,6 +412,28 @@ public class SumConfig {
             FIELD_KEY_BORDER_BORDERS, CATEGORY_BORDER,
             FIELD_DEFAULT_BORDER_BORDERS, FIELD_DESCRIPTION_BORDER_BORDERS);
         borderEntries = parseBorderEntries(borderEntryStrings);
+
+        payEnabled = config.getBoolean(
+            FIELD_KEY_PAY_ENABLED, CATEGORY_PAY,
+            FIELD_DEFAULT_PAY_ENABLED, FIELD_DESCRIPTION_PAY_ENABLED);
+        payFeePercent = config.get(CATEGORY_PAY, FIELD_KEY_PAY_FEE_PERCENT,
+            FIELD_DEFAULT_PAY_FEE_PERCENT, FIELD_DESCRIPTION_PAY_FEE_PERCENT, 0.0, 100.0).getDouble();
+
+        afkEnabled = config.getBoolean(
+            FIELD_KEY_AFK_ENABLED, CATEGORY_AFK,
+            FIELD_DEFAULT_AFK_ENABLED, FIELD_DESCRIPTION_AFK_ENABLED);
+        afkThresholdSeconds = config.getInt(
+            FIELD_KEY_AFK_THRESHOLD, CATEGORY_AFK,
+            FIELD_DEFAULT_AFK_THRESHOLD, 10, 86400, FIELD_DESCRIPTION_AFK_THRESHOLD);
+        afkExcludeFromSleepVote = config.getBoolean(
+            FIELD_KEY_AFK_EXCLUDE_SLEEP, CATEGORY_AFK,
+            FIELD_DEFAULT_AFK_EXCLUDE_SLEEP, FIELD_DESCRIPTION_AFK_EXCLUDE_SLEEP);
+        afkAnnounce = config.getBoolean(
+            FIELD_KEY_AFK_ANNOUNCE, CATEGORY_AFK,
+            FIELD_DEFAULT_AFK_ANNOUNCE, FIELD_DESCRIPTION_AFK_ANNOUNCE);
+        afkPauseWorldWhenAllAfk = config.getBoolean(
+            FIELD_KEY_AFK_PAUSE_ALL, CATEGORY_AFK,
+            FIELD_DEFAULT_AFK_PAUSE_ALL, FIELD_DESCRIPTION_AFK_PAUSE_ALL);
 
         if (config.hasChanged()) {
             config.save();
@@ -553,6 +631,34 @@ public class SumConfig {
 
     public static int getSleepVoteThresholdPercent() {
         return sleepVoteThresholdPercent;
+    }
+
+    public static boolean isPayEnabled() {
+        return payEnabled;
+    }
+
+    public static double getPayFeePercent() {
+        return payFeePercent;
+    }
+
+    public static boolean isAfkEnabled() {
+        return afkEnabled;
+    }
+
+    public static int getAfkThresholdSeconds() {
+        return afkThresholdSeconds;
+    }
+
+    public static boolean isAfkExcludeFromSleepVote() {
+        return afkExcludeFromSleepVote;
+    }
+
+    public static boolean isAfkAnnounce() {
+        return afkAnnounce;
+    }
+
+    public static boolean isAfkPauseWorldWhenAllAfk() {
+        return afkPauseWorldWhenAllAfk;
     }
 
     /**
