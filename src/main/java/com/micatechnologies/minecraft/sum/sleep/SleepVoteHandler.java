@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum.sleep;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
+import com.micatechnologies.minecraft.sum.afk.AfkTracker;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.text.TextComponentString;
@@ -41,15 +42,20 @@ public class SleepVoteHandler {
         tickCounter = 0;
 
         WorldServer world = (WorldServer) event.world;
-        int total = world.playerEntities.size();
+        boolean excludeAfk = SumConfig.isAfkEnabled() && SumConfig.isAfkExcludeFromSleepVote();
+
+        // AFK players are dropped from the denominator so one idle player can't block the skip.
+        // Sleepers are never AFK (getting into bed counts as activity), so they stay counted.
+        int total = 0;
+        int sleeping = 0;
+        for (EntityPlayer p : world.playerEntities) {
+            if (excludeAfk && AfkTracker.isAfk(p)) continue;
+            total++;
+            if (p.isPlayerSleeping()) sleeping++;
+        }
         if (total == 0) {
             lastAnnouncedSleeping = -1;
             return;
-        }
-
-        int sleeping = 0;
-        for (EntityPlayer p : world.playerEntities) {
-            if (p.isPlayerSleeping()) sleeping++;
         }
 
         int threshold = SumConfig.getSleepVoteThresholdPercent();

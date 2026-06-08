@@ -1,6 +1,7 @@
 package com.micatechnologies.minecraft.sum.mixin;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
+import com.micatechnologies.minecraft.sum.afk.AfkTracker;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 import org.spongepowered.asm.mixin.Final;
@@ -29,10 +30,15 @@ public abstract class MixinWorldServer {
         if (!SumConfig.isPauserEnabled()) {
             return;
         }
-        if (server == null) {
+        if (server == null || server.getPlayerList() == null) {
             return;
         }
-        if (server.getPlayerList() != null && server.getPlayerList().getCurrentPlayerCount() <= 0) {
+        if (server.getPlayerList().getCurrentPlayerCount() <= 0) {
+            ci.cancel();
+            return;
+        }
+        // Optional extension: also freeze the world while every online player is AFK.
+        if (SumConfig.isAfkPauseWorldWhenAllAfk() && AfkTracker.allOnlinePlayersAfk(server)) {
             ci.cancel();
         }
     }
