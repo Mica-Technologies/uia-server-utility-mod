@@ -7,8 +7,6 @@ import com.micatechnologies.minecraft.sum.bank.SafeDepositSavedData;
 import com.micatechnologies.minecraft.sum.economy.ContainerBillChanger;
 import com.micatechnologies.minecraft.sum.economy.GuiBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
-import com.micatechnologies.minecraft.sum.jobs.GuiJobBoard;
-import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.mailbox.ContainerMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.GuiMailbox;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
@@ -47,7 +45,9 @@ public class SumGuiHandler implements IGuiHandler {
     public static final int GUI_BILL_CHANGER = 4;
     public static final int GUI_TRASH_CAN = 5;
     public static final int GUI_MAILBOX = 6;
-    public static final int GUI_JOB_BOARD = 7;
+    // GUI id 7 (job board) is now opened via PacketOpenJobBoard (server pushes a listing
+    // snapshot) rather than the openGui handler, so the client can render it on a dedicated
+    // server where it can't read JobBoardSavedData.
     // GUI id 8 is reserved (was Signpost — moved to CSM, see CSM CUSTOM_SIGNPOSTS_PLAN.md).
     public static final int GUI_DESK_PHONE = 9;
     public static final int GUI_POCKET = 10;
@@ -124,10 +124,6 @@ public class SumGuiHandler implements IGuiHandler {
         if (id == GUI_MAILBOX) {
             TileEntityMailbox mb = lookupMailbox(world, x, y, z);
             return mb == null ? null : new GuiMailbox(new ContainerMailbox(mb, player));
-        }
-        if (id == GUI_JOB_BOARD) {
-            return new GuiJobBoard(player,
-                JobBoardSavedData.get(world).getActive(System.currentTimeMillis()));
         }
         if (id == GUI_DESK_PHONE) {
             // Shared phone — no banking app, but otherwise the same multi-app shell.

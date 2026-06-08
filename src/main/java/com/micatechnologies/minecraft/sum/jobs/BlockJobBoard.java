@@ -1,10 +1,12 @@
 package com.micatechnologies.minecraft.sum.jobs;
 
-import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
-import com.micatechnologies.minecraft.sum.atm.SumGuiHandler;
+import com.micatechnologies.minecraft.sum.atm.SumNetwork;
+import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import java.util.List;
+import java.util.Locale;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
 import net.minecraft.block.material.Material;
@@ -13,7 +15,10 @@ import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemBlock;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextFormatting;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.Mirror;
@@ -71,11 +76,34 @@ public class BlockJobBoard extends Block {
     public boolean onBlockActivated(World world, BlockPos pos, IBlockState state,
                                     EntityPlayer player, EnumHand hand, EnumFacing facing,
                                     float hitX, float hitY, float hitZ) {
-        // GuiJobBoard is screen-only — getServerGuiElement returns null for GUI_JOB_BOARD,
-        // so the server-side openGui call alone won't reach the client. Fire on both sides.
-        player.openGui(Sum.instance, SumGuiHandler.GUI_JOB_BOARD, world,
-            pos.getX(), pos.getY(), pos.getZ());
+        // Server-authoritative: job listings live in JobBoardSavedData (server-only), so we push
+        // a snapshot to the client which opens GuiJobBoard. (The client can't read the SavedData
+        // on a dedicated server.) Before sending, reclaim escrow from this player's own expired
+        // listings so timed-out bounties refund automatically the next time they visit a board.
+        if (!world.isRemote && player instanceof EntityPlayerMP) {
+            EntityPlayerMP mp = (EntityPlayerMP) player;
+            JobBoardSavedData data = JobBoardSavedData.get(world);
+            long now = System.currentTimeMillis();
+            refundExpired(mp, data, now);
+            SumNetwork.CHANNEL.sendTo(new PacketOpenJobBoard(data.getActive(now)), mp);
+        }
         return true;
+    }
+
+    /** Refunds and removes this player's expired listings, crediting the held escrow back. */
+    private static void refundExpired(EntityPlayerMP player, JobBoardSavedData data, long now) {
+        List<JobListing> expired = data.takeExpiredFor(player.getUniqueID(), now);
+        double refund = 0.0;
+        for (JobListing l : expired) {
+            refund += l.reward;
+        }
+        if (refund > 0.0) {
+            EconomyBridge.adjustBalance(player, refund);
+            TextComponentString msg = new TextComponentString(TextFormatting.GREEN
+                + "Reclaimed $" + String.format(Locale.ROOT, "%.2f", refund)
+                + " escrow from " + expired.size() + " expired listing(s).");
+            player.sendMessage(msg);
+        }
     }
 
     @Override
