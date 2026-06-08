@@ -77,6 +77,61 @@ public class JobBoardSavedData extends WorldSavedData {
         return active;
     }
 
+    /** Count of active OPEN (claimable) listings — drives the "jobs available" HUD. */
+    public int getOpenCount(long nowMillis) {
+        int n = 0;
+        for (JobListing l : listings) {
+            if (!l.isExpired(nowMillis) && l.status == JobStatus.OPEN) n++;
+        }
+        return n;
+    }
+
+    /** Looks up a listing by id regardless of expiry, or null. */
+    public JobListing getById(UUID id) {
+        for (JobListing l : listings) {
+            if (l.id.equals(id)) return l;
+        }
+        return null;
+    }
+
+    /** Marks the data dirty for saving. Public so action handlers can persist mutations to a
+     *  listing they hold a reference to (status / worker changes). */
+    public void touch() {
+        markDirty();
+    }
+
+    /** Removes and returns every expired listing posted by the given player. Used to reclaim
+     *  escrow from listings that timed out (the caller refunds the rewards). */
+    public List<JobListing> takeExpiredFor(UUID posterUuid, long nowMillis) {
+        List<JobListing> taken = new ArrayList<>();
+        Iterator<JobListing> it = listings.iterator();
+        while (it.hasNext()) {
+            JobListing l = it.next();
+            if (l.posterUuid.equals(posterUuid) && l.isExpired(nowMillis)) {
+                taken.add(l);
+                it.remove();
+            }
+        }
+        if (!taken.isEmpty()) markDirty();
+        return taken;
+    }
+
+    /** Removes and returns every listing posted by the given player (any state/expiry). Used by
+     *  {@code /sum job clear-mine} to refund all held escrow. */
+    public List<JobListing> takeByPoster(UUID posterUuid) {
+        List<JobListing> taken = new ArrayList<>();
+        Iterator<JobListing> it = listings.iterator();
+        while (it.hasNext()) {
+            JobListing l = it.next();
+            if (l.posterUuid.equals(posterUuid)) {
+                taken.add(l);
+                it.remove();
+            }
+        }
+        if (!taken.isEmpty()) markDirty();
+        return taken;
+    }
+
     /** Removes every listing posted by the given player. Returns the number removed. */
     public int removeByPoster(UUID posterUuid) {
         int before = listings.size();

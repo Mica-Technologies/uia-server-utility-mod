@@ -9,6 +9,7 @@ import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.jobs.JobListing;
+import com.micatechnologies.minecraft.sum.jobs.JobStatus;
 import com.micatechnologies.minecraft.sum.plots.ItemPlotWand;
 import com.micatechnologies.minecraft.sum.plots.PlotStatus;
 import com.micatechnologies.minecraft.sum.plots.SumPlot;
@@ -906,6 +907,26 @@ public class CommandSum extends CommandBase {
         if (description.length() > JOB_MAX_DESCRIPTION) {
             description = description.substring(0, JOB_MAX_DESCRIPTION);
         }
+        // Escrow the reward up front so the payout is guaranteed when a worker completes the job.
+        if (reward > 0.0) {
+            if (!EconomyBridge.isAvailable()) {
+                sendMessage(sender, TextFormatting.RED,
+                    "No economy backend is loaded — the reward can't be escrowed.");
+                return;
+            }
+            double balance = EconomyBridge.getBalance(player);
+            double have = Double.isNaN(balance) ? 0.0 : balance;
+            if (have < reward) {
+                sendMessage(sender, TextFormatting.RED,
+                    "Insufficient funds to escrow $" + formatMoney(reward)
+                    + " (you have $" + formatMoney(have) + ").");
+                return;
+            }
+            if (!EconomyBridge.adjustBalance(player, -reward)) {
+                sendMessage(sender, TextFormatting.RED, "Could not hold the escrow; listing not posted.");
+                return;
+            }
+        }
         long now = System.currentTimeMillis();
         JobListing listing = new JobListing(
             UUID.randomUUID(),
@@ -917,8 +938,9 @@ public class CommandSum extends CommandBase {
             now + JOB_EXPIRY_MILLIS);
         JobBoardSavedData.get(player.world).addListing(listing);
         sendMessage(sender, TextFormatting.GREEN,
-            "Posted listing — $" + String.format(Locale.ROOT, "%.2f", reward)
-            + " — expires in 7 days.");
+            "Posted listing — $" + formatMoney(reward)
+            + (reward > 0.0 ? " held in escrow" : "")
+            + " — expires in 7 days. Cancel from a job board to refund.");
     }
 
     private void handleJobList(ICommandSender sender) {
@@ -930,9 +952,12 @@ public class CommandSum extends CommandBase {
         }
         sendMessage(sender, TextFormatting.GOLD, "Active listings (" + active.size() + "):");
         for (JobListing l : active) {
+            String status = l.status == JobStatus.OPEN ? ""
+                : " [" + l.status.name()
+                    + (l.workerName.isEmpty() ? "" : " by " + l.workerName) + "]";
             sendMessage(sender, TextFormatting.AQUA,
                 "  $" + String.format(Locale.ROOT, "%.2f", l.reward)
-                + " — " + l.description + " (by " + l.posterName + ")");
+                + " — " + l.description + " (by " + l.posterName + ")" + status);
         }
     }
 
@@ -943,9 +968,17 @@ public class CommandSum extends CommandBase {
         }
         EntityPlayerMP player = (EntityPlayerMP) sender;
         JobBoardSavedData data = JobBoardSavedData.get(player.world);
-        int removed = data.removeByPoster(player.getUniqueID());
+        List<JobListing> mine = data.takeByPoster(player.getUniqueID());
+        double refund = 0.0;
+        for (JobListing l : mine) {
+            refund += l.reward;
+        }
+        if (refund > 0.0) {
+            EconomyBridge.adjustBalance(player, refund);
+        }
         sendMessage(sender, TextFormatting.GREEN,
-            "Removed " + removed + " listing(s).");
+            "Removed " + mine.size() + " listing(s)"
+            + (refund > 0.0 ? " — refunded $" + formatMoney(refund) + " escrow." : "."));
     }
 
     // --- /sum plots ---

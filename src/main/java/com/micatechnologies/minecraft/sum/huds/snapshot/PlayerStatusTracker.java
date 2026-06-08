@@ -111,7 +111,7 @@ public class PlayerStatusTracker {
         }
 
         int jobsAvailable = JobBoardSavedData.get(world)
-            .getActive(System.currentTimeMillis()).size();
+            .getOpenCount(System.currentTimeMillis());
 
         // Loyalty NBT lives under EntityPlayer.PERSISTED_NBT_TAG.sum_loyalty.ticks —
         // see LoyaltyHandler. Read defensively in case loyalty has never been
