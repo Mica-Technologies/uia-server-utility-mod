@@ -18,8 +18,12 @@ JAVA_HOME="..." ./gradlew build
 # Run Minecraft client in dev (x86_64 / Windows)
 JAVA_HOME="..." ./gradlew runClient
 
-# Run Minecraft client in dev (Apple Silicon Mac — uses lwjgl3ify)
+# Run Minecraft client in dev (Apple Silicon Mac — arm64-native via lwjgl3ify)
+# NOTE: launches + loads mods, but the window is currently broken on macOS (see below).
 JAVA_HOME="..." ./gradlew runClient17
+
+# Run Minecraft client in dev on Apple Silicon with a WORKING window (LWJGL2 under Rosetta 2)
+JAVA_HOME="..." ./gradlew runClient -Prosetta
 
 # Run Minecraft server in dev
 JAVA_HOME="..." ./gradlew runServer
@@ -32,6 +36,15 @@ JAVA_HOME="..." ./gradlew test
 ```
 
 **Requirements:** Java 17 (Azul Zulu Community). The project uses Jabel to allow modern Java syntax while targeting JVM 8. Heap is set to `-Xmx3G` in `gradle.properties` for decompilation.
+
+### Apple Silicon (macOS) dev client
+
+MC 1.12.2 ships LWJGL2 with x86_64-only natives, so the dev client needs help on Apple Silicon. Two paths:
+
+- **`runClient17`** — arm64-native via lwjgl3ify (LWJGL3 on JDK 17). It launches and loads mods, but on macOS the client window is currently **broken** (tiny, non-resizable; Apple's OpenGL-over-Metal driver SIGSEGVs on the first draw call). Cause: lwjgl3ify `1.0.1` (RetroFuturaBootstrap 1.0.6) skips the relauncher re-exec in the gradle dev launch, so GLFW never gets macOS's required `-XstartOnFirstThread` main-thread handling. The proper fix lives in RFB 1.1.0, which is currently 1.7.10-only. (`MixinMinecraft` re-adds the `org.lwjgl.` classloader exclusion that OneConfig's tweaker strips — that's what lets `runClient17` get past GLFW init at all; without it you get a `LinkageError: loader constraint violation` on `org.lwjgl.glfw.GLFWVidMode`.)
+- **`runClient -Prosetta`** — the reliable working client. Runs vanilla LWJGL2 under x86_64 (Rosetta 2). Requires Rosetta 2 (`softwareupdate --install-rosetta --agree-to-license`) and an x86_64 Java 8 JDK that Gradle auto-detects (e.g. Temurin 8 in `~/Library/Java/JavaVirtualMachines/`). The `-Prosetta` flag (wired in `addon.gradle`) selects that JDK via a `Java 8 + Adoptium` toolchain spec and points LWJGL2 at x86_64 natives in `.rosetta-natives/` (gitignored — repopulate per the comment in `addon.gradle`). An IntelliJ run config **"Run Client (Rosetta x86_64)"** is provided.
+
+The RetroFuturaGradle plugin is pinned to `1.4.7` (build.gradle): `1.4.0` was removed from all public repos and survives only in stale caches.
 
 ## Dependencies
 

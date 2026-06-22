@@ -34,7 +34,7 @@ plugins {
     id 'eclipse'
     id 'maven-publish'
     id 'org.jetbrains.gradle.plugin.idea-ext' version '1.1.8'
-    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.0'
+    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.7'
     id 'net.darkhax.curseforgegradle' version '1.1.24' apply false
     id 'com.modrinth.minotaur' version '2.8.7' apply false
     id 'com.diffplug.spotless' version '6.13.0' apply false
@@ -867,6 +867,12 @@ if (enableJava17RunTasks.toBoolean()) {
 
     dependencies {
         if (modId != 'lwjgl3ify') {
+            // NOTE: io.github.twilightflower:lwjgl3ify:1.0.1 is the 1.12.2-specific port
+            // (its classes target net.minecraftforge.fml). The GTNH mainline lwjgl3ify
+            // (com.github.GTNewHorizons:lwjgl3ify:3.x) is a 1.7.10 mod — it references
+            // cpw.mods.fml and its relauncher tweaker crashes here with
+            // NoClassDefFoundError cpw/mods/fml/relauncher/FMLLaunchHandler. Do NOT swap
+            // to it. See the runClient17 Apple-Silicon GLFW loader-constraint investigation.
             java17Dependencies("io.github.twilightflower:lwjgl3ify:1.0.1")
             java17PatchDependencies("io.github.twilightflower:lwjgl3ify:1.0.1:forgePatches") {
                 transitive = false
