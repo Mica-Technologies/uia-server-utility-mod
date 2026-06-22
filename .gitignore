@@ -94,3 +94,4 @@ logs/
 # Local reference: cloned/decompiled third-party mod source for analysis only.
 # Never committed (license + repo-hygiene reasons). See example-source/README.md.
 example-source/
+.rosetta-natives/
