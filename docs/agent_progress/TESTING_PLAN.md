@@ -373,6 +373,40 @@ Items already verified are marked with the commit that proved them out — you
 only need to re-test them if a recent change might have regressed the area
 (see "Regression checks" near the end).
 
+A 🧪 marker means the underlying logic is now locked by an automated unit test
+(see § 4.0). 🧪 covers the pure logic only — it does NOT replace the in-game
+behavior check (rendering, commands, world events), so those boxes stay open
+until a playtest confirms the full path.
+
+### 4.0 Automated unit-test coverage (`src/test`, 78 tests)
+
+Run with `JAVA_HOME="..." ./gradlew test`. JUnit 5 is enabled
+(`enableJUnit=true`); the suite is pure-logic only — no Minecraft runtime — so
+it runs in seconds and gates regressions in CI. All 78 green as of 2026-06-24.
+
+- [x] **Plot bbox math** (`SumPlotTest`, 13) — corner normalization, inclusive
+      `contains`, `volume` (incl. the "vol 65k" full-column figure + a long
+      overflow guard), NBT round-trip preserves owner/trusted/corners
+- [x] **Plot store / overlap refusal** (`SumPlotsWorldSavedDataTest`, 12) —
+      `overlapsAny` (the create-time overlap rule), per-dim filtering, FOR_SALE
+      listing, ownership + nearest-plot queries
+- [x] **Chunk index** (`SumPlotsChunkIndexTest`, 9) — multi-chunk spans,
+      negative coords, removal cleanup, rebuild
+- [x] **Plot status parsing** (`PlotStatusTest`, 5)
+- [x] **Config parsers** (`SumConfigParsersTest`, 11) — `dimId=radius:mode`
+      (border) + `minutes=type:value` (loyalty): valid parse, malformed-entry
+      rejection, duplicate-key handling, order preservation
+- [x] **Bill loot invariants** (`BillsLootInjectorTest`, 6) — $200/$500 never
+      injected, small denoms outweigh large, most rolls empty, 13 target tables
+- [x] **Bill denomination tables** (`BillsTest`, 5) — canonical 8, defensive
+      copy, withdraw subset excludes $200/$500
+- [x] **Custom-text placeholders** (`TextPlaceholdersTest`, 11) — substitution,
+      unknown-token-left-intact, trailing/empty `%`, case-insensitivity
+      (via `applyExample`, the preview path sharing `apply()`'s scan loop)
+- [x] **Desk-phone exchange hash** (`DeskPhoneExchangeTest`, 4) — determinism,
+      [0,1000) range, negative-coord safety, spread
+- [x] **Border config model** (`BorderEntryTest`, 2)
+
 ### 4.1 Section A — Bank / ATM kit (mostly verified)
 
 | Item | Status | Verification |
@@ -409,7 +443,7 @@ No re-test needed unless touching the relevant files.
 | C4 Phone + debit card bind + 2nd-click opens GUI | ✅ | `03f715d` fix verified |
 | C5 Player shop — owner setup, buyer purchase | ✅ | Pre-2026-05-08 |
 | C6 Bill changer — bundle 64 → packet, unbundle | ✅ | Pre-2026-05-08 |
-| C7 Bills in vanilla chest loot drops | ☐ **untested** | See section 4.5 below |
+| C7 Bills in vanilla chest loot drops | 🧪 invariant locked / ☐ in-game | Weighting + $200/$500-excluded proven by `BillsLootInjectorTest`; world-gen path still untested — see 4.5 |
 | C8 Bills display — TESR + insert/take | ✅ | Pre-2026-05-08 |
 | C9 `/sum migrate-economy` end-to-end | ⏳ deferred | Run on Alex's server when convenient |
 
@@ -443,6 +477,8 @@ This is the biggest untested chunk. Setup once:
 - [ ] `/sum plots create test2` (no price) → status RESERVED (price = 0)
 - [ ] `/sum plots create test_overlap 50` with selection overlapping an
       existing plot → refused with overlap error
+      🧪 overlap detection (incl. reversed corners, per-dim, touching faces)
+      covered by `SumPlotsWorldSavedDataTest`; only the command wiring is left
 - [ ] `/sum plots create` with no wand selection → refused with usage hint
 
 #### D2 — `/sum plots delete` (op)
@@ -457,6 +493,8 @@ This is the biggest untested chunk. Setup once:
 - [ ] `/sum plots list near` → only plots within ~64 blocks of player
 - [ ] `/sum plots info <id-prefix>` → name, owner, corners, volume,
       price, trusted-builder count
+      🧪 `volume()` math (inclusive on all axes, no int overflow) covered by
+      `SumPlotTest`
 - [ ] Switch to nether (`/execute in minecraft:the_nether run tp ~ ~ ~`
       doesn't exist in 1.12.2 — just use a nether portal) → `/sum plots
       list` shows empty (per-dim filter)
@@ -554,9 +592,13 @@ toward small denoms; **$200 and $500 should never world-gen**.
 - [ ] At least one chest should contain a SUM bill (`sum:bill_1` /
       `sum:bill_5` / `sum:bill_10` / `sum:bill_20` / `sum:bill_50` /
       `sum:bill_100`)
-- [ ] Small denoms ($1, $5, $10) vastly more common than $50 / $100
-- [ ] **NEVER** see `sum:bill_200` or `sum:bill_500` in a generated chest
-      (those are admin-only). Note as a bug if you do.
+- [x] 🧪 Small denoms ($1, $5, $10) vastly more common than $50 / $100 —
+      weight table is strictly descending by denomination
+      (`BillsLootInjectorTest.smallerDenominationsHaveStrictlyHigherWeight`).
+      Still worth an eyeball in-game, but the rule can't silently regress now.
+- [x] 🧪 **NEVER** see `sum:bill_200` or `sum:bill_500` in a generated chest
+      (those are admin-only) — `$200`/`$500` are absent from the injection
+      table (`BillsLootInjectorTest.neverInjectsTwoHundredOrFiveHundredBills`).
 
 If EconomyInc is loaded: ATM produces EconomyInc bills, but chest loot still
 drops SUM bills (`BillsLootInjector` doesn't gate on EconomyInc presence).
@@ -597,13 +639,19 @@ Custom Text 1.
       server IP), current FPS, wall-clock time
 - [ ] Set Text to `facing %direction%` → shows N/E/S/W; rotate the camera
       and confirm all four facings work
-- [ ] Set Text to `%bogus% %x%` → output `%bogus% 100` (unknown token
-      left intact so typos are visible)
+- [x] 🧪 Set Text to `%bogus% %x%` → output `%bogus% 100` (unknown token
+      left intact so typos are visible) —
+      `TextPlaceholdersTest.unknownTokenIsLeftIntact`
 - [ ] Set Text to `%date%` → YYYY-MM-DD
-- [ ] Set Text to empty string → HUD draws nothing (effectively hidden)
+      🧪 example-value path covered by `TextPlaceholdersTest`; live wall-clock
+      formatting still needs an eyeball
+- [x] 🧪 Set Text to empty string → HUD draws nothing (effectively hidden) —
+      `TextPlaceholdersTest.emptyStringStaysEmpty`
 - [ ] In OneConfig editor preview (drag the HUD): preview should show
       example values (Steve / 100 / 64 / -250 / Plains / Singleplayer /
       12:00 / 14:30 / 2026-05-20 / 120 / N) not live values
+      🧪 the example-value substitution itself is covered by
+      `TextPlaceholdersTest`; only the editor-render wiring is left
 
 Slot bump 5 → 10:
 
@@ -759,6 +807,9 @@ priority but worth catching when in the area:
 - [ ] Pocket capability (commit `49fe0d6`)
 - [ ] Area codes on player phone numbers (commit `383e049`)
 - [ ] Desk-phone TE + chunk-derived numbers (commit `2fb3682`)
+      🧪 the chunk→exchange hash (deterministic, [0,1000), negative-coord safe,
+      well-spread) is covered by `DeskPhoneExchangeTest`; the TE allocation +
+      display path is the in-game part still to confirm
 
 ---
 
