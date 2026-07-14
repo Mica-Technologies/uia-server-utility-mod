@@ -20,6 +20,13 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
  * advancing the world time to the next morning and waking sleeping players. Weather is left
  * alone — the server controls rain/thunder via its own systems and the sleep vote should not
  * override that.
+ *
+ * <p>Progress feedback: while at least one player is in bed, every overworld player gets a
+ * live action-bar line ("3/5 sleeping (need 3 to skip)"), re-pushed each check second so it
+ * stays visible and fades naturally a couple seconds after the last sleeper gets up. The
+ * denominator is the AFK-adjusted total, matching the vote itself. Setting
+ * {@code sleep_vote.actionBarProgress=false} falls back to the older chat line that fires
+ * only when the sleeper count changes.
  */
 public class SleepVoteHandler {
 
@@ -58,10 +65,7 @@ public class SleepVoteHandler {
             return;
         }
 
-        int threshold = SumConfig.getSleepVoteThresholdPercent();
-        // Ceiling division: required = ceil(total * threshold / 100)
-        int required = (total * threshold + 99) / 100;
-        if (required < 1) required = 1;
+        int required = requiredSleepers(total, SumConfig.getSleepVoteThresholdPercent());
 
         if (sleeping > 0 && sleeping >= required) {
             skipNight(world, sleeping, total);
@@ -69,7 +73,22 @@ public class SleepVoteHandler {
             return;
         }
 
-        // Announce only when the count of sleepers changes (and only when at least one is in bed).
+        if (SumConfig.isSleepVoteActionBarProgress()) {
+            // Re-push every check second while anyone is in bed; the action bar fades on its
+            // own shortly after the last sleeper gets up, so no explicit clear is needed.
+            if (sleeping > 0) {
+                TextComponentString message = new TextComponentString(
+                    TextFormatting.AQUA + progressLine(sleeping, total, required));
+                for (EntityPlayer p : world.playerEntities) {
+                    p.sendStatusMessage(message, true);
+                }
+            }
+            lastAnnouncedSleeping = -1;
+            return;
+        }
+
+        // Chat fallback: announce only when the count of sleepers changes (and only when at
+        // least one is in bed).
         if (sleeping > 0 && sleeping != lastAnnouncedSleeping) {
             announce(world,
                 TextFormatting.AQUA + "" + sleeping + "/" + total
@@ -79,6 +98,17 @@ public class SleepVoteHandler {
             // Reset so the next time someone gets in bed, we announce again.
             lastAnnouncedSleeping = -1;
         }
+    }
+
+    /** Sleepers needed to skip: ceil(total * thresholdPercent / 100), never below 1. */
+    public static int requiredSleepers(int total, int thresholdPercent) {
+        int required = (total * thresholdPercent + 99) / 100;
+        return Math.max(required, 1);
+    }
+
+    /** The action-bar progress line, e.g. {@code "3/5 sleeping (need 3 to skip)"}. */
+    public static String progressLine(int sleeping, int total, int required) {
+        return sleeping + "/" + total + " sleeping (need " + required + " to skip)";
     }
 
     private void skipNight(WorldServer world, int sleepers, int total) {
