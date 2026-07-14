@@ -219,6 +219,13 @@ public class SumConfig {
             + "Default 50. The required count is rounded up so 50% on a server of 3 needs 2.";
     private static final int FIELD_DEFAULT_SLEEP_VOTE_THRESHOLD = 50;
 
+    private static final String FIELD_KEY_SLEEP_VOTE_ACTION_BAR = "actionBarProgress";
+    private static final String FIELD_DESCRIPTION_SLEEP_VOTE_ACTION_BAR =
+        "When true, sleep-vote progress ('3/5 sleeping (need 3 to skip)') is shown live on the "
+            + "action bar of every overworld player while anyone is in bed. When false, falls "
+            + "back to a chat line that only fires when the sleeper count changes.";
+    private static final boolean FIELD_DEFAULT_SLEEP_VOTE_ACTION_BAR = true;
+
     private static final String CATEGORY_PAY = "pay";
 
     private static final String FIELD_KEY_PAY_ENABLED = "enabled";
@@ -278,6 +285,7 @@ public class SumConfig {
     private static boolean favoritesStarOverlay;
     private static boolean sleepVoteEnabled;
     private static int sleepVoteThresholdPercent;
+    private static boolean sleepVoteActionBarProgress;
 
     private static boolean beachesEnabled;
     private static boolean beachesAnimatedFlooding;
@@ -355,6 +363,9 @@ public class SumConfig {
             FIELD_KEY_SLEEP_VOTE_THRESHOLD, CATEGORY_SLEEP_VOTE,
             FIELD_DEFAULT_SLEEP_VOTE_THRESHOLD, 1, 100,
             FIELD_DESCRIPTION_SLEEP_VOTE_THRESHOLD);
+        sleepVoteActionBarProgress = config.getBoolean(
+            FIELD_KEY_SLEEP_VOTE_ACTION_BAR, CATEGORY_SLEEP_VOTE,
+            FIELD_DEFAULT_SLEEP_VOTE_ACTION_BAR, FIELD_DESCRIPTION_SLEEP_VOTE_ACTION_BAR);
 
         beachesEnabled = config.getBoolean(
             FIELD_KEY_BEACHES_ENABLED, CATEGORY_BEACHES,
@@ -442,6 +453,10 @@ public class SumConfig {
 
     public static boolean isSleepVoteEnabled() {
         return sleepVoteEnabled;
+    }
+
+    public static boolean isSleepVoteActionBarProgress() {
+        return sleepVoteActionBarProgress;
     }
 
     public static boolean isBeachesEnabled() {

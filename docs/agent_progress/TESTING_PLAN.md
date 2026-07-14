@@ -223,7 +223,7 @@ swap re-spaces rows without a second click.
 | `movement` | `toleranceEnabled`, `toleranceMultiplier` |
 | `pauser` | `enabled` |
 | `beaches` | `enabled`, `affectedBlocks`, `animatedFlooding`, `infiniteBucketWater`, `realisticErosion` |
-| `sleep_vote` | `enabled`, `thresholdPercent` |
+| `sleep_vote` | `enabled`, `thresholdPercent`, `actionBarProgress` (live action-bar progress line; false = legacy chat-on-change) |
 | `afk` | `enabled`, `thresholdSeconds` (default 300), `excludeFromSleepVote`, `announce`, `pauseWorldWhenAllAfk` |
 | `pay` | `enabled`, `feePercent` (default 0) |
 
@@ -402,7 +402,7 @@ until a playtest confirms the full path.
 
 Run with `JAVA_HOME="..." ./gradlew test`. JUnit 5 is enabled
 (`enableJUnit=true`); the suite is pure-logic only — no Minecraft runtime — so
-it runs in seconds and gates regressions in CI. All 78 green as of 2026-06-24.
+it runs in seconds and gates regressions in CI. All 83 green as of 2026-07-14.
 
 - [x] **Plot bbox math** (`SumPlotTest`, 13) — corner normalization, inclusive
       `contains`, `volume` (incl. the "vol 65k" full-column figure + a long
@@ -426,6 +426,9 @@ it runs in seconds and gates regressions in CI. All 78 green as of 2026-06-24.
 - [x] **Desk-phone exchange hash** (`DeskPhoneExchangeTest`, 4) — determinism,
       [0,1000) range, negative-coord safety, spread
 - [x] **Border config model** (`BorderEntryTest`, 2)
+- [x] **Sleep-vote math** (`SleepVoteMathTest`, 5) — ceiling-division required
+      count (incl. the documented "50% of 3 needs 2" example), never-below-1
+      floor, 100% = everyone, action-bar progress-line format
 
 ### 4.1 Section A — Bank / ATM kit (mostly verified)
 
@@ -934,6 +937,36 @@ Setup: poster + worker, economy backend loaded.
     offline-credit path) — but this is currently unreachable from the GUI
     (only the poster sees Cancel), so no money is lost in normal play.
 
+### 4.12 — Sleep-vote progress action bar (2026-07-14, untested)
+
+Backlog item #4 (§8), now implemented. While anyone is in bed in the
+overworld, every overworld player gets a live action-bar line
+"3/5 sleeping (need 3 to skip)", re-pushed each second; the count math is
+🧪 locked by `SleepVoteMathTest`. The chat-on-change announcement is now a
+fallback behind `sleep_vote.actionBarProgress=false`.
+
+**Config:** `sleep_vote` — `enabled` (true), `thresholdPercent` (50),
+`actionBarProgress` (true).
+
+Two players recommended (`gradlew runServer` + client, or two clients).
+
+- [ ] At night, player A gets in bed → both players see the action-bar line
+      (aqua) with correct counts; it stays visible (no flicker) while A
+      stays in bed
+- [ ] Player A leaves bed → action bar fades out on its own within a few
+      seconds (no stale line)
+- [ ] With 2 players and threshold 50%: second player gets in bed → night
+      skips immediately (no progress line lingers after the skip); "Night
+      skipped ... Good morning!" still arrives in chat
+- [ ] AFK denominator: with 2 players, force B AFK (drop
+      `afk.thresholdSeconds` to ~15 and idle) → A getting in bed shows
+      "1/1 sleeping (need 1 to skip)" and the night skips
+- [ ] Players in other dimensions do NOT get the action bar (it's
+      overworld-only, matching the vote)
+- [ ] `sleep_vote.actionBarProgress=false` + `/sum reloadconfig` → old
+      behavior: chat line on sleeper-count change only, no action bar
+- [ ] `sleep_vote.enabled=false` → no action bar, no chat, vanilla sleep
+
 ---
 
 ## 5. Regression checks (relevant after the 2026-05-20 session)
@@ -1027,12 +1060,11 @@ patterns. Pair with a phone "Find my grave" coordinate ping (the coords +
 snapshot-sync plumbing already exists). Highest single frustration-reducer
 for a survival server.
 
-### #4 — Sleep-vote progress feedback
+### #4 — Sleep-vote progress feedback — ✅ SHIPPED 2026-07-14
 
-An action-bar / HUD line ("3/5 sleeping — need 3") shown while anyone is in
-bed. Both the vote logic (`SleepVoteHandler`) and the HUD framework already
-exist — this is glue. Now that AFK exclusion is in, the displayed denominator
-should match the AFK-adjusted count.
+An action-bar line ("3/5 sleeping (need 3 to skip)") shown live while anyone
+is in bed, AFK-adjusted denominator, `sleep_vote.actionBarProgress` toggle
+with chat-on-change fallback. Playtest checklist: §4.12.
 
 ### #5 — `/baltop` leaderboard + notification toasts
 
