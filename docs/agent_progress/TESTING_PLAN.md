@@ -1,6 +1,8 @@
 # SUM testing plan + feature reference
 
-This is the canonical doc for SUM as of 2026-05-20. It captures:
+This is the canonical doc for SUM as of 2026-07-14 (the 2026-06-07 session
+notes, formerly a root-level `TESTING_AND_NEXT_STEPS.md`, have been merged
+in — see §4.11 and §8). It captures:
 
 1. **Where everything lives** — block / item / command / HUD / network-slot
    inventory so a future Claude session or dev can find any feature without
@@ -12,6 +14,7 @@ This is the canonical doc for SUM as of 2026-05-20. It captures:
 4. **Per-feature playtest checklists** — verified items marked done with the
    commit that proved them out; unverified items with detailed step-by-step
    instructions
+5. **Next-steps backlog** (§8) — features planned but not yet implemented
 
 Sections 1–3 are reference; sections 4+ are the actual playtest workflow.
 Tick boxes as you go. Add notes inline for anything that misbehaves so the
@@ -54,22 +57,23 @@ Weather 2 Remastered fork) — NOT this repo.
 | Package | What |
 |---|---|
 | `Sum.java` / `SumConstants.java` / `SumConfig.java` / `SumRegistry.java` / `SumTab.java` / `SumProxy.java` / `Sum{Client,Common}Proxy.java` | Mod root; lifecycle, registration, config, creative tab, proxies |
+| `.afk` | AFK tracking (`AfkTracker`) — activity detection, sleep-vote exclusion, all-AFK world pause |
 | `.atm` | ATM kit (kiosk/wall/drive-thru), `SumNetwork`, `SumGuiHandler`, atm GUI + packet |
 | `.bank` | Bank counter, safe deposit box, vault door, velvet rope |
 | `.beaches` | Pretty-Beaches absorption (`BeachesHandler`) |
 | `.border` | World-border (`BorderHandler`, `BorderEntry`) |
-| `.command` | `CommandSum`, `CommandBalance` |
+| `.command` | `CommandSum`, `CommandBalance`, `CommandPay` |
 | `.economy` | `EconomyBridge` facade, SUM-native money capability, bill items + packet items, bill changer, bills display, phone + debit card item (`ItemAccountAccess`), bills loot injector, EconomyInc migration command logic |
 | `.favorites` | Creative-tab favorites system (`FavoriteKey`, `FavoritesStore`, `CreativeTabFavorites`, `FavoritesClientHandler`, `FavoritesKeybinds`) |
 | `.huds` | ~30 OneConfig HUDs + `TextPlaceholders` helper for `CustomTextHud` |
 | `.huds.presets` | `HudPresets`, `HudStyle`, `HudLayout` (8 styles × 17 layouts) |
 | `.huds.snapshot` | Server→client player-status bridge for SUM-data HUDs (slot 14) |
-| `.jobs` | Job board block + listings + GUI |
+| `.jobs` | Job board block + listings + GUI + escrow/accept/complete loop (`PacketOpenJobBoard` snapshot push) |
 | `.loyalty` | Loyalty rewards (milestones + handler) |
 | `.mailbox` | Mailbox block + claim/deposit/inbox GUI |
 | `.mixin` | `SumCoreMod` (IFMLLoadingPlugin), `MixinWorldServer`, `MixinNetHandlerPlayServer` |
 | `.pauser` | (Empty per Mixin rewrite; logic lives in `MixinWorldServer`) |
-| `.phone` | Phone item + GUI shell, desk phone TE, phone cloud (notes/contacts/messages saved-data), area-code allocation |
+| `.phone` | Phone item + GUI shell (incl. the "Pay" app, personal phones only), desk phone TE, phone cloud (notes/contacts/messages saved-data), area-code allocation |
 | `.plots` | Plot data + saved-data + chunk index + wand + protection events + `/sum plots gui` browser |
 | `.pocket` | Pocket inventory (3-slot capability + GUI), `PocketHud` (favorites preview), `SumOneConfig` root config |
 | `.roamer` | Roamer NPC entity, AI tasks, shelter cache, role enum, atlas + persona variants, render |
@@ -130,6 +134,7 @@ Weather 2 Remastered fork) — NOT this repo.
 | `/sum sealevel` | anyone | Reports current dim's sea Y (debug aid for beaches testing) |
 | `/sum beaches debug` | op | Toggle chat-spam on each beaches match (debug aid) |
 | `/balance [player]` | anyone self / op for others | User-facing balance |
+| `/pay <player> <amount>` | anyone | Player-to-player transfer; optional fee via `pay.feePercent`; tab-completes online players |
 
 ### 1.6 SumNetwork packet slots (`SumNetwork.init()`)
 
@@ -153,8 +158,9 @@ Weather 2 Remastered fork) — NOT this repo.
 | 15 | `PacketOpenPlotBrowser` | S→C |
 | 16 | `PacketPlotAction` | C→S |
 | 17 | `PacketSyncServerConfig` | S→C |
+| 18 | `PacketOpenJobBoard` | S→C |
 
-Next free slot: **18**. Update `SumNetwork.java` AND this table when claiming.
+Next free slot: **19**. Update `SumNetwork.java` AND this table when claiming.
 
 ### 1.7 SumGuiHandler IDs
 
@@ -167,7 +173,7 @@ Next free slot: **18**. Update `SumNetwork.java` AND this table when claiming.
 | 4 | `GUI_BILL_CHANGER` |
 | 5 | `GUI_TRASH_CAN` |
 | 6 | `GUI_MAILBOX` |
-| 7 | `GUI_JOB_BOARD` |
+| 7 | RETIRED (was `GUI_JOB_BOARD` — job board now opens via `PacketOpenJobBoard`, slot 18, so the GUI gets a server-built snapshot instead of reading client-side `WorldSavedData`) |
 | 8 | RESERVED (was Signpost — moved to CSM) |
 | 9 | `GUI_DESK_PHONE` |
 | 10 | `GUI_POCKET` |
@@ -218,6 +224,8 @@ swap re-spaces rows without a second click.
 | `pauser` | `enabled` |
 | `beaches` | `enabled`, `affectedBlocks`, `animatedFlooding`, `infiniteBucketWater`, `realisticErosion` |
 | `sleep_vote` | `enabled`, `thresholdPercent` |
+| `afk` | `enabled`, `thresholdSeconds` (default 300), `excludeFromSleepVote`, `announce`, `pauseWorldWhenAllAfk` |
+| `pay` | `enabled`, `feePercent` (default 0) |
 
 After edits: `/sum reloadconfig` rereads the file. The Server Config Viewer
 GUI is per-login — re-login to see changes there.
@@ -307,6 +315,12 @@ Each line is one decision + brief why.
 - **SUM is a coremod via MixinBooter** (`mixin.SumCoreMod` IFMLLoadingPlugin).
   Reversal of the original "no coremod" rule, locked 2026-05-09.
 
+### Scope
+
+- **Teleport/utility commands** (`/home`, `/tpa`, `/back`, `/warp`, `/spawn`)
+  are **out of scope by decision** — handled by **ForgeEssentials** in the
+  Alto pack; intentionally not duplicated in SUM.
+
 ### Build / packaging
 
 - **OneConfig wrapper embedded into the published jar** (Task 14). End users
@@ -344,6 +358,7 @@ area, double-check it doesn't undo one of these.
 | `f1dc77c` | HUD title double colons (`"HP::"`) | OneConfig's `SingleTextHud.getCompleteText` auto-appends `": "`; stripped trailing colons from all 30 HUD titles |
 | `f1dc77c` | Mixin config not loading in dev | MixinBooter only auto-discovers configs via jar MANIFEST attributes. Dev launches had no manifest. Fix: `SumCoreMod` IFMLLoadingPlugin + `coreModClass` in `buildscript.properties` |
 | `f1dc77c` | Favorites HUD icons overflowed at small style scales (Realistic Game HUD 0.4×) | `renderItemAndEffectIntoGUI` always paints 16×16; wrapped with `GlStateManager.scale` to size to the slot frame |
+| `a594a2e` | Job board showed no listings on a dedicated server | GUI read `JobBoardSavedData` client-side, which is empty off the integrated server. Replaced the `openGui` path (GUI id 7, now retired) with `PacketOpenJobBoard` (slot 18) pushing a server-built snapshot |
 
 ### Brittle areas to be careful in
 
@@ -364,6 +379,11 @@ area, double-check it doesn't undo one of these.
 - **In Forge 1.12.2, don't guard `player.openGui` with `!world.isRemote`
   for non-Container GUIs** — both sides need to fire (memory:
   `feedback_forge_screen_only_gui`).
+- **Screen-only GUIs must not read server-side `WorldSavedData` from the
+  client** — it's empty on a dedicated server (the job-board bug, `a594a2e`).
+  Any GUI whose data lives in saved-data needs a server-pushed snapshot
+  (packet → `displayGuiScreen`, like the plot browser and job board). Worth a
+  quick audit if any other screen looks empty on the dedicated server.
 
 ---
 
@@ -431,7 +451,7 @@ No re-test needed unless touching the relevant files.
 | SV Sleep voting — threshold-met → night skips | ✅ | Pre-2026-05-08 |
 | BC Business cards — personalize / give / view | ✅ | Pre-2026-05-08 |
 | MX Mailbox — claim on first right-click; deposit-only for non-owners | ✅ | Pre-2026-05-08 |
-| JB Job board — listings, post/list/clear-mine, GUI Remove button | ✅ | Pre-2026-05-08 |
+| JB Job board — listings, post/list/clear-mine, GUI Remove button | ✅ (superseded) | Pre-2026-05-08 — the `a594a2e` escrow rework replaced the GUI open path and buttons; re-test via §4.11.4 |
 
 ### 4.3 Section C — SUM economy (mostly verified)
 
@@ -811,6 +831,109 @@ priority but worth catching when in the area:
       well-spread) is covered by `DeskPhoneExchangeTest`; the TE allocation +
       display path is the in-game part still to confirm
 
+### 4.11 — 2026-06-07 session features (AFK, `/pay`, phone Pay app, job escrow)
+
+Shipped on branch `dev/ogh`:
+
+| Commit | Feature |
+|--------|---------|
+| `97ee3e4` | AFK tracking + `/pay` player-to-player transfers |
+| `a0e0833` | Phone "Pay" app |
+| `a594a2e` | Job-board escrow + accept/complete loop (+ dedicated-server listings fix, see §3) |
+
+All three compile (`gradlew compileJava`) and the JUnit suite passes
+(`gradlew test`). None have been exercised in a running client/server yet —
+that's the checklists below. Run with two players where noted
+(`gradlew runServer` + a client, or two clients). Set `JAVA_HOME` to the
+Java 17 Azul install first.
+
+#### 4.11.1 AFK tracking → sleep vote + pauser
+
+**Config:** `afk` category — `enabled` (true), `thresholdSeconds` (300),
+`excludeFromSleepVote` (true), `announce` (true), `pauseWorldWhenAllAfk`
+(false).
+
+- [ ] Stand still (no movement/look/chat) for `thresholdSeconds` → "is now
+      AFK" broadcast (if `announce`). Move/look/chat → "no longer AFK".
+- [ ] Drop `thresholdSeconds` to ~15 to test quickly.
+- [ ] **Main win:** with 2 players, one in bed and the other AFK → night
+      skips (AFK player excluded from the head count). Toggle
+      `excludeFromSleepVote` off → vanilla behavior returns (AFK player
+      blocks skip).
+- [ ] Sleeping must never count as AFK (getting in bed is activity).
+- [ ] Set `pauseWorldWhenAllAfk=true`: with all online players AFK, world
+      freezes (time/mobs/growth stop); any player moving unfreezes it.
+      Confirm it does **not** freeze when at least one player is active.
+- **Known limitation:** activity = position, rotation, or chat. A player who
+  is genuinely interacting but perfectly still and silent (e.g. staring at a
+  furnace) would eventually flag AFK. Acceptable; revisit if it bites.
+
+#### 4.11.2 `/pay <player> <amount>`
+
+**Config:** `pay` category — `enabled` (true), `feePercent` (0).
+
+- [ ] `/pay <name> 25` → debits sender, credits recipient, both get chat
+      lines. Tab-completes online players.
+- [ ] Guards: pay yourself, pay more than you have, non-numeric amount,
+      amount ≤ 0, offline/unknown target.
+- [ ] Set `feePercent` > 0 → recipient receives `amount − fee`; sender pays
+      full amount; the difference is a sink. Confirm rounding to cents.
+- [ ] Works on both economy backends (EconomyInc present vs. SUM-native
+      fallback).
+
+#### 4.11.3 Phone "Pay" app
+
+- [ ] Personal phone shows the **Pay** tile (7th app); desk phone does
+      **not**.
+- [ ] Pay flow: open Pay → pick a contact → enter amount → Pay. Balance line
+      shows your wallet.
+- [ ] Amount field accepts only digits + one decimal point; Enter submits.
+- [ ] Same guards as `/pay` (insufficient funds, offline recipient, ≤ 0) —
+      surfaced as chat lines from the server; the entry screen shows a local
+      "Enter a valid amount" for parse failures.
+- [ ] Back/Home navigation from both Pay sub-screens.
+- **Known limitation:** no client-side success toast — confirmation arrives
+  via chat (consistent with the messages app). No per-send cooldown (the
+  `/pay` command isn't rate-limited either).
+
+#### 4.11.4 Job-board escrow + accept/complete loop
+
+This is the largest change and also **fixes a latent multiplayer bug** (the
+board previously read `JobBoardSavedData` client-side, which is empty on a
+dedicated server, so listings never showed — see §3).
+
+Setup: poster + worker, economy backend loaded.
+
+- [ ] `/sum job post 50 break some stone` → debits $50 (escrow). Posting
+      with no economy backend, or insufficient funds, is rejected.
+- [ ] Right-click a job board → listings appear (test specifically on a
+      **dedicated server**, not just singleplayer, since that's the path
+      that was broken).
+- [ ] Worker view: OPEN listing shows **Accept** → becomes CLAIMED (worker
+      name shown); poster is notified in chat.
+- [ ] Worker: **Done** → SUBMITTED; **Drop** → back to OPEN.
+- [ ] Poster view on SUBMITTED: **Pay** → worker credited $50, listing
+      removed, both notified; **Reject** → back to CLAIMED for rework.
+- [ ] Poster view on OPEN/CLAIMED: **Cancel** → $50 refunded, listing
+      removed (worker notified if mid-job).
+- [ ] GUI live-refreshes after each action (server re-pushes the snapshot —
+      no close/reopen).
+- [ ] `/sum job clear-mine` → removes the poster's listings and refunds
+      total escrow.
+- [ ] Expiry: post a job, let it expire (or shorten `JOB_EXPIRY_MILLIS` for
+      a test build), reopen a board as the poster → escrow auto-reclaimed
+      with a chat line.
+- [ ] `/sum job list` shows `[CLAIMED by X]` / `[REVIEW by X]` status
+      suffixes.
+- [ ] "Jobs available" HUD counts **OPEN** listings only.
+- **Known limitations:**
+  - **Approval requires the worker to be online** (payout needs a live
+    capability). Poster is told to wait if the worker is offline; escrow
+    stays held.
+  - Admin force-cancel of an offline poster's job can't refund (no
+    offline-credit path) — but this is currently unreachable from the GUI
+    (only the poster sees Cancel), so no money is lost in normal play.
+
 ---
 
 ## 5. Regression checks (relevant after the 2026-05-20 session)
@@ -852,6 +975,18 @@ these still work since the changes could have shaken them loose:
       tracker subscription wasn't disturbed)
 - [ ] Other login-event handlers (loyalty tracker, money sync) still fire
 
+### After the 2026-06-07 session (slot 18, GUI id 7 retired, AFK hooks)
+
+- [ ] All packets on slots 0–17 still flow without errors (slot 18 is
+      additive; no holes reused)
+- [ ] Other `SumGuiHandler` GUIs (ATM, safe deposit, shop, bill changer,
+      trash, mailbox, desk phone, pocket) still open — id 7 was retired,
+      not renumbered
+- [ ] Sleep vote with AFK feature **disabled** (`afk.enabled=false`) →
+      behaves exactly as before the AFK exclusion existed
+- [ ] Server pauser (`pauser` config) unaffected by the separate
+      `pauseWorldWhenAllAfk` path when the latter is off
+
 ---
 
 ## 6. Bug log (fill in as you find issues)
@@ -875,3 +1010,61 @@ When everything in section 4 is green (or has a tracked fix-commit):
 - [ ] Update this doc's "Status" line at top with the date
 - [ ] Optional: archive this doc + start a fresh one if the next round of
       work is materially different in scope
+
+---
+
+## 8. Next steps — planned but not yet implemented
+
+From the feature review at the start of the 2026-06-07 session. Numbering
+matches that discussion (the missing numbers shipped in that session or were
+dropped).
+
+### #2 — Death graves / item recovery
+
+A `BlockGrave` tile entity holding the dead player's inventory + XP,
+owner-priority pickup, optional decay. Reuses the mailbox/safe-deposit TE+GUI
+patterns. Pair with a phone "Find my grave" coordinate ping (the coords +
+snapshot-sync plumbing already exists). Highest single frustration-reducer
+for a survival server.
+
+### #4 — Sleep-vote progress feedback
+
+An action-bar / HUD line ("3/5 sleeping — need 3") shown while anyone is in
+bed. Both the vote logic (`SleepVoteHandler`) and the HUD framework already
+exist — this is glue. Now that AFK exclusion is in, the displayed denominator
+should match the AFK-adjusted count.
+
+### #5 — `/baltop` leaderboard + notification toasts
+
+- `/baltop`: top balances. Small command; pairs with `/balance` and `/pay`.
+- Toast HUD: a transient overlay for events that currently only hit chat
+  (money received, new message, job accepted/approved, loyalty milestone).
+  Reuses the OneConfig HUD framework + `PlayerStatusSnapshot` sync. Would
+  make `/pay`, the phone Pay app, and the jobs loop feel much more
+  responsive.
+
+### #7 — Plot money sinks (economy depth)
+
+The economy has many faucets (loyalty, loot bills, job rewards) and few
+sinks. Plots are the natural sink:
+
+- **Rent / upkeep** — periodic charge on owned plots (loyalty-style tick +
+  `EconomyBridge`); unpaid → reverts to `FOR_SALE`.
+- **Plot-home teleport** — `/plot home` to an owned plot's spawn.
+- **Street-address system** — assign each plot an address, unifying plots +
+  mailbox delivery + a phone Maps/GPS app.
+
+### #8 — Roamer economy ("make the city alive")
+
+Give Roamers economic purpose, reusing `TileEntityShop` + `EntityRoamer`:
+
+- **Customer roamers** periodically buy from nearby player shops, depositing
+  to the owner — passive income that rewards building shops on trafficked
+  roads.
+- **Shopkeeper roamers** bound to a shop block → right-click the NPC opens
+  `GuiShopBuyer`.
+- **Quest-giver roamers** that post to the job board — ties roamers + the
+  new jobs loop together.
+
+Most distinctive direction; depends on whether the next priority is economy
+depth (#7) or city flavor (#8).
