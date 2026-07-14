@@ -29,7 +29,8 @@ import net.minecraft.world.World;
  * happens both on initial placement and on chunk reload (via the TE's {@code onLoad}), so
  * existing signs survive server restarts.
  *
- * <p>Wall-mounted: 2/16 thick, full 16×16 face on the wall, four horizontal facings. Use
+ * <p>Wall-mounted: 0.5/16 thick, 12 wide × 16 tall face on the wall (matching the 3:4
+ * proportions of the real-world sign artwork), four horizontal facings. Use
  * {@code FACING} property to track orientation. The block hangs off the wall the player
  * clicked when placing — the placement face becomes the sign's facing direction.
  *
@@ -42,11 +43,11 @@ public class BlockStormShelterSign extends Block implements ITileEntityProvider 
         "facing", EnumFacing.Plane.HORIZONTAL);
 
     /** Body sits on the wall the sign is mounted against. For facing=NORTH, the sign faces
-     *  north, so it's mounted on the south wall of its own block — body fills z=14..16. */
-    private static final AxisAlignedBB BB_NORTH = new AxisAlignedBB(0.0, 0.0, 14.0 / 16.0, 1.0, 1.0, 1.0);
-    private static final AxisAlignedBB BB_SOUTH = new AxisAlignedBB(0.0, 0.0, 0.0, 1.0, 1.0, 2.0 / 16.0);
-    private static final AxisAlignedBB BB_WEST = new AxisAlignedBB(14.0 / 16.0, 0.0, 0.0, 1.0, 1.0, 1.0);
-    private static final AxisAlignedBB BB_EAST = new AxisAlignedBB(0.0, 0.0, 0.0, 2.0 / 16.0, 1.0, 1.0);
+     *  north, so it's mounted on the south wall of its own block — body fills z=15.5..16. */
+    private static final AxisAlignedBB BB_NORTH = new AxisAlignedBB(2.0 / 16.0, 0.0, 15.5 / 16.0, 14.0 / 16.0, 1.0, 1.0);
+    private static final AxisAlignedBB BB_SOUTH = new AxisAlignedBB(2.0 / 16.0, 0.0, 0.0, 14.0 / 16.0, 1.0, 0.5 / 16.0);
+    private static final AxisAlignedBB BB_WEST = new AxisAlignedBB(15.5 / 16.0, 0.0, 2.0 / 16.0, 1.0, 1.0, 14.0 / 16.0);
+    private static final AxisAlignedBB BB_EAST = new AxisAlignedBB(0.0, 0.0, 2.0 / 16.0, 0.5 / 16.0, 1.0, 14.0 / 16.0);
 
     public BlockStormShelterSign() {
         super(Material.IRON);
