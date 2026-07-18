@@ -152,4 +152,34 @@ class SumConfigParsersTest {
         // And a lone null-ish blank list element doesn't crash.
         assertNull(parseBorders("").get(0));
     }
+
+    // --- RoadRunner speed-block parser (block=multiplier) ---
+
+    @Test
+    void parsesValidSpeedBlock() {
+        Map<String, Double> result = SumConfig.parseSpeedBlocks(new String[] {"minecraft:concrete=1.8"});
+        assertEquals(1, result.size());
+        assertEquals(1.8, result.get("minecraft:concrete"));
+    }
+
+    @Test
+    void speedBlockParserTrimsWhitespace() {
+        Map<String, Double> result = SumConfig.parseSpeedBlocks(new String[] {"  minecraft:stone = 2.0 "});
+        assertEquals(2.0, result.get("minecraft:stone"));
+    }
+
+    @Test
+    void speedBlockParserSkipsMalformedEntries() {
+        Map<String, Double> result = SumConfig.parseSpeedBlocks(new String[] {
+            "",                    // blank → no '='
+            "garbage",             // no '='
+            "minecraft:stone=abc", // non-numeric multiplier
+            "a=b=1.5"});           // split("=",2) → parse "b=1.5" fails
+        assertTrue(result.isEmpty(), "every entry was malformed");
+    }
+
+    @Test
+    void speedBlockParserEmptyInputIsEmpty() {
+        assertTrue(SumConfig.parseSpeedBlocks(new String[0]).isEmpty());
+    }
 }

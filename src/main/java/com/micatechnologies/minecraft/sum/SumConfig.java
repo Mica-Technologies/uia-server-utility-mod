@@ -337,20 +337,7 @@ public class SumConfig {
         String[] speedBlockEntries = config.getStringList(
             FIELD_KEY_ROADRUNNER_SPEED_BLOCKS, CATEGORY_ROADRUNNER,
             FIELD_DEFAULT_ROADRUNNER_SPEED_BLOCKS, FIELD_DESCRIPTION_ROADRUNNER_SPEED_BLOCKS);
-        roadRunnerSpeedBlocks = new HashMap<>();
-        for (String entry : speedBlockEntries) {
-            String[] parts = entry.split("=", 2);
-            if (parts.length == 2) {
-                try {
-                    double multiplier = Double.parseDouble(parts[1].trim());
-                    roadRunnerSpeedBlocks.put(parts[0].trim(), multiplier);
-                } catch (NumberFormatException e) {
-                    Sum.LOGGER.warn("Invalid RoadRunner speed entry '{}': multiplier is not a number", entry);
-                }
-            } else {
-                Sum.LOGGER.warn("Invalid RoadRunner speed entry '{}': expected format 'block=multiplier'", entry);
-            }
-        }
+        roadRunnerSpeedBlocks = parseSpeedBlocks(speedBlockEntries);
 
         favoritesStarOverlay = config.getBoolean(
             FIELD_KEY_FAVORITES_STAR_OVERLAY, CATEGORY_FAVORITES,
@@ -489,6 +476,29 @@ public class SumConfig {
 
     public static Map<Integer, BorderEntry> getAllBorderEntries() {
         return borderEntries;
+    }
+
+    /**
+     * Parses RoadRunner {@code block=multiplier} entries into a map. Entries without an {@code =}
+     * or with a non-numeric multiplier are skipped with a warning. Package-private + pure so it's
+     * unit-testable like the border/loyalty parsers. Keys/values are trimmed.
+     */
+    static Map<String, Double> parseSpeedBlocks(String[] entries) {
+        Map<String, Double> result = new HashMap<>();
+        for (String entry : entries) {
+            String[] parts = entry.split("=", 2);
+            if (parts.length == 2) {
+                try {
+                    double multiplier = Double.parseDouble(parts[1].trim());
+                    result.put(parts[0].trim(), multiplier);
+                } catch (NumberFormatException e) {
+                    Sum.LOGGER.warn("Invalid RoadRunner speed entry '{}': multiplier is not a number", entry);
+                }
+            } else {
+                Sum.LOGGER.warn("Invalid RoadRunner speed entry '{}': expected format 'block=multiplier'", entry);
+            }
+        }
+        return result;
     }
 
     private static Map<Integer, BorderEntry> parseBorderEntries(String[] entries) {
