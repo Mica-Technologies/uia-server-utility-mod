@@ -398,37 +398,63 @@ A 🧪 marker means the underlying logic is now locked by an automated unit test
 behavior check (rendering, commands, world events), so those boxes stay open
 until a playtest confirms the full path.
 
-### 4.0 Automated unit-test coverage (`src/test`, 78 tests)
+### 4.0 Automated unit-test coverage (`src/test`, 318 tests)
 
 Run with `JAVA_HOME="..." ./gradlew test`. JUnit 5 is enabled
 (`enableJUnit=true`); the suite is pure-logic only — no Minecraft runtime — so
-it runs in seconds and gates regressions in CI. All 83 green as of 2026-07-14.
+it runs in seconds and gates regressions in CI. All 318 green as of 2026-07-18
+(expanded from 83 in the 2026-07-18 unit-test push).
 
-- [x] **Plot bbox math** (`SumPlotTest`, 13) — corner normalization, inclusive
-      `contains`, `volume` (incl. the "vol 65k" full-column figure + a long
-      overflow guard), NBT round-trip preserves owner/trusted/corners
-- [x] **Plot store / overlap refusal** (`SumPlotsWorldSavedDataTest`, 12) —
-      `overlapsAny` (the create-time overlap rule), per-dim filtering, FOR_SALE
-      listing, ownership + nearest-plot queries
-- [x] **Chunk index** (`SumPlotsChunkIndexTest`, 9) — multi-chunk spans,
-      negative coords, removal cleanup, rebuild
-- [x] **Plot status parsing** (`PlotStatusTest`, 5)
-- [x] **Config parsers** (`SumConfigParsersTest`, 11) — `dimId=radius:mode`
-      (border) + `minutes=type:value` (loyalty): valid parse, malformed-entry
-      rejection, duplicate-key handling, order preservation
-- [x] **Bill loot invariants** (`BillsLootInjectorTest`, 6) — $200/$500 never
-      injected, small denoms outweigh large, most rolls empty, 13 target tables
-- [x] **Bill denomination tables** (`BillsTest`, 5) — canonical 8, defensive
-      copy, withdraw subset excludes $200/$500
-- [x] **Custom-text placeholders** (`TextPlaceholdersTest`, 11) — substitution,
-      unknown-token-left-intact, trailing/empty `%`, case-insensitivity
-      (via `applyExample`, the preview path sharing `apply()`'s scan loop)
-- [x] **Desk-phone exchange hash** (`DeskPhoneExchangeTest`, 4) — determinism,
-      [0,1000) range, negative-coord safety, spread
-- [x] **Border config model** (`BorderEntryTest`, 2)
-- [x] **Sleep-vote math** (`SleepVoteMathTest`, 5) — ceiling-division required
-      count (incl. the documented "50% of 3 needs 2" example), never-below-1
-      floor, 100% = everyone, action-bar progress-line format
+**Testing approach.** Three access patterns are used throughout: (1) pure public
+static methods tested directly; (2) MC-dependent methods where the pure math is
+extracted into a helper (e.g. `PhoneFormat`, `HudFormat`, `MoneyTransfer
+.computeAmounts`, `BorderHandler.clampToInset`, `TileEntityShop.breakIntoBills`)
+and the live method delegates to it; (3) private static parsers/data reached via
+reflection. `NBTTagCompound`, `BlockPos`, netty `ByteBuf`, Forge `ByteBufUtils`,
+`WorldSavedData`/`TileEntity` (with a null world → `markDirty` no-op), and
+`TextComponent*` all work off-runtime; **OneConfig** types do not (compileOnly),
+so HUD classes and `HudPresets` can't be loaded in tests — hence the standalone
+`HudFormat`.
+
+Original core (still green):
+- [x] **Plot bbox math** (`SumPlotTest`, 13) · **plot store/overlap**
+      (`SumPlotsWorldSavedDataTest`, 12) · **chunk index**
+      (`SumPlotsChunkIndexTest`, 9) · **plot status** (`PlotStatusTest`, 5)
+- [x] **Config parsers** (`SumConfigParsersTest`, 15) — border `dimId=radius:mode`,
+      loyalty `minutes=type:value`, **roadrunner `block=multiplier`** (new)
+- [x] **Bill loot invariants** (`BillsLootInjectorTest`, 6) · **bill tables**
+      (`BillsTest`, 7 — +withdraw-subset + registry-alignment)
+- [x] **Custom-text placeholders** (`TextPlaceholdersTest`, 11) · **desk-phone
+      exchange** (`DeskPhoneExchangeTest`, 4) · **border model**
+      (`BorderEntryTest`, 2) · **sleep-vote math** (`SleepVoteMathTest`, 7 —
+      +`ticksUntilMorning`)
+
+2026-07-18 expansion (~235 new tests):
+- [x] **economy/atm** — `DefaultSumMoney` (clamp/overdraft/NBT),
+      `PersonalItemsSavedData` (bitmask NBT), `MoneyTransfer` (round/fee/clamp),
+      `TileEntityBillChanger.describe`, three packet round-trips
+- [x] **phone** — cloud `Message`/`MessageThread` (FIFO evict)/`Contact`/
+      `PhoneCloudData`/`PhoneCloudSavedData` (number format + allocation)/
+      `PhoneCloudAction` (byte round-trip); `PhoneTextField` state machine;
+      `PhoneFormat` (clock/calc/brighten/firstLine)
+- [x] **jobs** — `JobListing` (lifecycle + NBT + ByteBuf), `JobStatus`,
+      `JobBoardSavedData` (filter/sort/take/sweep), `JobListing.formatRemaining`
+- [x] **roamer** — `RoamerRole`, `RoamerExitCache` + `RoamerShelterCache`
+      (dedup/range/priority geometry)
+- [x] **favorites/pocket/bank** — `FavoriteKey`, `FavoritesStore` (version
+      counter), `PocketInventory.Slot`, `TileEntityVaultDoor` (SHA-256 passcode)
+- [x] **serverconfig/huds** — `ServerConfigSnapshot` (versioned wire),
+      `ServerConfigBridge` formatters, `PlayerStatusSnapshot`,
+      `PacketSyncPlayerStatus`, `HudLayout` builder, `HudFormat` (12 formatters)
+- [x] **loyalty/border/shop/contacts** — `LoyaltyMilestone`/`LoyaltyHandler`,
+      `BorderHandler` geometry, `TileEntityShop` (describe/clamps/breakIntoBills),
+      `ItemBusinessCard.isPersonalizedTag`
+
+> ⚠️ **Found during the expansion (not yet fixed):** `DirectionHud`'s octant math
+> `Math.round((yaw+22.5)/45) % 8` double-shifts the bucket offset — due south
+> (yaw 0) renders "SW", north renders "NE", i.e. every direction reads 45°
+> clockwise. Fix is `Math.round` → `(int)` (floor). Deliberately left un-extracted
+> and untested pending a decision. See §6 bug log.
 
 ### 4.1 Section A — Bank / ATM kit (mostly verified)
 
@@ -1026,7 +1052,7 @@ these still work since the changes could have shaken them loose:
 
 | # | Section | Symptom | Repro steps | Severity | Commit-fix |
 |---|---|---|---|---|---|
-|   |         |         |             |          |            |
+| 1 | E / DirectionHud | Compass reads 45° clockwise — facing due south shows "SW", north shows "NE", etc. | Face due south (F3 yaw ≈ 0) with the Direction HUD enabled | Medium (cosmetic, but wrong on every facing) | Found via unit-test push 2026-07-18; fix is `Math.round((yaw+22.5)/45)` → `(int)((yaw+22.5)/45)` in `DirectionHud.getText`, then extract to `HudFormat.direction` + test. **Not yet applied.** |
 
 ---
 
