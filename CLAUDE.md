@@ -4,9 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build Commands
 
-Set `JAVA_HOME` to a Java 17 install before each `./gradlew` invocation:
-- Windows: `C:/Users/<username>/.jdks/azul-17.0.18` (managed by IntelliJ)
-- macOS:   `/Users/<username>/Library/Java/JavaVirtualMachines/azul-17.0.19/Contents/Home`
+Set `JAVA_HOME` to a **Java 21+** install before each `./gradlew` invocation (CI runs Java 21).
+**21 is the recommended sweet spot:** RetroFuturaGradle requires the Gradle process to run on
+Java 21+ (older is deprecated and slated for removal), and the pinned Gradle 8.9 officially
+supports running only on Java ≤ 22 — so 21/22 are both in-support *and* match CI. Newer JDKs
+(23–26) still compile the mod correctly via Jabel but run Gradle past its supported ceiling
+(you'll see harmless `native-access` / restricted-method warnings). Either way the compiler and
+mod code target **Java 8** — only the JVM that runs Gradle changes.
+
+IntelliJ manages these JDKs (point `JAVA_HOME` at your install; exact patch version varies):
+- Windows: `C:/Users/<username>/.jdks/azul-21.x` (managed by IntelliJ)
+- macOS:   `/Users/<username>/Library/Java/JavaVirtualMachines/azul-21.x/Contents/Home`
 
 ```bash
 # Setup workspace (required first time, or after clean)
@@ -35,7 +43,7 @@ JAVA_HOME="..." ./gradlew clean
 JAVA_HOME="..." ./gradlew test
 ```
 
-**Requirements:** Java 17 (Azul Zulu Community). The project uses Jabel to allow modern Java syntax while targeting JVM 8. Heap is set to `-Xmx3G` in `gradle.properties` for decompilation.
+**Requirements:** Java 21+ (Azul Zulu Community; CI uses 21). The project uses Jabel to allow modern Java syntax while targeting JVM 8 — so mod code stays Java 8 regardless of which JDK runs Gradle. Heap is set to `-Xmx3G` in `gradle.properties` for decompilation.
 
 ### Apple Silicon (macOS) dev client
 
