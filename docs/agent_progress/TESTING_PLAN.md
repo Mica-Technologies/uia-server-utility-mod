@@ -445,16 +445,17 @@ Original core (still green):
       counter), `PocketInventory.Slot`, `TileEntityVaultDoor` (SHA-256 passcode)
 - [x] **serverconfig/huds** — `ServerConfigSnapshot` (versioned wire),
       `ServerConfigBridge` formatters, `PlayerStatusSnapshot`,
-      `PacketSyncPlayerStatus`, `HudLayout` builder, `HudFormat` (12 formatters)
+      `PacketSyncPlayerStatus`, `HudLayout` builder, `HudFormat` (13 formatters
+      incl. `direction`)
 - [x] **loyalty/border/shop/contacts** — `LoyaltyMilestone`/`LoyaltyHandler`,
       `BorderHandler` geometry, `TileEntityShop` (describe/clamps/breakIntoBills),
       `ItemBusinessCard.isPersonalizedTag`
 
-> ⚠️ **Found during the expansion (not yet fixed):** `DirectionHud`'s octant math
-> `Math.round((yaw+22.5)/45) % 8` double-shifts the bucket offset — due south
-> (yaw 0) renders "SW", north renders "NE", i.e. every direction reads 45°
-> clockwise. Fix is `Math.round` → `(int)` (floor). Deliberately left un-extracted
-> and untested pending a decision. See §6 bug log.
+> ✅ **Fixed during the expansion:** `DirectionHud`'s octant math
+> `Math.round((yaw+22.5)/45)` double-shifted the bucket offset — due south
+> rendered "SW", north "NE" (every facing read 45° clockwise). Changed to
+> truncation `(int)((yaw+22.5)/45)`, extracted to `HudFormat.direction`, and
+> covered by compass tests. See §6 bug log.
 
 ### 4.1 Section A — Bank / ATM kit (mostly verified)
 
@@ -1052,7 +1053,7 @@ these still work since the changes could have shaken them loose:
 
 | # | Section | Symptom | Repro steps | Severity | Commit-fix |
 |---|---|---|---|---|---|
-| 1 | E / DirectionHud | Compass reads 45° clockwise — facing due south shows "SW", north shows "NE", etc. | Face due south (F3 yaw ≈ 0) with the Direction HUD enabled | Medium (cosmetic, but wrong on every facing) | Found via unit-test push 2026-07-18; fix is `Math.round((yaw+22.5)/45)` → `(int)((yaw+22.5)/45)` in `DirectionHud.getText`, then extract to `HudFormat.direction` + test. **Not yet applied.** |
+| 1 | E / DirectionHud | Compass read 45° clockwise — facing due south showed "SW", north "NE", etc. | Face due south (F3 yaw ≈ 0) with the Direction HUD enabled | Medium (cosmetic, but wrong on every facing) | ✅ **Fixed** 2026-07-18 — `Math.round((yaw+22.5)/45)` → `(int)((yaw+22.5)/45)`, extracted to `HudFormat.direction`, covered by `HudFormatTest` compass tests. |
 
 ---
 

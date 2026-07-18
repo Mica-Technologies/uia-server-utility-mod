@@ -6,10 +6,48 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Tests the pure HUD formatters extracted into {@link HudFormat} — the number/time/label math
- * that each HUD's {@code getText} used to inline. (DirectionHud's octant math is intentionally
- * NOT here: its rounding is under review for an off-by-one.)
+ * that each HUD's {@code getText} used to inline.
  */
 class HudFormatTest {
+
+    // --- direction (compass octants; vanilla yaw 0 = south, increasing clockwise) ---
+
+    @Test
+    void directionMapsCardinalsToCompassPoints() {
+        assertEquals("S", HudFormat.direction(0, false));
+        assertEquals("SW", HudFormat.direction(45, false));
+        assertEquals("W", HudFormat.direction(90, false));
+        assertEquals("NW", HudFormat.direction(135, false));
+        assertEquals("N", HudFormat.direction(180, false));
+        assertEquals("NE", HudFormat.direction(225, false));
+        assertEquals("E", HudFormat.direction(270, false));
+        assertEquals("SE", HudFormat.direction(315, false));
+    }
+
+    @Test
+    void directionLongNames() {
+        assertEquals("South", HudFormat.direction(0, true));
+        assertEquals("West", HudFormat.direction(90, true));
+        assertEquals("North", HudFormat.direction(180, true));
+        assertEquals("East", HudFormat.direction(270, true));
+    }
+
+    @Test
+    void directionNormalizesNegativeAndOverflowYaw() {
+        assertEquals("E", HudFormat.direction(-90, false), "-90 wraps to 270 = East");
+        assertEquals("SE", HudFormat.direction(-45, false), "-45 wraps to 315 = South-East");
+        assertEquals("S", HudFormat.direction(360, false), "360 wraps to 0 = South");
+        assertEquals("W", HudFormat.direction(450, false), "450 wraps to 90 = West");
+    }
+
+    @Test
+    void directionBucketsAreCenteredOnCardinals() {
+        // Each octant spans ±22.5° around its cardinal, so due-south's bucket is [337.5, 22.5).
+        assertEquals("S", HudFormat.direction(22.4f, false));
+        assertEquals("S", HudFormat.direction(337.5f, false));
+        assertEquals("S", HudFormat.direction(350f, false));
+        assertEquals("SW", HudFormat.direction(22.5f, false), "the edge tips into the next octant");
+    }
 
     // --- inGameTime ---
 
