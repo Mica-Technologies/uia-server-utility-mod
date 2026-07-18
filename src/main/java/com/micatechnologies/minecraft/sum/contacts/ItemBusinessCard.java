@@ -53,7 +53,12 @@ public class ItemBusinessCard extends Item {
     }
 
     public static boolean isPersonalized(ItemStack stack) {
-        NBTTagCompound tag = stack.getTagCompound();
+        return isPersonalizedTag(stack.getTagCompound());
+    }
+
+    /** Pure tag check, extracted so personalization detection is testable without a registered
+     *  Item/ItemStack. A card is personalized once both halves of its owner UUID are stored. */
+    static boolean isPersonalizedTag(NBTTagCompound tag) {
         return tag != null
             && tag.hasKey(NBT_OWNER + "Most")
             && tag.hasKey(NBT_OWNER + "Least");
