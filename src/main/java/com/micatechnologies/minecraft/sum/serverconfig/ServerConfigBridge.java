@@ -65,7 +65,8 @@ public class ServerConfigBridge {
         return s;
     }
 
-    private static List<String> formatMilestones(java.util.Collection<LoyaltyMilestone> ms) {
+    // Package-private (not private) so the pure list-formatting is unit-testable.
+    static List<String> formatMilestones(java.util.Collection<LoyaltyMilestone> ms) {
         List<String> out = new ArrayList<>(ms.size());
         for (LoyaltyMilestone m : ms) {
             String typeStr = m.getType() == LoyaltyMilestone.Type.MONEY ? "money" : "command";
@@ -74,7 +75,7 @@ public class ServerConfigBridge {
         return out;
     }
 
-    private static List<String> formatBorders(Map<Integer, BorderEntry> entries) {
+    static List<String> formatBorders(Map<Integer, BorderEntry> entries) {
         List<String> out = new ArrayList<>(entries.size());
         for (BorderEntry b : entries.values()) {
             String mode = b.getMode() == BorderEntry.Mode.LOOP ? "loop" : "bounce";
@@ -92,7 +93,7 @@ public class ServerConfigBridge {
         return out;
     }
 
-    private static List<String> formatSpeedBlocks(Map<String, Double> map) {
+    static List<String> formatSpeedBlocks(Map<String, Double> map) {
         List<String> out = new ArrayList<>(map.size());
         for (Map.Entry<String, Double> e : map.entrySet()) {
             out.add(e.getKey() + "=" + String.format(Locale.ROOT, "%.3g", e.getValue()));
