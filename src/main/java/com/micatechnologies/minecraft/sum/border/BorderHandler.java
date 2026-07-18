@@ -36,7 +36,7 @@ public class BorderHandler {
         double x = player.posX;
         double z = player.posZ;
         double r = border.getRadius();
-        if (Math.abs(x) <= r && Math.abs(z) <= r) {
+        if (isInside(x, z, r)) {
             return;
         }
         switch (border.getMode()) {
@@ -50,25 +50,32 @@ public class BorderHandler {
     }
 
     private void applyBounce(EntityPlayer player, double x, double z, double radius) {
-        double inset = radius - 1.0;
-        double newX = clamp(x, -inset, inset);
-        double newZ = clamp(z, -inset, inset);
-        player.setPositionAndUpdate(newX, player.posY, newZ);
+        player.setPositionAndUpdate(clampToInset(x, radius), player.posY, clampToInset(z, radius));
         notify(player, TextFormatting.RED + "You've reached the world border.");
     }
 
     private void applyLoop(EntityPlayer player, double x, double z, double radius) {
-        double inset = radius - 1.0;
-        double newX = x;
-        double newZ = z;
-        if (Math.abs(x) > radius) {
-            newX = x > 0 ? -inset : inset;
-        }
-        if (Math.abs(z) > radius) {
-            newZ = z > 0 ? -inset : inset;
-        }
-        player.setPositionAndUpdate(newX, player.posY, newZ);
+        player.setPositionAndUpdate(loopWrap(x, radius), player.posY, loopWrap(z, radius));
         notify(player, TextFormatting.AQUA + "You wrapped to the other side of the world.");
+    }
+
+    /** True if (x, z) is within the square, origin-centered border of the given radius (inclusive). */
+    static boolean isInside(double x, double z, double radius) {
+        return Math.abs(x) <= radius && Math.abs(z) <= radius;
+    }
+
+    /** Bounce: clamp an axis to one block inside the border edge. */
+    static double clampToInset(double v, double radius) {
+        double inset = radius - 1.0;
+        return clamp(v, -inset, inset);
+    }
+
+    /** Loop: an axis beyond the radius wraps to one block inside the opposite edge; else unchanged. */
+    static double loopWrap(double v, double radius) {
+        if (Math.abs(v) > radius) {
+            return v > 0 ? -(radius - 1.0) : (radius - 1.0);
+        }
+        return v;
     }
 
     private void notify(EntityPlayer player, String message) {
