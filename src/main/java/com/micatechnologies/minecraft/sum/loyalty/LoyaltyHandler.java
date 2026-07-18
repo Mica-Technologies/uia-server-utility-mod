@@ -207,7 +207,8 @@ public class LoyaltyHandler {
         }
     }
 
-    private static String formatAmount(double amount) {
+    // Package-private (not private) so the pure formatting/search helpers are unit-testable.
+    static String formatAmount(double amount) {
         if (amount == Math.floor(amount)) {
             return Long.toString((long) amount);
         }
@@ -222,7 +223,7 @@ public class LoyaltyHandler {
         return entityData.getCompoundTag(EntityPlayer.PERSISTED_NBT_TAG);
     }
 
-    private static boolean containsInt(NBTTagList list, int value) {
+    static boolean containsInt(NBTTagList list, int value) {
         for (int i = 0; i < list.tagCount(); i++) {
             if (list.getIntAt(i) == value) {
                 return true;
