@@ -30,8 +30,6 @@ public class DurabilityHud extends SingleTextHud {
         if (stack.isEmpty() || !stack.isItemStackDamageable()) return "—";
         int max = stack.getMaxDamage();
         int remaining = max - stack.getItemDamage();
-        if (!showPercent) return Integer.toString(remaining);
-        int pct = max == 0 ? 0 : Math.round(remaining * 100f / max);
-        return remaining + " (" + pct + "%)";
+        return HudFormat.durability(remaining, max, showPercent);
     }
 }

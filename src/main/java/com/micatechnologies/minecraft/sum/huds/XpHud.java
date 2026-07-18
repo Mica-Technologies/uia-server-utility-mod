@@ -26,8 +26,6 @@ public class XpHud extends SingleTextHud {
         if (example) return showProgress ? "L30 (45%)" : "L30";
         EntityPlayer p = Minecraft.getMinecraft().player;
         if (p == null) return "—";
-        if (!showProgress) return "L" + p.experienceLevel;
-        int pct = (int) Math.round(p.experience * 100f);
-        return "L" + p.experienceLevel + " (" + pct + "%)";
+        return HudFormat.xp(p.experienceLevel, p.experience, showProgress);
     }
 }

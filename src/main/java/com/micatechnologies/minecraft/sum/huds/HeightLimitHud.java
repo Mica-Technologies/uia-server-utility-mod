@@ -34,6 +34,6 @@ public class HeightLimitHud extends SingleTextHud {
         if (absolute) {
             return Integer.toString(limit);
         }
-        return Integer.toString(limit - (int) Math.floor(player.posY));
+        return Integer.toString(HudFormat.roomAbove(limit, player.posY));
     }
 }

@@ -41,8 +41,7 @@ public class TpsHud extends SingleTextHud {
                 // 20 server ticks per packet × 1000ms/s ÷ real-millis-elapsed = TPS.
                 // Clamp to [0, 20] so a hiccup that produces an outlier doesn't display
                 // 50 TPS.
-                double tps = Math.min(20.0, Math.max(0.0, 20000.0 / delta));
-                tpsText = String.format("%.2f", tps);
+                tpsText = HudFormat.tps(delta);
             }
         }
         lastUpdated = now;

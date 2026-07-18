@@ -23,7 +23,6 @@ public class DayCounterHud extends SingleTextHud {
         if (world == null) {
             return "—";
         }
-        long day = world.getWorldTime() / 24000L + 1L;
-        return Long.toString(day);
+        return Long.toString(HudFormat.dayNumber(world.getWorldTime()));
     }
 }

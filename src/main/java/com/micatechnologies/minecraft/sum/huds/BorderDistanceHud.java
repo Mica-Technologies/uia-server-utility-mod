@@ -33,7 +33,6 @@ public class BorderDistanceHud extends SingleTextHud {
 
         // Border is a square AABB centered at origin. Distance to the nearest
         // edge is radius - max(|x|, |z|) — positive inside, negative outside.
-        double dist = border.getRadius() - Math.max(Math.abs(p.posX), Math.abs(p.posZ));
-        return Long.toString(Math.round(dist));
+        return Long.toString(HudFormat.borderDistance(border.getRadius(), p.posX, p.posZ));
     }
 }
