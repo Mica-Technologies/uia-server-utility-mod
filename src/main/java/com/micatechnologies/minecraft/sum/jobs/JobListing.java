@@ -46,6 +46,19 @@ public class JobListing {
         return nowMillis >= expiresAt;
     }
 
+    /**
+     * Formats a remaining-time span (millis until expiry) as a short "N{m,h,d} left" label,
+     * or "expired" once it runs out. Pure so {@link GuiJobBoard} can render it and tests can
+     * pin the bucket boundaries without a clock.
+     */
+    public static String formatRemaining(long remainingMs) {
+        if (remainingMs <= 0) return "expired";
+        if (remainingMs < 60_000L) return "<1m left";
+        if (remainingMs < 3_600_000L) return (remainingMs / 60_000L) + "m left";
+        if (remainingMs < 86_400_000L) return (remainingMs / 3_600_000L) + "h left";
+        return (remainingMs / 86_400_000L) + "d left";
+    }
+
     public boolean isPoster(UUID uuid) {
         return posterUuid.equals(uuid);
     }
