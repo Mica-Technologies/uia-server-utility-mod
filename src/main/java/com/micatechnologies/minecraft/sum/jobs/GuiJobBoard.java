@@ -236,12 +236,7 @@ public class GuiJobBoard extends GuiScreen {
     }
 
     private static String formatExpiry(JobListing l) {
-        long remainingMs = l.expiresAt - System.currentTimeMillis();
-        if (remainingMs <= 0) return "expired";
-        if (remainingMs < 60_000L) return "<1m left";
-        if (remainingMs < 3_600_000L) return (remainingMs / 60_000L) + "m left";
-        if (remainingMs < 86_400_000L) return (remainingMs / 3_600_000L) + "h left";
-        return (remainingMs / 86_400_000L) + "d left";
+        return JobListing.formatRemaining(l.expiresAt - System.currentTimeMillis());
     }
 
     @Override
