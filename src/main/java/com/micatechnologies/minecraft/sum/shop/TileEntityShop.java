@@ -427,29 +427,45 @@ public class TileEntityShop extends TileEntity implements IInventory {
         for (ItemStack stack : slots) {
             if (!stack.isEmpty()) drops.add(stack.copy());
         }
-        // Dispense remaining funds as bills, largest denominations first.
-        double remaining = fundsAccumulated;
-        for (int denom : new int[]{500, 200, 100, 50, 20, 10, 5, 1}) {
-            Item bill = Bills.billItem(denom);
-            if (bill == null) continue;
-            int count = (int) Math.floor(remaining / denom);
-            while (count > 0) {
-                int give = Math.min(count, 64);
-                drops.add(new ItemStack(bill, give));
-                count -= give;
-                remaining -= give * denom;
-            }
+        // Dispense remaining funds as bills, largest denominations first. All eight SUM
+        // denominations always register, so billItem is non-null in practice; the guard is
+        // defensive for the (never-observed) case a denomination's item is missing.
+        for (int[] pair : breakIntoBills(fundsAccumulated)) {
+            Item bill = Bills.billItem(pair[0]);
+            if (bill != null) drops.add(new ItemStack(bill, pair[1]));
         }
         return drops;
     }
 
+    /**
+     * Greedy largest-first decomposition of a funds amount into whole bills, each stack capped at
+     * 64. Pure ({@code [denom, count]} pairs) so the bill-making arithmetic is unit-testable
+     * without the item registry; {@link #collectDrops} maps the pairs to bill items. Fractional
+     * cents below $1 are dropped (floored).
+     */
+    static java.util.List<int[]> breakIntoBills(double funds) {
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        double remaining = funds;
+        for (int denom : new int[]{500, 200, 100, 50, 20, 10, 5, 1}) {
+            int count = (int) Math.floor(remaining / denom);
+            while (count > 0) {
+                int give = Math.min(count, 64);
+                out.add(new int[]{denom, give});
+                count -= give;
+                remaining -= (double) give * denom;
+            }
+        }
+        return out;
+    }
+
     // --- utilities ---
 
-    private static int clamp(int v, int lo, int hi) {
+    // Package-private (not private) so the pure clamp bounds are unit-testable.
+    static int clamp(int v, int lo, int hi) {
         return v < lo ? lo : (v > hi ? hi : v);
     }
 
-    private static double clampD(double v, double lo, double hi) {
+    static double clampD(double v, double lo, double hi) {
         return v < lo ? lo : (v > hi ? hi : v);
     }
 }
