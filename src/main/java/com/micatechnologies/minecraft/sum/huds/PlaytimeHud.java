@@ -20,9 +20,6 @@ public class PlaytimeHud extends SingleTextHud {
             return "—";
         }
         long elapsedSec = (System.currentTimeMillis() - start) / 1000L;
-        long h = elapsedSec / 3600L;
-        long m = (elapsedSec % 3600L) / 60L;
-        long s = elapsedSec % 60L;
-        return String.format("%02d:%02d:%02d", h, m, s);
+        return HudFormat.playtime(elapsedSec);
     }
 }

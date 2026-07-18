@@ -20,10 +20,6 @@ public class FtiHud extends SingleTextHud {
         if (example) {
             return "7ms";
         }
-        int fps = Minecraft.getDebugFPS();
-        if (fps <= 0) {
-            return "?ms";
-        }
-        return Math.round(1000f / fps) + "ms";
+        return HudFormat.frameTime(Minecraft.getDebugFPS());
     }
 }

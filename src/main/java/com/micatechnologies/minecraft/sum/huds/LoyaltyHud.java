@@ -25,12 +25,6 @@ public class LoyaltyHud extends SingleTextHud {
         if (example) return "12m / 30m";
         PlayerStatusSnapshot snap = PlayerStatusTracker.latest;
         if (snap == null) return "—";
-        int curMin = snap.loyaltyTicks / (20 * 60);
-        if (snap.nextMilestoneTicks < 0) {
-            // No further milestones — show just current accrued time.
-            return curMin + "m";
-        }
-        int nextMin = snap.nextMilestoneTicks / (20 * 60);
-        return curMin + "m / " + nextMin + "m";
+        return HudFormat.loyalty(snap.loyaltyTicks, snap.nextMilestoneTicks);
     }
 }

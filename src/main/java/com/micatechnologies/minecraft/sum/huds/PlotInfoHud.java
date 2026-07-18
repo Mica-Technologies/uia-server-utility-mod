@@ -29,7 +29,6 @@ public class PlotInfoHud extends SingleTextHud {
         if (example) return showOwner ? "Downtown Apt 4 (alex)" : "Downtown Apt 4";
         PlayerStatusSnapshot snap = PlayerStatusTracker.latest;
         if (snap == null || snap.plotName.isEmpty()) return "—";
-        if (!showOwner || snap.plotOwner.isEmpty()) return snap.plotName;
-        return snap.plotName + " (" + snap.plotOwner + ")";
+        return HudFormat.plotInfo(snap.plotName, snap.plotOwner, showOwner);
     }
 }

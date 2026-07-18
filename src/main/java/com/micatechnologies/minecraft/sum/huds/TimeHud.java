@@ -48,17 +48,6 @@ public class TimeHud extends SingleTextHud {
         if (world == null) {
             return "—";
         }
-        long ticks = world.getWorldTime() % 24000L;
-        // 6 AM offset: dayTime=0 → 06:00. Convert to minutes-since-midnight.
-        int minutes = (int) ((ticks * 1440L) / 24000L) + 360;
-        minutes %= 1440;
-        int h24 = minutes / 60;
-        int m = minutes % 60;
-        if (twentyFourHour) {
-            return String.format("%02d:%02d", h24, m);
-        }
-        int h12 = h24 % 12;
-        if (h12 == 0) h12 = 12;
-        return String.format("%d:%02d %s", h12, m, h24 < 12 ? "AM" : "PM");
+        return HudFormat.inGameTime(world.getWorldTime(), twentyFourHour);
     }
 }

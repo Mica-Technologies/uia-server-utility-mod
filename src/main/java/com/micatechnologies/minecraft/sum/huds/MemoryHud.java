@@ -21,9 +21,6 @@ public class MemoryHud extends SingleTextHud {
         Runtime rt = Runtime.getRuntime();
         long max = rt.maxMemory();
         long used = rt.totalMemory() - rt.freeMemory();
-        if (asPercent) {
-            return Math.round(100.0 * used / max) + "%";
-        }
-        return String.format("%.1f / %.1f GB", used / 1073741824.0, max / 1073741824.0);
+        return HudFormat.memory(used, max, asPercent);
     }
 }
