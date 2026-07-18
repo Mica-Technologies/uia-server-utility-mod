@@ -29,20 +29,8 @@ public class DirectionHud extends SingleTextHud {
         if (player == null) {
             return "—";
         }
-        float yaw = player.rotationYaw % 360F;
-        if (yaw < 0F) yaw += 360F;
-        // Map yaw to 8 octants (N, NE, E, SE, S, SW, W, NW). Vanilla puts yaw=0 facing
-        // south, so rotate by +180 / 22.5° per octant.
-        int octant = Math.round((yaw + 22.5F) / 45F) % 8;
-        return longNames ? LONG[octant] : SHORT[octant];
+        return HudFormat.direction(player.rotationYaw, longNames);
     }
-
-    /** Index 0..7 corresponding to yaw=0 (south), increasing clockwise per 45° step. */
-    private static final String[] SHORT = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
-    private static final String[] LONG = {
-        "South", "South-West", "West", "North-West",
-        "North", "North-East", "East", "South-East"
-    };
 
     /** Bridge for any future caller that wants the EnumFacing equivalent. Not exposed in
      *  the GUI but kept here so other SUM features can reuse the same axis math. */

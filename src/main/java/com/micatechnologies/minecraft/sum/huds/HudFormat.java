@@ -11,6 +11,26 @@ public final class HudFormat {
 
     private HudFormat() {}
 
+    /** Compass abbreviations, index 0..7 = yaw 0 (south) increasing clockwise per 45° octant. */
+    private static final String[] DIR_SHORT = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+    private static final String[] DIR_LONG = {
+        "South", "South-West", "West", "North-West",
+        "North", "North-East", "East", "South-East"
+    };
+
+    /**
+     * Maps a Minecraft yaw to one of eight compass octants. Vanilla yaw 0 faces south and
+     * increases clockwise; each octant is centered on its cardinal, so the +22.5° offset shifts
+     * the bucket edges to the half-points and truncation (not rounding) selects the bucket —
+     * facing due south returns "S", not the neighbouring octant.
+     */
+    public static String direction(float yaw, boolean longName) {
+        yaw %= 360f;
+        if (yaw < 0f) yaw += 360f;
+        int octant = (int) ((yaw + 22.5f) / 45f) % 8;
+        return longName ? DIR_LONG[octant] : DIR_SHORT[octant];
+    }
+
     /**
      * Formats a Minecraft world time (ticks) as a wall clock. dayTime 0 = 06:00; the value wraps
      * every 24000 ticks. {@code twentyFourHour} chooses {@code HH:mm} vs {@code h:mm AM/PM}.
