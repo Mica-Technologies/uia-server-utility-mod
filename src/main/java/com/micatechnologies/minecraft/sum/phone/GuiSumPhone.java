@@ -702,7 +702,7 @@ public class GuiSumPhone extends GuiScreen {
 
     private void drawStatusBar(int x1, int y1, int x2) {
         drawRect(x1, y1, x2, y1 + 12, STATUS_BG);
-        String clock = formatClock(player.world.getWorldTime());
+        String clock = PhoneFormat.formatClock(player.world.getWorldTime());
         this.fontRenderer.drawString(clock, x1 + 4, y1 + 3, TEXT_LIGHT);
         String wx = weatherGlyph(player.world);
         int wxW = this.fontRenderer.getStringWidth(wx);
@@ -782,7 +782,7 @@ public class GuiSumPhone extends GuiScreen {
             ? I18n.format("sum.phone.weather.thunder")
             : raining ? I18n.format("sum.phone.weather.rain")
                       : I18n.format("sum.phone.weather.clear");
-        String tod = formatClock(world.getWorldTime() % 24000L);
+        String tod = PhoneFormat.formatClock(world.getWorldTime() % 24000L);
         String biomeName = biome == null ? "?" : biome.getBiomeName();
 
         int rowY = y1 + 28;
@@ -1038,7 +1038,7 @@ public class GuiSumPhone extends GuiScreen {
                 if (r.calcKey == CalcKey.EQUALS) bg = CALC_KEY_EQ_BG;
                 else if (r.calcKey != null && r.calcKey.isOperator()) bg = CALC_KEY_OP_BG;
                 else bg = CALC_KEY_BG;
-                if (hover) bg = brighten(bg);
+                if (hover) bg = PhoneFormat.brighten(bg);
                 drawRect(r.x, r.y, r.x + r.w, r.y + r.h, bg);
                 int lw = this.fontRenderer.getStringWidth(r.label);
                 this.fontRenderer.drawString(r.label,
@@ -1050,7 +1050,7 @@ public class GuiSumPhone extends GuiScreen {
                 drawRect(r.x, r.y, r.x + r.w, r.y + r.h, hover ? LIST_ROW_HOVER : LIST_ROW_BG);
                 String preview = "";
                 if (cloud != null && idx < cloud.notes.size()) {
-                    preview = firstLine(cloud.notes.get(idx));
+                    preview = PhoneFormat.firstLine(cloud.notes.get(idx));
                 }
                 if (preview.isEmpty()) preview = I18n.format("sum.phone.notes.untitled");
                 this.fontRenderer.drawString(preview, r.x + 4, r.y + 4, TEXT_LIGHT);
@@ -1315,7 +1315,7 @@ public class GuiSumPhone extends GuiScreen {
             case PERCENT:
                 try {
                     double v = Double.parseDouble(calcDisplay) / 100.0;
-                    calcDisplay = formatNumber(v);
+                    calcDisplay = PhoneFormat.formatCalc(v);
                     calcFreshEntry = true;
                 } catch (NumberFormatException e) { calcError = true; }
                 return;
@@ -1346,56 +1346,17 @@ public class GuiSumPhone extends GuiScreen {
                 default: break;
             }
         }
-        calcDisplay = formatNumber(calcAccumulator);
-    }
-
-    private static String formatNumber(double v) {
-        if (Double.isNaN(v) || Double.isInfinite(v)) return "Err";
-        if (v == Math.floor(v) && !Double.isInfinite(v) && Math.abs(v) < 1e12) {
-            return Long.toString((long) v);
-        }
-        String s = String.format(Locale.ROOT, "%.10g", v);
-        if (s.contains(".") && !s.contains("e") && !s.contains("E")) {
-            int end = s.length();
-            while (end > 0 && s.charAt(end - 1) == '0') end--;
-            if (end > 0 && s.charAt(end - 1) == '.') end--;
-            s = s.substring(0, end);
-        }
-        if (s.length() > 12) s = s.substring(0, 12);
-        return s;
+        calcDisplay = PhoneFormat.formatCalc(calcAccumulator);
     }
 
     // ---------------------------------------------------------------------------------------
     // Misc helpers
     // ---------------------------------------------------------------------------------------
 
-    private static String formatClock(long worldTime) {
-        long todTicks = ((worldTime % 24000L) + 24000L) % 24000L;
-        long minutesOfDay = ((todTicks + 6000L) % 24000L) * 60L / 1000L;
-        long hours = minutesOfDay / 60L;
-        long minutes = minutesOfDay % 60L;
-        return String.format(Locale.ROOT, "%02d:%02d", hours, minutes);
-    }
-
     private static String weatherGlyph(World w) {
         if (w.isThundering()) return "T";
         if (w.isRaining()) return "R";
         return "S";
-    }
-
-    private static int brighten(int argb) {
-        int a = (argb >>> 24) & 0xFF;
-        int r = Math.min(255, ((argb >> 16) & 0xFF) + 20);
-        int g = Math.min(255, ((argb >> 8) & 0xFF) + 20);
-        int b = Math.min(255, (argb & 0xFF) + 20);
-        return (a << 24) | (r << 16) | (g << 8) | b;
-    }
-
-    private static String firstLine(String s) {
-        int nl = s.indexOf('\n');
-        String line = nl < 0 ? s : s.substring(0, nl);
-        if (line.length() > 22) line = line.substring(0, 22) + "…";
-        return line;
     }
 
     // ---------------------------------------------------------------------------------------
