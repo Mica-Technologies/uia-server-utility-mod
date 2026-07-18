@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Field;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -46,5 +49,31 @@ class BillsTest {
     @Test
     void withdrawButtonsAreAscendingAndExpected() {
         assertArrayEquals(new int[] {1, 5, 10, 20, 50, 100}, Bills.WITHDRAW_DENOMINATIONS);
+    }
+
+    @Test
+    void everyWithdrawDenominationIsARealDenomination() {
+        Set<Integer> all = new HashSet<>();
+        for (int d : Bills.allDenominationsHighToLow()) {
+            all.add(d);
+        }
+        for (int denom : Bills.WITHDRAW_DENOMINATIONS) {
+            assertTrue(all.contains(denom),
+                "withdraw denomination $" + denom + " is not in the canonical denomination set");
+        }
+    }
+
+    @Test
+    void economyIncRegistryNamesAlignWithDenominations() throws Exception {
+        // The two parallel arrays are index-matched (denom[i] ↔ registry name[i]); a length
+        // drift would silently mis-map EconomyInc bills. Read the private static tables directly.
+        Field denomsField = Bills.class.getDeclaredField("DENOMINATIONS");
+        Field namesField = Bills.class.getDeclaredField("ECONOMY_INC_REGISTRY_NAMES");
+        denomsField.setAccessible(true);
+        namesField.setAccessible(true);
+        int[] denoms = (int[]) denomsField.get(null);
+        String[] names = (String[]) namesField.get(null);
+        assertEquals(denoms.length, names.length,
+            "DENOMINATIONS and ECONOMY_INC_REGISTRY_NAMES must stay index-aligned");
     }
 }

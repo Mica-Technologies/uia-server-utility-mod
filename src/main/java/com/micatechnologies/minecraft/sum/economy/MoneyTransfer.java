@@ -61,13 +61,16 @@ public final class MoneyTransfer {
         if (!EconomyBridge.isAvailable()) {
             return Result.fail("No economy backend is loaded.");
         }
-        if (Double.isNaN(rawAmount) || Double.isInfinite(rawAmount)) {
-            return Result.fail("Amount is not a valid number.");
+
+        // Amount validation, rounding, and fee math are pure — factored into computeAmounts so
+        // they can be unit-tested without an economy backend or live players.
+        Result computed = computeAmounts(rawAmount, SumConfig.getPayFeePercent());
+        if (!computed.ok) {
+            return computed;
         }
-        double amount = roundToCents(rawAmount);
-        if (amount <= 0.0) {
-            return Result.fail("Amount must be greater than $0.00.");
-        }
+        double amount = computed.amount;
+        double credited = computed.credited;
+        double fee = computed.fee;
 
         double balance = EconomyBridge.getBalance(from);
         if (Double.isNaN(balance)) {
@@ -77,13 +80,6 @@ public final class MoneyTransfer {
             return Result.fail("Insufficient funds. Need $" + money(amount)
                 + ", have $" + money(balance) + ".");
         }
-
-        double feePercent = SumConfig.getPayFeePercent();
-        double fee = feePercent > 0.0 ? roundToCents(amount * feePercent / 100.0) : 0.0;
-        if (fee > amount) {
-            fee = amount;
-        }
-        double credited = amount - fee;
 
         // Charge the sender first; EconomyBridge refuses to overdraft, so a false here means abort.
         if (!EconomyBridge.adjustBalance(from, -amount)) {
@@ -97,7 +93,33 @@ public final class MoneyTransfer {
         return Result.success(amount, credited, fee);
     }
 
-    private static double roundToCents(double v) {
+    /**
+     * Pure amount/fee arithmetic for a transfer, factored out of {@link #transfer} so the
+     * validation-rounding-fee-clamp chain can be unit-tested without an economy backend or live
+     * players. Rejects non-finite and non-positive amounts, rounds the amount to whole cents,
+     * then computes the rounded fee (never exceeding the amount) and the credited remainder.
+     *
+     * @return a successful {@link Result} carrying {@code amount}/{@code credited}/{@code fee},
+     *         or a failure {@link Result} with the same user-facing message {@code transfer} uses.
+     */
+    static Result computeAmounts(double rawAmount, double feePercent) {
+        if (Double.isNaN(rawAmount) || Double.isInfinite(rawAmount)) {
+            return Result.fail("Amount is not a valid number.");
+        }
+        double amount = roundToCents(rawAmount);
+        if (amount <= 0.0) {
+            return Result.fail("Amount must be greater than $0.00.");
+        }
+        double fee = feePercent > 0.0 ? roundToCents(amount * feePercent / 100.0) : 0.0;
+        if (fee > amount) {
+            fee = amount;
+        }
+        double credited = amount - fee;
+        return Result.success(amount, credited, fee);
+    }
+
+    /** Rounds a currency value to whole cents (half-up). Package-private for unit testing. */
+    static double roundToCents(double v) {
         return Math.floor(v * 100.0 + 0.5) / 100.0;
     }
 

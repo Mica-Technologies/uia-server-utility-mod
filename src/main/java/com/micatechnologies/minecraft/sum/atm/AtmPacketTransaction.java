@@ -46,6 +46,14 @@ public class AtmPacketTransaction implements IMessage {
         buf.writeInt(this.amount);
     }
 
+    int getAction() {
+        return action;
+    }
+
+    int getAmount() {
+        return amount;
+    }
+
     public static class Handler implements IMessageHandler<AtmPacketTransaction, IMessage> {
 
         @Override

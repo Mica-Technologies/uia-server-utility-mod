@@ -43,6 +43,14 @@ public class PacketBillChangerAction implements IMessage {
         buf.writeInt(action);
     }
 
+    BlockPos getPos() {
+        return pos;
+    }
+
+    int getAction() {
+        return action;
+    }
+
     public static class Handler implements IMessageHandler<PacketBillChangerAction, IMessage> {
 
         @Override
