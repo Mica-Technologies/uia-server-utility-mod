@@ -111,12 +111,19 @@ public class SleepVoteHandler {
         return sleeping + "/" + total + " sleeping (need " + required + " to skip)";
     }
 
+    /**
+     * Ticks to advance from {@code worldTime} to the next morning (day-of-cycle 0), or 0 if it's
+     * already exactly morning. Pure so the night-skip delta is testable without a world.
+     */
+    static long ticksUntilMorning(long worldTime) {
+        long timeOfDay = worldTime % 24000;
+        return timeOfDay == 0 ? 0 : (24000 - timeOfDay);
+    }
+
     private void skipNight(WorldServer world, int sleepers, int total) {
         // Advance to the next morning. Day-of-cycle is worldTime % 24000, where 0 = morning.
         long now = world.getWorldTime();
-        long timeOfDay = now % 24000;
-        long delta = timeOfDay == 0 ? 0 : (24000 - timeOfDay);
-        world.setWorldTime(now + delta);
+        world.setWorldTime(now + ticksUntilMorning(now));
 
         // Wake everyone who was in a bed. wakeUpPlayer(immediately, updateWorldFlag, setSpawn).
         // setSpawn=true matches vanilla's natural morning-wake behavior — the bed becomes the
