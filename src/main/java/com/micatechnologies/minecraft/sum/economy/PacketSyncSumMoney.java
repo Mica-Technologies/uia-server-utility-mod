@@ -38,6 +38,10 @@ public class PacketSyncSumMoney implements IMessage {
         buf.writeDouble(this.balance);
     }
 
+    double getBalance() {
+        return balance;
+    }
+
     public static class Handler implements IMessageHandler<PacketSyncSumMoney, IMessage> {
 
         @Override
