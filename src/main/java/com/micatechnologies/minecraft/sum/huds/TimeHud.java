@@ -9,18 +9,22 @@ import net.minecraft.world.World;
 
 /**
  * Time HUD — displays either the real-world local time or the in-game time-of-day.
- * Modeled on EvergreenHUD's time / Minecraft-time elements.
+ * Modeled on EvergreenHUD's time / Minecraft-time elements. Defaults to the in-game
+ * clock in 12-hour AM/PM form, since the Alto layouts sit it beside the day counter
+ * where players read it as "what time is it in-world".
  */
 public class TimeHud extends SingleTextHud {
 
     @Switch(name = "Show In-Game Time (else: real time)")
-    public boolean inGame = false;
+    public boolean inGame = true;
 
     @Switch(name = "24-hour Format")
-    public boolean twentyFourHour = true;
+    public boolean twentyFourHour = false;
 
     private static final DateTimeFormatter FMT_24 = DateTimeFormatter.ofPattern("HH:mm");
-    private static final DateTimeFormatter FMT_12 = DateTimeFormatter.ofPattern("hh:mm a");
+
+    /** {@code h} not {@code hh}: matches {@link HudFormat#inGameTime}'s un-padded 12-hour clock. */
+    private static final DateTimeFormatter FMT_12 = DateTimeFormatter.ofPattern("h:mm a");
 
     public TimeHud() {
         super("Time", false, 5, 5);
