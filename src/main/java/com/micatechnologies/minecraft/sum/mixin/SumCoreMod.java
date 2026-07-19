@@ -1,5 +1,7 @@
 package com.micatechnologies.minecraft.sum.mixin;
 
+import java.security.CodeSource;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
@@ -38,7 +40,41 @@ import org.spongepowered.asm.mixin.Mixins;
 public class SumCoreMod implements IFMLLoadingPlugin {
 
     public SumCoreMod() {
-        Mixins.addConfiguration("mixins.sum.json");
+        // Only register manually in dev. In a production jar the MANIFEST's
+        // `MixinConfigs: mixins.sum.json` attribute is what MixinBooter discovers, and calling
+        // Mixins.addConfiguration here would blow up: FML instantiates coremods from
+        // CoreModManager.discoverCoreMods, which runs *before* MixinBooter's tweaker has called
+        // MixinBootstrap.init(), so Mixin throws "Environment conflict, mismatched versions or
+        // you didn't call MixinBootstrap.init()" and the game dies during coremod discovery.
+        //
+        // This used to be masked: while the jar declared a TweakClass, FML took the cascading-
+        // tweaker branch and `continue`d past loadCoreMod entirely, so this constructor never
+        // ran here — MixinBooter instantiated it later, once Mixin was ready. Dropping the
+        // TweakClass (see addon.gradle for why it had to go) exposed the latent bug.
+        if (isDevEnvironment()) {
+            Mixins.addConfiguration("mixins.sum.json");
+        }
+    }
+
+    /**
+     * True when running from loose classes ({@code build/classes}) rather than a packaged jar,
+     * i.e. a {@code runClient} / {@code runServer} dev launch. Deliberately does not consult
+     * {@code Launch.blackboard.get("fml.deobfuscatedEnvironment")}: FML only publishes that key
+     * after {@code discoverCoreMods} has already constructed every coremod, so it is still
+     * absent at this point.
+     */
+    private static boolean isDevEnvironment() {
+        try {
+            CodeSource source = SumCoreMod.class.getProtectionDomain().getCodeSource();
+            if (source == null || source.getLocation() == null) {
+                return false;
+            }
+            return !source.getLocation().getPath().toLowerCase(Locale.ROOT).endsWith(".jar");
+        }
+        catch (SecurityException e) {
+            // Locked-down security manager — assume production and let the manifest do the work.
+            return false;
+        }
     }
 
     @Override

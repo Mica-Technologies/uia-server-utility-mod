@@ -39,53 +39,34 @@ if (project.hasProperty('usesMixins') && usesMixins.toBoolean()) {
     }
 }
 
-// OneConfig bootstrap manifest entries for the published jar.
+// OneConfig bootstrap: deliberately NOT declared in this jar's MANIFEST.
 //
-// The OneConfig wrapper jar is embedded into SUM's jar via `embed` in
-// dependencies.gradle, so the wrapper's tweaker class
-// (cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker) ends up inside
-// SUM's META-INF/.../ classpath at runtime. For FML / LaunchWrapper to actually
-// invoke that tweaker on production launches, SUM's MANIFEST.MF needs to declare
-// it via TweakClass + TweakOrder. The wrapper's own jar manifest is empty
-// (it's designed to be embedded into a host mod), so without this block end
-// users would install SUM and nothing would bootstrap OneConfig.
+// SUM embeds OneConfig's stage0 wrapper (see `embed` in dependencies.gradle), and the
+// published MANIFEST used to declare `TweakClass: cc.polyfrost...LaunchWrapperTweaker` so
+// LaunchWrapper would run it. That is actively harmful on 1.12.2:
 //
-// In dev launches the SUM jar isn't on the classpath (we run from build outputs),
-// so this manifest entry is ignored there — dev wiring continues via
-// minecraft.extraTweakClasses below.
+//  1. Servers. LaunchWrapper honours TweakClass on BOTH sides, so a dedicated server
+//     downloaded and loaded OneConfig — a client-only mod referencing IntegratedServer —
+//     and Forge's SideTransformer killed startup with "Attempted to load class chd for
+//     invalid side SERVER".
 //
-// ForceLoadAsMod is already set to true by the GTNH buildscript's
-// getManifestAttributes() (since containsMixinsAndOrCoreModOnly=false), so we
-// don't re-set it here.
-// Only apply the TweakClass MANIFEST entries when building a publishable jar — NOT when
-// the dev run tasks are in the task graph. In a dev launch the SUM jar lives on the run
-// classpath, so any tweaker declared in its MANIFEST is read by GradleStart and added as
-// a "cascading tweaker." Combined with the SumCoreMod FMLCorePlugin entry on the same jar,
-// this confuses FML's coremod scanner: FMLSanityChecker.injectData ends up calling
-// FMLDeobfuscatingRemapper.setup at a point where it crashes inside Guava's BiMap with
-// `RegularImmutableBiMap does not implement BiMap`. Dev runs already wire the tweaker
-// via `minecraft.extraTweakClasses` in this file, so they don't need the MANIFEST entry
-// at all. Published jars (./gradlew build, CI) still get it.
-boolean isDevRun = project.gradle.startParameter.taskNames.any {
-    it.contains('runClient') || it.contains('runServer')
-}
-if (!isDevRun) {
-    afterEvaluate {
-        tasks.named('jar').configure {
-            manifest {
-                attributes(
-                        // NOT OneConfig's tweaker directly — that bootstraps on both physical
-                        // sides, and OneConfig is client-only (it references IntegratedServer),
-                        // so a dedicated server dies with "Attempted to load class chd for
-                        // invalid side SERVER" during mod construction. SumOneConfigTweaker is a
-                        // side-aware shim that cascades to OneConfig's tweaker on clients only.
-                        'TweakClass': 'com.micatechnologies.minecraft.sum.mixin.SumOneConfigTweaker',
-                        'TweakOrder': '0'
-                )
-            }
-        }
-    }
-}
+//  2. Mod discovery. FML's CoreModManager.discoverCoreMods (1.12.2, line ~395) does:
+//         if (cascadedTweaker != null) { handleCascadingTweak(...);
+//                                        ignoredModFiles.add(coreMod.getName());
+//                                        continue; }
+//     `ignoredModFiles.add` is UNCONDITIONAL and it `continue`s past the FMLCorePlugin
+//     branch. There is no ForceLoadAsMod escape hatch — that attribute does not exist
+//     anywhere in FML 1.12.2. So ANY jar declaring a TweakClass is dropped from mod
+//     discovery. SUM only ever loaded because GlintColorizer declares the *same* OneConfig
+//     tweaker class and is scanned first (g < s), so LaunchWrapper de-duplicated and
+//     sum.jar's entry was inert. Pointing TweakClass at a SUM-owned class removed that
+//     accident and SUM silently vanished from the game: no tabs, no items, no HUD, and
+//     not even listed in OneConfig.
+//
+// So the jar declares no TweakClass at all, which restores the manifest shape SUM shipped
+// for months before the OneConfig embed. Clients get OneConfig from the modpack (Alto
+// ships GlintColorizer, which bootstraps it; the standalone OneConfig-Bootstrap mod also
+// works). Dev runs wire the tweaker explicitly via minecraft.extraTweakClasses below.
 
 // ARM macOS (Apple Silicon) support for runClient17/runClient21:
 // MC 1.12.2 bundles JNA 4.4.0 and java-objc-bridge 1.0.0, both x86_64-only.
