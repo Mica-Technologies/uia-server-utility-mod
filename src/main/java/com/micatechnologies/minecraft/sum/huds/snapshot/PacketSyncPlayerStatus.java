@@ -6,6 +6,8 @@ import net.minecraftforge.fml.common.network.ByteBufUtils;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
  * S→C carrier for {@link PlayerStatusSnapshot}. Registered on
@@ -52,11 +54,20 @@ public class PacketSyncPlayerStatus implements IMessage {
 
         @Override
         public IMessage onMessage(PacketSyncPlayerStatus msg, MessageContext ctx) {
+            ClientDispatch.handle(msg);
+            return null;
+        }
+    }
+
+    /** Client-only inner class so registering {@link Handler} on a dedicated server doesn't
+     *  drag in {@code Minecraft}. */
+    @SideOnly(Side.CLIENT)
+    private static class ClientDispatch {
+        static void handle(PacketSyncPlayerStatus msg) {
             // Bounce onto the client main thread before mutating the static cache —
             // the network thread isn't allowed to touch client state directly.
             Minecraft.getMinecraft().addScheduledTask(
                 () -> PlayerStatusTracker.receive(msg.snapshot));
-            return null;
         }
     }
 }

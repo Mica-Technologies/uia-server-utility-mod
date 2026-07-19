@@ -46,9 +46,15 @@ import net.minecraftforge.fml.common.registry.GameRegistry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+// OneConfig is deliberately a SOFT dependency ("after", not "required-after"). It is a
+// client-only mod, so a dedicated server never has it and a hard requirement would abort
+// server startup with MissingModsException. Nothing on the server touches it: SumOneConfig
+// is constructed only by SumClientProxy. On clients it is still guaranteed present, because
+// SUM embeds OneConfig's stage0 bootstrap and cascades it via SumOneConfigTweaker — so the
+// hard requirement bought us nothing there either, while breaking servers outright.
 @Mod(modid = SumConstants.MOD_NAMESPACE, version = SumConstants.MOD_VERSION, name = SumConstants.MOD_NAME,
      acceptedMinecraftVersions = "[1.12.2]",
-     dependencies = "required-after:oneconfig;after:csm")
+     dependencies = "after:oneconfig;after:csm")
 public class Sum {
 
     public static final Logger LOGGER = LogManager.getLogger(SumConstants.MOD_NAMESPACE);

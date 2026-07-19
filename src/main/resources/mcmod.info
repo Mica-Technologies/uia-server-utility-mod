@@ -12,7 +12,7 @@
     "authorList": ["Mica Technologies"],
     "dependencies": ["oneconfig"],
     "dependants": [],
-    "requiredMods": ["oneconfig"],
+    "requiredMods": [],
     "useDependencyInformation": "true"
   }
 ]
