@@ -147,3 +147,60 @@ if (project.hasProperty('rosetta')) {
         it.javaLauncher.set(rosettaLauncher)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Build-time guard on the published jar's MANIFEST.
+//
+// On 2026-07-19 SUM shipped a release that declared
+// `TweakClass: <a SUM-owned class>`. FML 1.12.2's CoreModManager.discoverCoreMods
+// unconditionally calls ignoredModFiles.add() for ANY jar declaring a TweakClass and
+// `continue`s past the FMLCorePlugin branch, so SUM was silently dropped from mod
+// discovery: the pack loaded with no SUM tabs, items or HUD, and no error anywhere.
+// (ForceLoadAsMod is NOT an escape hatch — it does not exist in FML 1.12.2.)
+//
+// That is invisible to `./gradlew build`, to the unit tests, and to runClient/runServer,
+// because dev launches run from build/classes and wire tweakers via
+// minecraft.extraTweakClasses — they never read this manifest. The only place it shows up
+// is a real launcher against a real pack. So assert the invariants here, at build time,
+// where breaking them costs seconds instead of a production incident.
+//
+// Checked on reobfJar because that is the artifact that actually ships: `jar` is disabled
+// when shadowing is active, and reobfJar consumes shadowJar's output.
+tasks.matching { it.name == 'reobfJar' }.configureEach {
+    doLast {
+        outputs.files.files.findAll { it.name.endsWith('.jar') }.each { File jarFile ->
+            if (!jarFile.exists()) {
+                return
+            }
+            java.util.jar.Manifest manifest = null
+            new java.util.jar.JarFile(jarFile).withCloseable { jf ->
+                manifest = jf.manifest
+            }
+            if (manifest == null) {
+                throw new GradleException("${jarFile.name} has no MANIFEST.MF")
+            }
+            def attrs = manifest.mainAttributes
+            def problems = []
+
+            if (attrs.getValue('TweakClass') != null) {
+                problems << ("declares TweakClass '${attrs.getValue('TweakClass')}' — any TweakClass "
+                        + 'removes the jar from FML 1.12.2 mod discovery, so the mod silently '
+                        + 'vanishes in production. Bootstrap OneConfig from the modpack instead.')
+            }
+            if (attrs.getValue('FMLCorePlugin') == null) {
+                problems << 'is missing FMLCorePlugin — SumCoreMod would never register the mixin config.'
+            }
+            if (attrs.getValue('MixinConfigs') == null) {
+                problems << ('is missing MixinConfigs — production relies on MixinBooter discovering '
+                        + 'mixins.sum.json from the manifest, since SumCoreMod only self-registers in dev.')
+            }
+
+            if (!problems.isEmpty()) {
+                throw new GradleException("Published jar MANIFEST is invalid:\n"
+                        + problems.collect { "  - ${jarFile.name} ${it}" }.join('\n'))
+            }
+            logger.lifecycle("Manifest guard OK: ${jarFile.name} "
+                    + '(no TweakClass, FMLCorePlugin + MixinConfigs present)')
+        }
+    }
+}
