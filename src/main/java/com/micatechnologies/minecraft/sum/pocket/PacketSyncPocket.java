@@ -6,6 +6,8 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
  * Server → client full snapshot of a player's pocket inventory. Sent on login, dimension
@@ -43,6 +45,16 @@ public class PacketSyncPocket implements IMessage {
 
         @Override
         public IMessage onMessage(PacketSyncPocket msg, MessageContext ctx) {
+            ClientDispatch.handle(msg);
+            return null;
+        }
+    }
+
+    /** Client-only inner class so registering {@link Handler} on a dedicated server doesn't
+     *  drag in {@code Minecraft} / {@code EntityPlayerSP}. */
+    @SideOnly(Side.CLIENT)
+    private static class ClientDispatch {
+        static void handle(PacketSyncPocket msg) {
             // Marshal back onto the client main thread before touching the capability;
             // entity capabilities are not safe to mutate from the netty thread.
             Minecraft.getMinecraft().addScheduledTask(() -> {
@@ -54,7 +66,6 @@ public class PacketSyncPocket implements IMessage {
                     inv.deserializeNBT(msg.nbt);
                 }
             });
-            return null;
         }
     }
 }

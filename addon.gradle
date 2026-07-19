@@ -74,7 +74,12 @@ if (!isDevRun) {
         tasks.named('jar').configure {
             manifest {
                 attributes(
-                        'TweakClass': 'cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker',
+                        // NOT OneConfig's tweaker directly — that bootstraps on both physical
+                        // sides, and OneConfig is client-only (it references IntegratedServer),
+                        // so a dedicated server dies with "Attempted to load class chd for
+                        // invalid side SERVER" during mod construction. SumOneConfigTweaker is a
+                        // side-aware shim that cascades to OneConfig's tweaker on clients only.
+                        'TweakClass': 'com.micatechnologies.minecraft.sum.mixin.SumOneConfigTweaker',
                         'TweakOrder': '0'
                 )
             }
@@ -109,8 +114,18 @@ if (project.hasProperty('enableJava17RunTasks') && enableJava17RunTasks.toBoolea
 // runtime classpath (see dependencies.gradle for the why) — its manifest references
 // a tweaker class that doesn't exist as an artifact, and GradleStart's classpath
 // scan would crash on it before we could even reach the OneConfig loader.
-minecraft {
-    extraTweakClasses.add('cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker')
+//
+// Client-only, for the same reason the published manifest goes through
+// SumOneConfigTweaker: OneConfig is a client mod, so cascading its loader into a dev
+// `runServer` reproduces the dedicated-server crash. runClient still gets it directly —
+// no shim needed when we already know the side at configuration time.
+boolean isDevServerRun = project.gradle.startParameter.taskNames.any {
+    it.contains('runServer')
+}
+if (!isDevServerRun) {
+    minecraft {
+        extraTweakClasses.add('cc.polyfrost.oneconfig.loader.stage0.LaunchWrapperTweaker')
+    }
 }
 
 // Apple-Silicon fallback: run the LWJGL2 client under x86_64 (Rosetta 2).

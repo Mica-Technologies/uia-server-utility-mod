@@ -6,6 +6,8 @@ import net.minecraft.network.PacketBuffer;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
  * Server → client message asking the receiving client to add an item to its local
@@ -39,6 +41,16 @@ public class PacketAddFavorite implements IMessage {
 
         @Override
         public IMessage onMessage(PacketAddFavorite msg, MessageContext ctx) {
+            ClientDispatch.handle(msg);
+            return null;
+        }
+    }
+
+    /** Client-only inner class so registering {@link Handler} on a dedicated server doesn't
+     *  drag in {@code Minecraft}. */
+    @SideOnly(Side.CLIENT)
+    private static class ClientDispatch {
+        static void handle(PacketAddFavorite msg) {
             // Marshal back onto the client main thread before mutating the favorites store
             // and writing to disk — FavoritesStore is internally synchronized, but the save()
             // does file I/O that we'd rather not run on the netty thread.
@@ -51,7 +63,6 @@ public class PacketAddFavorite implements IMessage {
                     FavoritesStore.save();
                 }
             });
-            return null;
         }
     }
 }
