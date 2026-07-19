@@ -28,7 +28,14 @@ SUCCESS_RE='Done \([0-9.]+s\)!'
 # signature of client-only code reaching the server.
 FAILURE_RE='Encountered an unexpected exception|MissingModsException|for invalid side|A fatal error has occurred|The state engine was in incorrect state|Failed to start the minecraft server|FML has found a problem'
 
-mkdir -p run/server
+# Accept the EULA in both possible run directories. RFG's runServer uses `run/` unless the
+# buildscript property `separateRunDirectories` is true, in which case it's `run/server/`.
+# It defaults to false, so `run/` is the one that actually matters today — but writing both
+# keeps this working if that property is ever flipped. (Getting this wrong is invisible
+# locally, where an already-accepted run/eula.txt lingers from earlier manual runs, and only
+# shows up on a clean CI checkout as "Minecraft EULA not accepted".)
+mkdir -p run run/server
+printf 'eula=true\n' > run/eula.txt
 printf 'eula=true\n' > run/server/eula.txt
 
 echo "==> Starting dedicated server (timeout ${TIMEOUT}s)"
