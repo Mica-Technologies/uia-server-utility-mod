@@ -135,4 +135,34 @@ public final class HudFormat {
     public static int roomAbove(int worldHeight, double posY) {
         return worldHeight - (int) Math.floor(posY);
     }
+
+    /**
+     * Speed unit dropdown indices. These are persisted by ordinal in OneConfig's {@code sum.json},
+     * so new units must be <em>appended</em> — renumbering would silently reinterpret every
+     * existing install's saved selection as a different unit.
+     */
+    public static final int SPEED_BLOCKS_PER_SEC = 0;
+    public static final int SPEED_BLOCKS_PER_TICK = 1;
+    public static final int SPEED_MPH = 2;
+    public static final int SPEED_KMH = 3;
+
+    /** Exact metres-per-second to miles-per-hour factor (a block is one metre). */
+    private static final double MPS_TO_MPH = 2.2369362920544;
+
+    /**
+     * Formats a horizontal speed given in blocks per tick. A block is one metre and a tick is
+     * 1/20 s, so blocks/sec is metres/sec and the real-world units follow directly from that.
+     */
+    public static String speed(double perTick, int unit) {
+        switch (unit) {
+            case SPEED_BLOCKS_PER_TICK:
+                return String.format("%.2f b/t", perTick);
+            case SPEED_MPH:
+                return String.format("%.2f mph", perTick * 20.0 * MPS_TO_MPH);
+            case SPEED_KMH:
+                return String.format("%.2f km/h", perTick * 20.0 * 3.6);
+            default:
+                return String.format("%.2f b/s", perTick * 20.0);
+        }
+    }
 }

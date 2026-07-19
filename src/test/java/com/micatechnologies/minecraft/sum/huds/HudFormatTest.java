@@ -180,4 +180,40 @@ class HudFormatTest {
         assertEquals(1, HudFormat.roomAbove(256, 255.0));
         assertEquals(256, HudFormat.roomAbove(256, 0.0));
     }
+
+    // --- speed ---
+
+    @Test
+    void speedConvertsPerTickToEachUnit() {
+        // 0.2158 b/t is roughly vanilla sprint speed: 4.317 b/s.
+        assertEquals("4.32 b/s", HudFormat.speed(0.2158, HudFormat.SPEED_BLOCKS_PER_SEC));
+        assertEquals("0.22 b/t", HudFormat.speed(0.2158, HudFormat.SPEED_BLOCKS_PER_TICK));
+        assertEquals("9.65 mph", HudFormat.speed(0.2158, HudFormat.SPEED_MPH));
+        assertEquals("15.54 km/h", HudFormat.speed(0.2158, HudFormat.SPEED_KMH));
+    }
+
+    @Test
+    void speedUnitIndicesAreStableForSavedConfigs() {
+        // These ordinals are persisted in sum.json; renumbering silently changes what an
+        // existing install's saved selection means.
+        assertEquals(0, HudFormat.SPEED_BLOCKS_PER_SEC);
+        assertEquals(1, HudFormat.SPEED_BLOCKS_PER_TICK);
+        assertEquals(2, HudFormat.SPEED_MPH);
+        assertEquals(3, HudFormat.SPEED_KMH);
+    }
+
+    @Test
+    void speedHandlesStandingStillAndUnknownUnit() {
+        assertEquals("0.00 mph", HudFormat.speed(0.0, HudFormat.SPEED_MPH));
+        assertEquals("0.00 km/h", HudFormat.speed(0.0, HudFormat.SPEED_KMH));
+        assertEquals("4.32 b/s", HudFormat.speed(0.2158, 99), "unknown unit falls back to b/s");
+    }
+
+    @Test
+    void speedMphMatchesExactMetresPerSecondFactor() {
+        // 1 b/t = 20 m/s = 44.74 mph. Guards the conversion constant itself.
+        assertEquals("44.74 mph", HudFormat.speed(1.0, HudFormat.SPEED_MPH));
+        assertEquals("72.00 km/h", HudFormat.speed(1.0, HudFormat.SPEED_KMH));
+        assertEquals("20.00 b/s", HudFormat.speed(1.0, HudFormat.SPEED_BLOCKS_PER_SEC));
+    }
 }
