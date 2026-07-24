@@ -38,20 +38,28 @@ public class SumClientProxy implements SumProxy {
         FavoritesClientHandler.registerKeybinds();
         MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
 
-        // SUM OneConfig — the simple `new SumOneConfig()` fires its constructor which
-        // registers the SUM mod with OneConfig and exposes any @HUD fields. OneConfig
-        // drives all HUD rendering, persistence, and drag-to-reposition UX, so SUM
-        // doesn't register its own RenderGameOverlayEvent handler for the HUD.
-        new SumOneConfig();
-        // The stateful counter HUDs (CPS, click count, blocks placed, session playtime)
-        // need a real event subscriber to keep their counters fresh — HUD modules are
-        // managed by OneConfig and can't subscribe to events themselves.
-        MinecraftForge.EVENT_BUS.register(new HudStateTracker());
-        // Feeds the Now Playing HUD — captures music/record sounds via PlaySoundEvent and
-        // polls SoundHandler to notice when they finish (no stop event exists).
-        MinecraftForge.EVENT_BUS.register(new NowPlayingTracker());
-        PocketKeybinds.register();
-        MinecraftForge.EVENT_BUS.register(new PocketKeybinds());
+        // OneConfig drives every SUM HUD and the pocket UI, and it's an optional (after:)
+        // dependency — so all of the OneConfig-touching registrations are gated on it actually
+        // being installed. When it isn't, SUM simply runs without its HUDs/pocket rather than
+        // crashing at class-load; the economy, blocks, items and TESRs above don't need it.
+        if (net.minecraftforge.fml.common.Loader.isModLoaded("oneconfig")) {
+            // `new SumOneConfig()` fires its constructor, which registers the SUM mod with
+            // OneConfig and exposes its @HUD fields. OneConfig owns HUD rendering, persistence
+            // and drag-to-reposition, so SUM registers no RenderGameOverlayEvent handler itself.
+            new SumOneConfig();
+            // The stateful counter HUDs (CPS, click count, blocks placed, session playtime)
+            // need a real event subscriber to keep their counters fresh — HUD modules are
+            // managed by OneConfig and can't subscribe to events themselves.
+            MinecraftForge.EVENT_BUS.register(new HudStateTracker());
+            // Feeds the Now Playing HUD — captures music/record sounds via PlaySoundEvent and
+            // polls SoundHandler to notice when they finish (no stop event exists).
+            MinecraftForge.EVENT_BUS.register(new NowPlayingTracker());
+            PocketKeybinds.register();
+            MinecraftForge.EVENT_BUS.register(new PocketKeybinds());
+        } else {
+            Sum.LOGGER.warn("OneConfig is not installed; SUM's HUDs and pocket UI are disabled "
+                + "for this session (everything else, including the economy, still works).");
+        }
     }
 
     @Override
