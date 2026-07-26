@@ -126,20 +126,23 @@ public class SumConfig {
     private static final String FIELD_KEY_MOVEMENT_ENABLED = "toleranceEnabled";
     private static final String FIELD_DESCRIPTION_MOVEMENT_ENABLED =
         "When true, vanilla's hardcoded \"moved too quickly\" thresholds in NetHandlerPlayServer "
-            + "are multiplied by 'toleranceMultiplier'. With multiplier 10 (default), a player can "
-            + "be roughly sqrt(10) times farther from their last good position before being "
-            + "rubberband-snapped — enough to absorb most lag-induced false positives. With "
-            + "multiplier 1, behavior matches vanilla. Inspired by Moving Quickly (coremod by "
-            + "thiakil et al.); SUM patches the same constants via Mixin and gates by this flag.";
+            + "are multiplied by 'toleranceMultiplier', so lag-induced position desyncs stop "
+            + "rubberband-snapping players back. With multiplier 1, behavior matches vanilla. "
+            + "Inspired by Moving Quickly (coremod by thiakil et al.); SUM patches the same "
+            + "constants via Mixin and gates by this flag.";
     private static final boolean FIELD_DEFAULT_MOVEMENT_ENABLED = true;
 
     private static final String FIELD_KEY_MOVEMENT_MULTIPLIER = "toleranceMultiplier";
     private static final String FIELD_DESCRIPTION_MOVEMENT_MULTIPLIER =
         "Factor applied to vanilla's 100.0 (player) / 100.0 (vehicle) / 300.0 (elytra) thresholds. "
-            + "Reasonable range: 1.0 (vanilla) to 100.0 (effectively disabled). Default 10.0.";
-    private static final double FIELD_DEFAULT_MOVEMENT_MULTIPLIER = 10.0;
+            + "Vanilla compares SQUARED distance, so allowed travel per server tick only grows by "
+            + "the square root of this: 1.0 = 10 blocks (vanilla), 10.0 = 31.6 blocks, 1024.0 = 320 "
+            + "blocks. Default 1024.0 matches the Moving Quickly coremod SUM replaced, which "
+            + "multiplied the same two constants by 1024 — effectively retiring the check. Drop to "
+            + "16.0-100.0 if you want lag tolerance while keeping some speed-hack protection.";
+    private static final double FIELD_DEFAULT_MOVEMENT_MULTIPLIER = 1024.0;
     private static final double FIELD_MIN_MOVEMENT_MULTIPLIER = 1.0;
-    private static final double FIELD_MAX_MOVEMENT_MULTIPLIER = 1000.0;
+    private static final double FIELD_MAX_MOVEMENT_MULTIPLIER = 4096.0;
 
     private static final String CATEGORY_PAUSER = "pauser";
 

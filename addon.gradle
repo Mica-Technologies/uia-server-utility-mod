@@ -188,11 +188,13 @@ tasks.matching { it.name == 'reobfJar' }.configureEach {
                         + 'vanishes in production. Bootstrap OneConfig from the modpack instead.')
             }
             if (attrs.getValue('FMLCorePlugin') == null) {
-                problems << 'is missing FMLCorePlugin — SumCoreMod would never register the mixin config.'
+                problems << ('is missing FMLCorePlugin — without it FML never instantiates SumCoreMod, '
+                        + 'so MixinBooter never sees it in the coremod list and no SUM mixin applies.')
             }
             if (attrs.getValue('MixinConfigs') == null) {
-                problems << ('is missing MixinConfigs — production relies on MixinBooter discovering '
-                        + 'mixins.sum.json from the manifest, since SumCoreMod only self-registers in dev.')
+                problems << ('is missing MixinConfigs — metadata only (SumCoreMod registers the config '
+                        + 'via IEarlyMixinLoader), but its absence means the jar task lost the addon.gradle '
+                        + 'manifest block, which usually means other attributes drifted too.')
             }
 
             if (!problems.isEmpty()) {
