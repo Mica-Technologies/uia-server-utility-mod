@@ -22,7 +22,11 @@ import com.micatechnologies.minecraft.sum.pocket.CapabilityPocket;
 import com.micatechnologies.minecraft.sum.pocket.PocketEvents;
 import com.micatechnologies.minecraft.sum.roadrunner.RoadRunnerHandler;
 import com.micatechnologies.minecraft.sum.sleep.SleepVoteHandler;
+import com.micatechnologies.minecraft.sum.roamer.EntityAIRoamerFireEvacuate;
+import com.micatechnologies.minecraft.sum.roamer.EntityAIRoamerStormShelter;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
+import com.micatechnologies.minecraft.sum.roamer.RoamerExitCache;
+import com.micatechnologies.minecraft.sum.roamer.RoamerShelterCache;
 import com.micatechnologies.minecraft.sum.roamer.TileEntityStormShelterSign;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
 import net.minecraft.block.Block;
@@ -38,6 +42,7 @@ import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
+import net.minecraftforge.fml.common.event.FMLServerStoppedEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.network.NetworkRegistry;
 import net.minecraftforge.fml.common.registry.EntityEntry;
@@ -152,5 +157,26 @@ public class Sum {
         event.registerServerCommand(new CommandSum());
         event.registerServerCommand(new CommandBalance());
         event.registerServerCommand(new CommandPay());
+    }
+
+    /**
+     * Drops the roamer subsystem's in-memory world state when the server stops.
+     *
+     * <p>These caches are plain statics holding {@link net.minecraft.util.math.BlockPos} values
+     * with no world attached, so carrying them across a server lifetime is wrong: on a client,
+     * leaving one singleplayer world and opening another would hand the second world the first
+     * world's shelters, exits and claims. Their javadoc has always said "cleared on world unload";
+     * nothing actually called them until now.
+     *
+     * <p>{@code FMLServerStoppedEvent} rather than {@code WorldEvent.Unload} on purpose — the
+     * caches are not keyed by dimension, so unloading the Nether must not wipe the overworld's
+     * entries.
+     */
+    @EventHandler
+    public void serverStopped(FMLServerStoppedEvent event) {
+        EntityAIRoamerFireEvacuate.clearClaims();
+        EntityAIRoamerStormShelter.clearClaims();
+        RoamerExitCache.clear();
+        RoamerShelterCache.clear();
     }
 }
