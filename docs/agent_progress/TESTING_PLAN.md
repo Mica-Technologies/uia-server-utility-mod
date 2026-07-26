@@ -311,7 +311,8 @@ Each line is one decision + brief why.
   pause-everything semantics.)
 - **Moving Quickly: `@ModifyConstant` Mixin** on
   `NetHandlerPlayServer.processPlayer` (100.0F + 300.0F) and
-  `processVehicleMove` (100.0D), gated by config flag, default multiplier 10×.
+  `processVehicleMove` (100.0D), gated by config flag, default multiplier
+  1024× — parity with the Moving Quickly coremod it replaced.
 - **SUM is a coremod via MixinBooter** (`mixin.SumCoreMod` IFMLLoadingPlugin).
   Reversal of the original "no coremod" rule, locked 2026-05-09.
 
@@ -793,8 +794,9 @@ players. Use `./gradlew runServer`:
 
 Solo sanity tests only — real validation needs lossy network conditions.
 
-- [ ] Default config (multiplier 10.0): play normally with elytra,
-      sprinting, vehicles. No "moved too quickly" log spam in client log
+- [ ] Default config (multiplier 1024.0 — Moving Quickly parity, 320 blocks
+      per tick vs vanilla's 10): play normally with elytra, sprinting,
+      vehicles. No "moved too quickly" log spam in client log
 - [ ] `B:toleranceEnabled=false`, `/sum reloadconfig`, restart client → no
       visible behavior change on stable connection
 - [ ] `D:toleranceMultiplier=100.0`, `/sum reloadconfig` → verify the

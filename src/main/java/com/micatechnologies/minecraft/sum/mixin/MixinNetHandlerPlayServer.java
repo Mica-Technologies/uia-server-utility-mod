@@ -17,12 +17,16 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
  * </ul>
  *
  * <p>Each constant is multiplied by {@link SumConfig#getMovementToleranceMultiplier()} when the
- * feature is enabled. With the default multiplier of 10, a player can be ~3.16x further from
- * their last good position before vanilla rubberband-snaps them; with multiplier 1, behavior
- * matches vanilla.
+ * feature is enabled. Vanilla compares a <em>squared</em> distance, so allowed travel per server
+ * tick grows only with the square root of the multiplier: at 1024 (default) a player may move 320
+ * blocks per tick instead of vanilla's 10; with multiplier 1, behavior matches vanilla.
  *
  * <p>Inspired by Moving Quickly / GottaGoFast (server-side coremods that patch the same
- * constants). SUM is the only one of the three using a per-server config knob.
+ * constants). The 1024 default is deliberate parity with Moving Quickly 1.12.2_1.0.0, whose
+ * {@code MovingQuicklyTransformer} rewrote every {@code LDC} of 100.0F/300.0F in
+ * {@code processPlayer} as {@code value * 1024.0F}. Two deliberate differences: SUM also relaxes
+ * {@code processVehicleMove} (Moving Quickly left boats and minecarts at vanilla), and SUM gates
+ * the whole thing behind a per-server config knob.
  */
 @Mixin(NetHandlerPlayServer.class)
 public abstract class MixinNetHandlerPlayServer {
