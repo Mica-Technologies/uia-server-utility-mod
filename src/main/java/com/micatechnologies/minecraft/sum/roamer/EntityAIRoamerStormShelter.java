@@ -2,9 +2,7 @@ package com.micatechnologies.minecraft.sum.roamer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockDoor;
 import net.minecraft.block.BlockGlass;
@@ -77,8 +75,9 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private static final int INDOOR_WANDER_INTERVAL_MIN = 60;  // 3 seconds
     private static final int INDOOR_WANDER_INTERVAL_MAX = 200; // 10 seconds
 
-    // Shared set of claimed shelter positions — prevents all roamers from picking the same spot
-    private static final Set<BlockPos> claimedPositions = new HashSet<>();
+    // Shared claims on shelter positions — prevents all roamers from picking the same spot.
+    // Ownership-tracked so a claim dies with its roamer; see RoamerPositionClaims for why.
+    private static final RoamerPositionClaims CLAIMS = new RoamerPositionClaims();
 
     private final EntityRoamer roamer;
     private final double speed;
@@ -271,9 +270,9 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
 
     @Override
     public void resetTask() {
-        if (shelterTarget != null) {
-            releasePosition(shelterTarget);
-        }
+        // Release everything this roamer holds, not just shelterTarget: a task can claim a
+        // preferred sign shelter and then a search result before reset.
+        CLAIMS.releaseAll(roamer.getEntityId());
         shelterTarget = null;
         sheltered = false;
         searching = false;
@@ -550,23 +549,19 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
 
     // --- Position claiming ---
 
-    private static void claimPosition(BlockPos pos) {
-        claimedPositions.add(pos);
+    private void claimPosition(BlockPos pos) {
+        CLAIMS.claim(pos, roamer.getEntityId());
     }
 
-    private static void releasePosition(BlockPos pos) {
-        claimedPositions.remove(pos);
-    }
-
-    private static boolean isPositionClaimed(BlockPos candidate) {
-        return claimedPositions.contains(candidate);
+    private boolean isPositionClaimed(BlockPos candidate) {
+        return CLAIMS.isClaimedByOther(roamer.world, candidate, roamer.getEntityId());
     }
 
     /**
-     * Clears all claimed shelter positions. Should be called on world unload.
+     * Clears all claimed shelter positions. Called from {@code Sum.serverStopped}.
      */
     public static void clearClaims() {
-        claimedPositions.clear();
+        CLAIMS.clear();
     }
 
     private static class ScoredPos {

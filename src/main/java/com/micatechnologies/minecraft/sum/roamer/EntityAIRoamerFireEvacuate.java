@@ -4,10 +4,8 @@ import com.micatechnologies.minecraft.sum.SumConfig;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.ai.EntityAIBase;
@@ -69,8 +67,9 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     private static final int OUTDOOR_WANDER_INTERVAL_MIN = 60;  // 3 seconds
     private static final int OUTDOOR_WANDER_INTERVAL_MAX = 200; // 10 seconds
 
-    // Shared set of claimed rally positions — prevents two roamers from picking the same block
-    private static final Set<BlockPos> claimedPositions = new HashSet<>();
+    // Shared claims on rally + exit positions — prevents two roamers picking the same block.
+    // Ownership-tracked so a claim dies with its roamer; see RoamerPositionClaims for why.
+    private static final RoamerPositionClaims CLAIMS = new RoamerPositionClaims();
 
     private final EntityRoamer roamer;
     private final double speed;
@@ -265,9 +264,10 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
     @Override
     public void resetTask() {
-        if (rallyPoint != null) {
-            releasePosition(rallyPoint);
-        }
+        // Release everything this roamer holds. Releasing only rallyPoint leaked every exit
+        // claimed by stepFireExitSearch and every rally block claimed on arrival — permanently,
+        // since nothing else ever removed them.
+        CLAIMS.releaseAll(roamer.getEntityId());
         exitTarget = null;
         rallyPoint = null;
         reachedOutdoors = false;
@@ -300,25 +300,21 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
     // --- Position claiming ---
 
-    private static void claimPosition(BlockPos pos) {
-        claimedPositions.add(pos);
-    }
-
-    private static void releasePosition(BlockPos pos) {
-        claimedPositions.remove(pos);
+    private void claimPosition(BlockPos pos) {
+        CLAIMS.claim(pos, roamer.getEntityId());
     }
 
     /**
-     * Clears all claimed rally positions. Should be called on world unload.
+     * Clears all claimed rally positions. Called from {@code Sum.serverStopped}.
      */
     public static void clearClaims() {
-        claimedPositions.clear();
+        CLAIMS.clear();
     }
 
     // --- Exit search ---
 
-    private static boolean isPositionClaimed(BlockPos candidate) {
-        return claimedPositions.contains(candidate);
+    private boolean isPositionClaimed(BlockPos candidate) {
+        return CLAIMS.isClaimedByOther(roamer.world, candidate, roamer.getEntityId());
     }
 
     /**
