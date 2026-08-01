@@ -93,6 +93,8 @@ public class Sum {
             new com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker());
         MinecraftForge.EVENT_BUS.register(
             new com.micatechnologies.minecraft.sum.serverconfig.ServerConfigBridge());
+        MinecraftForge.EVENT_BUS.register(
+            new com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyEvents());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();
@@ -157,6 +159,12 @@ public class Sum {
         event.registerServerCommand(new CommandSum());
         event.registerServerCommand(new CommandBalance());
         event.registerServerCommand(new CommandPay());
+        // Started here rather than in preInit because it needs the live MinecraftServer: the
+        // dedicated-vs-integrated check, the world save that holds the rollback counter, and the
+        // player list all come from it.
+        com.micatechnologies.minecraft.sum.economy.EconomyBridge.setRemoteService(
+            com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService
+                .startIfEnabled(event.getServer()));
     }
 
     /**
@@ -174,6 +182,15 @@ public class Sum {
      */
     @EventHandler
     public void serverStopped(FMLServerStoppedEvent event) {
+        // Stop the economy client first: it holds background threads and an in-memory balance
+        // cache tied to this server instance, and a single-player client that opens a second
+        // world must not inherit either.
+        com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService remote =
+            com.micatechnologies.minecraft.sum.economy.EconomyBridge.getRemoteService();
+        if (remote != null) {
+            remote.stop();
+        }
+        com.micatechnologies.minecraft.sum.economy.EconomyBridge.clearRemoteService();
         EntityAIRoamerFireEvacuate.clearClaims();
         EntityAIRoamerStormShelter.clearClaims();
         RoamerExitCache.clear();
