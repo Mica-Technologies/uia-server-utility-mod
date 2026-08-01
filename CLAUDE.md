@@ -117,18 +117,34 @@ All config is in `SumConfig.java` using Forge's `Configuration` class. Categorie
 - **`economy_api`** -- Open MCEconomic API client (off by default). Full protocol spec in
   `docs/ECONOMIC_API.md`; the `.tex`/`.pdf` alongside it are the same content typeset.
 
-### Economy backends
+### Economy: wallet vs bank
 
-`EconomyBridge` is the single facade for all balance operations, routing between three backends in
-priority order: **Open MCEconomic API** (remote, authoritative) -> **EconomyInc** (if loaded) ->
-**SUM's own capability**. Feature code only ever calls the bridge.
+Two distinct balances. Getting these confused is the single easiest way to break the economy.
+
+| | What it is | Backed by | Spent by |
+|---|---|---|---|
+| **Wallet** | Invisible balance (`ISumMoney`) **plus** the face value of bills carried in inventory/pocket | Always local (world save) | Shops, plots, job escrow, `/pay`, loyalty rewards |
+| **Bank** | A savings account | Remote OMCE service if configured, otherwise `BankSavedData` in the world save | Nothing directly -- only reachable at an ATM or with a debit card |
+
+- `WalletService` is the wallet API. `spend()` drains the invisible balance first, then breaks
+  carried bills, returning change to the invisible balance.
+- `EconomyBridge` handles only the wallet's **invisible balance** and is always local and
+  synchronous. It does *not* route to the remote service.
+- `BankService` is the bank API. It settles inline on the local backend and after a round trip on
+  the remote one, so every caller passes a callback and nothing is granted before the money moves.
+- The ATM is the only crossing point: wallet <-> bank, plus cash <-> bank. Converting wallet money
+  to physical bills is deposit-then-withdraw-as-cash.
+
+A remote economy is therefore **optional in every sense** -- without one configured, the bank runs
+on the world save and everything still works.
 
 The remote backend is server-side only and never runs on a Minecraft client; on an integrated
 (single-player/LAN) server it stays off unless `economy_api.allowIntegratedServer` is set, so a
-local save cannot spend from a shared economy. Because HTTP must not run on the server thread,
-`EconomyBridge.adjustBalance` is optimistic under the remote backend -- its boolean means
-"accepted and dispatched", not "committed". Anything granting an irreversible in-world effect
-should use `OmceEconomyService.processTransaction`, whose callback fires only on `committed`.
+local save cannot spend from a shared economy.
+
+Three HUDs, easily confused: **Wallet** (carried money), **Bank** (account balance, synced via
+`PlayerStatusSnapshot` because the client cannot read a remote account), **Vault** (face value of
+bills stored in safe-deposit boxes).
 
 ### Key Patterns
 

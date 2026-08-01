@@ -742,6 +742,13 @@ is debited by `amount`. If `destination` is a settled account it is credited by
 | `admin_debit` | `player` | `system` | `/sum economy add` with a negative amount |
 | `admin_migration` | either | either | Bulk balance migration between backends |
 
+> **What SUM actually emits.** SUM models a player's money as a local *wallet* and a *bank
+> account*, and only the bank account is owned by a service implementing this protocol. In-game
+> purchases spend the wallet and never reach the network. In practice that means a SUM client emits
+> only `atm_deposit`, `atm_withdraw`, and administrative adjustments. The remaining types are
+> defined because the protocol is generic and another client may settle them remotely — but a
+> service built solely for SUM does not need to handle traffic it will never receive.
+
 > **Forward compatibility (important).** This vocabulary **will grow** as SUM adds features. A
 > service MUST NOT reject an unrecognised `type`. It MUST record the string verbatim and settle the
 > transaction using the `source`/`destination` semantics above, which are complete on their own. A
