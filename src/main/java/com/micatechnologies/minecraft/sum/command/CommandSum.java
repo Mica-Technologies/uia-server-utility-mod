@@ -5,14 +5,14 @@ import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
+import com.micatechnologies.minecraft.sum.bank.BankService;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import com.micatechnologies.minecraft.sum.economy.WalletService;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.jobs.JobListing;
 import com.micatechnologies.minecraft.sum.jobs.JobStatus;
-import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
-import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
 import com.micatechnologies.minecraft.sum.plots.ItemPlotWand;
 import com.micatechnologies.minecraft.sum.plots.PlotStatus;
 import com.micatechnologies.minecraft.sum.plots.SumPlot;
@@ -285,7 +285,7 @@ public class CommandSum extends CommandBase {
             sendMessage(sender, TextFormatting.RED, "Usage: /sum econ <balance|add|set> [args...]");
             return;
         }
-        if (!EconomyBridge.isAvailable()) {
+        if (!WalletService.isAvailable()) {
             sendMessage(sender, TextFormatting.YELLOW,
                 "EconomyInc bridge unavailable (mod not loaded or reflection bind failed). "
                     + "See server log for details.");
@@ -323,33 +323,32 @@ public class CommandSum extends CommandBase {
             return;
         }
         sendMessage(sender, TextFormatting.GREEN,
-            target.getName() + "'s balance: $" + formatMoney(balance));
+            target.getName() + "'s wallet: $" + formatMoney(WalletService.getTotal(target))
+                + " (bank: $" + formatMoney(BankService.getBalance(target)) + ")");
     }
 
     private void handleEconAdd(MinecraftServer server, ICommandSender sender, String[] args)
         throws CommandException {
         if (args.length < 3) {
-            sendMessage(sender, TextFormatting.RED, "Usage: /sum econ add <amount> [player]");
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum econ add <amount> [player] [--bank]");
             return;
         }
+        boolean bank = hasBankFlag(args);
         double delta = parseMoneyArg(sender, args[2]);
         if (Double.isNaN(delta)) {
             return;
         }
-        EntityPlayerMP target = (args.length >= 4) ? getPlayer(server, sender, args[3]) : asPlayer(sender);
+        EntityPlayerMP target = targetOf(server, sender, args);
         if (target == null) {
             return;
         }
-        if (EconomyBridge.adjustBalance(target, delta,
-            delta >= 0.0 ? OmceProtocol.TX_ADMIN_CREDIT : OmceProtocol.TX_ADMIN_DEBIT,
-            OmceParty.system(delta >= 0.0 ? "faucet.admin" : "sink.admin"),
-            "Admin adjustment by " + sender.getName())) {
+        if (adjustTargetBalance(target, delta, bank)) {
             sendMessage(sender, TextFormatting.GREEN,
-                "Adjusted " + target.getName() + "'s balance by $" + formatMoney(delta)
-                    + " (now $" + formatMoney(EconomyBridge.getBalance(target)) + ").");
+                "Adjusted " + target.getName() + "'s " + label(bank) + " by $" + formatMoney(delta)
+                    + " (now $" + formatMoney(readBalance(target, bank)) + ").");
         } else {
-            sendMessage(sender, TextFormatting.RED,
-                "Adjustment failed (capability missing or would overdraft).");
+            sendMessage(sender, TextFormatting.RED, adjustFailureReason(bank));
         }
     }
 
@@ -359,32 +358,86 @@ public class CommandSum extends CommandBase {
             sendMessage(sender, TextFormatting.RED, "Usage: /sum econ set <amount> [player]");
             return;
         }
+        boolean bank = hasBankFlag(args);
         double amount = parseMoneyArg(sender, args[2]);
         if (Double.isNaN(amount) || amount < 0.0) {
             sendMessage(sender, TextFormatting.RED, "Amount must be a non-negative number.");
             return;
         }
-        EntityPlayerMP target = (args.length >= 4) ? getPlayer(server, sender, args[3]) : asPlayer(sender);
+        EntityPlayerMP target = targetOf(server, sender, args);
         if (target == null) {
             return;
         }
-        double current = EconomyBridge.getBalance(target);
+        double current = readBalance(target, bank);
         if (Double.isNaN(current)) {
             sendMessage(sender, TextFormatting.YELLOW,
-                target.getName() + " has no IMoney capability.");
+                target.getName() + " has no " + label(bank) + " available.");
             return;
         }
-        // Expressed as a delta because the bridge has no absolute-set operation. A remote
-        // service offering /setBalance closes the small race here; see docs/ECONOMIC_API.md.
-        if (EconomyBridge.adjustBalance(target, amount - current,
-            amount >= current ? OmceProtocol.TX_ADMIN_CREDIT : OmceProtocol.TX_ADMIN_DEBIT,
-            OmceParty.system(amount >= current ? "faucet.admin" : "sink.admin"),
-            "Admin set balance to " + formatMoney(amount) + " by " + sender.getName())) {
+        if (adjustTargetBalance(target, amount - current, bank)) {
             sendMessage(sender, TextFormatting.GREEN,
-                "Set " + target.getName() + "'s balance to $" + formatMoney(amount) + ".");
+                "Set " + target.getName() + "'s " + label(bank) + " to $" + formatMoney(amount) + ".");
         } else {
-            sendMessage(sender, TextFormatting.RED, "Set failed (capability missing).");
+            sendMessage(sender, TextFormatting.RED, adjustFailureReason(bank));
         }
+    }
+
+    /**
+     * Admin balance commands act on the wallet by default and the bank account with {@code --bank}.
+     *
+     * <p>Two balances now exist, so "add $100" is ambiguous without saying which. The wallet is the
+     * default because it is the one players spend.
+     */
+    private static boolean hasBankFlag(String[] args) {
+        for (String arg : args) {
+            if ("--bank".equalsIgnoreCase(arg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Resolves the optional player argument, skipping the {@code --bank} flag if present. */
+    @Nullable
+    private EntityPlayerMP targetOf(MinecraftServer server, ICommandSender sender, String[] args)
+        throws CommandException {
+        for (int i = 3; i < args.length; i++) {
+            if (!"--bank".equalsIgnoreCase(args[i])) {
+                return getPlayer(server, sender, args[i]);
+            }
+        }
+        return asPlayer(sender);
+    }
+
+    private static String label(boolean bank) {
+        return bank ? "bank account" : "wallet";
+    }
+
+    private static double readBalance(EntityPlayerMP target, boolean bank) {
+        return bank ? BankService.getBalance(target) : WalletService.getInvisibleBalance(target);
+    }
+
+    /**
+     * Applies an administrative adjustment to whichever balance was named.
+     *
+     * <p>Wallet adjustments touch the invisible balance rather than the total, since handing a
+     * player bills is a different operation. Bank adjustments are refused outright when a remote
+     * service owns the account: that ledger is not ours to write to directly.
+     */
+    private static boolean adjustTargetBalance(EntityPlayerMP target, double delta, boolean bank) {
+        if (bank) {
+            return BankService.adminAdjust(target, delta, "Admin adjustment");
+        }
+        return delta >= 0.0
+            ? WalletService.credit(target, delta)
+            : EconomyBridge.adjustBalance(target, delta);
+    }
+
+    private static String adjustFailureReason(boolean bank) {
+        return bank
+            ? "Bank adjustment failed. A remote economy service owns this account, so its balance "
+                + "must be changed on the service side."
+            : "Wallet adjustment failed (no balance backend, or it would overdraft).";
     }
 
     @Nullable
@@ -743,62 +796,6 @@ public class CommandSum extends CommandBase {
         return roamer.hasCustomName() ? roamer.getCustomNameTag() : "(unnamed)";
     }
 
-    /**
-     * Undoes a plot purchase whose charge a remote economy refused after the fact.
-     *
-     * <p>Skipped if the plot is no longer owned by this buyer, so an admin who reassigned or
-     * relisted it in the meantime does not get their change stamped over.
-     */
-    private static void revertPlotPurchase(EntityPlayerMP player, SumPlotsWorldSavedData data,
-        SumPlot plot) {
-        if (!player.getUniqueID().equals(plot.getOwnerUuid())) {
-            Sum.LOGGER.warn("[plots] Purchase of {} was refused, but the plot is no longer owned "
-                + "by {} — leaving its current state alone.", plot.getDisplayName(), player.getName());
-            return;
-        }
-        plot.setOwner(null, "");
-        plot.setStatus(PlotStatus.FOR_SALE);
-        data.touch();
-        player.sendMessage(new TextComponentString(TextFormatting.RED
-            + "The payment for " + plot.getDisplayName()
-            + " was declined — the plot has been returned to sale."));
-    }
-
-    /** Puts cleared listings back on the board after a refused escrow reclaim. */
-    private static void restoreClearedListings(EntityPlayerMP player, List<JobListing> cleared,
-        double refund) {
-        JobBoardSavedData data = JobBoardSavedData.get(player.world);
-        for (JobListing listing : cleared) {
-            data.addListing(listing);
-        }
-        player.sendMessage(new TextComponentString(TextFormatting.RED
-            + "The $" + formatMoney(refund)
-            + " escrow reclaim was declined — your listings were restored."));
-    }
-
-    /**
-     * Removes a job listing whose escrow a remote economy refused after the fact, so the board
-     * never shows a job whose reward was never actually held.
-     *
-     * <p>Only removes it while it is still OPEN: once a worker has claimed it, silently deleting
-     * their work is worse than leaving an operator to resolve it, so this logs instead.
-     */
-    private static void revertJobPost(EntityPlayerMP player, UUID listingId, double reward) {
-        JobBoardSavedData data = JobBoardSavedData.get(player.world);
-        JobListing listing = data.getById(listingId);
-        if (listing == null) {
-            return;
-        }
-        if (listing.status != JobStatus.OPEN) {
-            Sum.LOGGER.error("[jobs] Escrow for listing {} was refused, but it is already {} — "
-                + "a worker may be relying on it. Resolve this manually.", listingId, listing.status);
-            return;
-        }
-        data.removeListing(listingId);
-        player.sendMessage(new TextComponentString(TextFormatting.RED
-            + "The $" + formatMoney(reward) + " escrow was declined — your job listing was removed."));
-    }
-
     // --- /sum migrate-economy ---
 
     private void handleMigrateEconomy(MinecraftServer server, ICommandSender sender, String[] args) {
@@ -835,7 +832,7 @@ public class CommandSum extends CommandBase {
         for (EntityPlayerMP player : server.getPlayerList().getPlayers()) {
             // Read EconomyInc balance (the bridge's getBalance routes to EconomyInc when it's
             // the active backend, which it is at this point).
-            double balance = EconomyBridge.getBalance(player);
+            double balance = WalletService.getTotal(player);
             if (Double.isNaN(balance)) balance = 0.0;
             int bills = countEconomyIncBills(player);
 
@@ -987,15 +984,14 @@ public class CommandSum extends CommandBase {
         }
         // Minted before the charge when there is one, so the rejection callback can name the
         // listing it must remove. Null when the job is unpaid and nothing needs escrowing.
-        UUID escrowedListingId = null;
         // Escrow the reward up front so the payout is guaranteed when a worker completes the job.
         if (reward > 0.0) {
-            if (!EconomyBridge.isAvailable()) {
+            if (!WalletService.isAvailable()) {
                 sendMessage(sender, TextFormatting.RED,
                     "No economy backend is loaded — the reward can't be escrowed.");
                 return;
             }
-            double balance = EconomyBridge.getBalance(player);
+            double balance = WalletService.getTotal(player);
             double have = Double.isNaN(balance) ? 0.0 : balance;
             if (have < reward) {
                 sendMessage(sender, TextFormatting.RED,
@@ -1003,25 +999,14 @@ public class CommandSum extends CommandBase {
                     + " (you have $" + formatMoney(have) + ").");
                 return;
             }
-            // The listing does not exist yet, so the undo has to reach forward to the id we are
-            // about to mint. A listing is server-side data, so pulling it back is clean.
-            //
-            // The callback cannot fire before the listing exists: it is delivered via the server's
-            // task queue from a background thread, and we are currently on the server thread, so
-            // it cannot run until this method returns.
-            escrowedListingId = UUID.randomUUID();
-            final UUID pendingId = escrowedListingId;
-            if (!EconomyBridge.adjustBalance(player, -reward,
-                OmceProtocol.TX_JOB_POST_ESCROW, OmceParty.system("escrow.jobs"),
-                "Escrow for a new job listing",
-                () -> revertJobPost(player, pendingId, reward))) {
+            if (!WalletService.spend(player, reward)) {
                 sendMessage(sender, TextFormatting.RED, "Could not hold the escrow; listing not posted.");
                 return;
             }
         }
         long now = System.currentTimeMillis();
         JobListing listing = new JobListing(
-            escrowedListingId != null ? escrowedListingId : UUID.randomUUID(),
+            UUID.randomUUID(),
             player.getUniqueID(),
             player.getName(),
             description,
@@ -1066,13 +1051,7 @@ public class CommandSum extends CommandBase {
             refund += l.reward;
         }
         if (refund > 0.0) {
-            // takeByPoster already removed the listings, so a refused credit would destroy the
-            // escrow. Restore them if that happens.
-            final double reclaimed = refund;
-            EconomyBridge.adjustBalance(player, refund,
-                OmceProtocol.TX_JOB_REFUND, OmceParty.system("escrow.jobs"),
-                "Reclaimed escrow from " + mine.size() + " removed job listing(s)",
-                () -> restoreClearedListings(player, mine, reclaimed));
+            WalletService.credit(player, refund);
         }
         sendMessage(sender, TextFormatting.GREEN,
             "Removed " + mine.size() + " listing(s)"
@@ -1307,11 +1286,11 @@ public class CommandSum extends CommandBase {
                 "That plot has no listed price; ask an admin to set one.");
             return;
         }
-        if (!EconomyBridge.isAvailable()) {
+        if (!WalletService.isAvailable()) {
             sendMessage(sender, TextFormatting.RED, "No economy backend is loaded.");
             return;
         }
-        double balance = EconomyBridge.getBalance(player);
+        double balance = WalletService.getTotal(player);
         if (Double.isNaN(balance) || balance < plot.getPrice()) {
             sendMessage(sender, TextFormatting.RED,
                 "Insufficient funds. Need $"
@@ -1319,11 +1298,7 @@ public class CommandSum extends CommandBase {
                 + ", have $" + String.format(Locale.ROOT, "%.2f", balance) + ".");
             return;
         }
-        if (!EconomyBridge.adjustBalance(player, -plot.getPrice(),
-            OmceProtocol.TX_PLOT_PURCHASE,
-            OmceParty.plot("plot:" + plot.getPlotId(), plot.getDisplayName()),
-            "Bought plot " + plot.getDisplayName(),
-            () -> revertPlotPurchase(player, data, plot))) {
+        if (!WalletService.spend(player, plot.getPrice())) {
             sendMessage(sender, TextFormatting.RED, "Charge failed; purchase aborted.");
             return;
         }
