@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum.command;
 
+import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
@@ -10,6 +11,8 @@ import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
 import com.micatechnologies.minecraft.sum.jobs.JobListing;
 import com.micatechnologies.minecraft.sum.jobs.JobStatus;
+import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
+import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
 import com.micatechnologies.minecraft.sum.plots.ItemPlotWand;
 import com.micatechnologies.minecraft.sum.plots.PlotStatus;
 import com.micatechnologies.minecraft.sum.plots.SumPlot;
@@ -337,7 +340,10 @@ public class CommandSum extends CommandBase {
         if (target == null) {
             return;
         }
-        if (EconomyBridge.adjustBalance(target, delta)) {
+        if (EconomyBridge.adjustBalance(target, delta,
+            delta >= 0.0 ? OmceProtocol.TX_ADMIN_CREDIT : OmceProtocol.TX_ADMIN_DEBIT,
+            OmceParty.system(delta >= 0.0 ? "faucet.admin" : "sink.admin"),
+            "Admin adjustment by " + sender.getName())) {
             sendMessage(sender, TextFormatting.GREEN,
                 "Adjusted " + target.getName() + "'s balance by $" + formatMoney(delta)
                     + " (now $" + formatMoney(EconomyBridge.getBalance(target)) + ").");
@@ -368,7 +374,12 @@ public class CommandSum extends CommandBase {
                 target.getName() + " has no IMoney capability.");
             return;
         }
-        if (EconomyBridge.adjustBalance(target, amount - current)) {
+        // Expressed as a delta because the bridge has no absolute-set operation. A remote
+        // service offering /setBalance closes the small race here; see docs/ECONOMIC_API.md.
+        if (EconomyBridge.adjustBalance(target, amount - current,
+            amount >= current ? OmceProtocol.TX_ADMIN_CREDIT : OmceProtocol.TX_ADMIN_DEBIT,
+            OmceParty.system(amount >= current ? "faucet.admin" : "sink.admin"),
+            "Admin set balance to " + formatMoney(amount) + " by " + sender.getName())) {
             sendMessage(sender, TextFormatting.GREEN,
                 "Set " + target.getName() + "'s balance to $" + formatMoney(amount) + ".");
         } else {
@@ -732,10 +743,77 @@ public class CommandSum extends CommandBase {
         return roamer.hasCustomName() ? roamer.getCustomNameTag() : "(unnamed)";
     }
 
+    /**
+     * Undoes a plot purchase whose charge a remote economy refused after the fact.
+     *
+     * <p>Skipped if the plot is no longer owned by this buyer, so an admin who reassigned or
+     * relisted it in the meantime does not get their change stamped over.
+     */
+    private static void revertPlotPurchase(EntityPlayerMP player, SumPlotsWorldSavedData data,
+        SumPlot plot) {
+        if (!player.getUniqueID().equals(plot.getOwnerUuid())) {
+            Sum.LOGGER.warn("[plots] Purchase of {} was refused, but the plot is no longer owned "
+                + "by {} — leaving its current state alone.", plot.getDisplayName(), player.getName());
+            return;
+        }
+        plot.setOwner(null, "");
+        plot.setStatus(PlotStatus.FOR_SALE);
+        data.touch();
+        player.sendMessage(new TextComponentString(TextFormatting.RED
+            + "The payment for " + plot.getDisplayName()
+            + " was declined — the plot has been returned to sale."));
+    }
+
+    /** Puts cleared listings back on the board after a refused escrow reclaim. */
+    private static void restoreClearedListings(EntityPlayerMP player, List<JobListing> cleared,
+        double refund) {
+        JobBoardSavedData data = JobBoardSavedData.get(player.world);
+        for (JobListing listing : cleared) {
+            data.addListing(listing);
+        }
+        player.sendMessage(new TextComponentString(TextFormatting.RED
+            + "The $" + formatMoney(refund)
+            + " escrow reclaim was declined — your listings were restored."));
+    }
+
+    /**
+     * Removes a job listing whose escrow a remote economy refused after the fact, so the board
+     * never shows a job whose reward was never actually held.
+     *
+     * <p>Only removes it while it is still OPEN: once a worker has claimed it, silently deleting
+     * their work is worse than leaving an operator to resolve it, so this logs instead.
+     */
+    private static void revertJobPost(EntityPlayerMP player, UUID listingId, double reward) {
+        JobBoardSavedData data = JobBoardSavedData.get(player.world);
+        JobListing listing = data.getById(listingId);
+        if (listing == null) {
+            return;
+        }
+        if (listing.status != JobStatus.OPEN) {
+            Sum.LOGGER.error("[jobs] Escrow for listing {} was refused, but it is already {} — "
+                + "a worker may be relying on it. Resolve this manually.", listingId, listing.status);
+            return;
+        }
+        data.removeListing(listingId);
+        player.sendMessage(new TextComponentString(TextFormatting.RED
+            + "The $" + formatMoney(reward) + " escrow was declined — your job listing was removed."));
+    }
+
     // --- /sum migrate-economy ---
 
     private void handleMigrateEconomy(MinecraftServer server, ICommandSender sender, String[] args) {
         boolean verify = args.length >= 2 && "verify".equalsIgnoreCase(args[1]);
+        // This command moves balances from EconomyInc into SUM's own capability, which is only
+        // meaningful when that capability is the authority. With a remote economy connected it is
+        // not: getBalance below would read the REMOTE balance and adjustBalance would debit the
+        // remote service, moving real money into a local mirror nothing reads. Refuse outright.
+        if (EconomyBridge.isRemoteBackend()) {
+            sendMessage(sender, TextFormatting.RED,
+                "A remote economy service is the authority for balances, so migrating into SUM's "
+                + "local capability would destroy money. Disable economy_api first, or migrate "
+                + "the balances on the service side.");
+            return;
+        }
         if (!EconomyBridge.isEconomyIncBackend()) {
             sendMessage(sender, TextFormatting.YELLOW,
                 "EconomyInc is not loaded — there's nothing to migrate from. SUM is already the active economy.");
@@ -907,6 +985,9 @@ public class CommandSum extends CommandBase {
         if (description.length() > JOB_MAX_DESCRIPTION) {
             description = description.substring(0, JOB_MAX_DESCRIPTION);
         }
+        // Minted before the charge when there is one, so the rejection callback can name the
+        // listing it must remove. Null when the job is unpaid and nothing needs escrowing.
+        UUID escrowedListingId = null;
         // Escrow the reward up front so the payout is guaranteed when a worker completes the job.
         if (reward > 0.0) {
             if (!EconomyBridge.isAvailable()) {
@@ -922,14 +1003,25 @@ public class CommandSum extends CommandBase {
                     + " (you have $" + formatMoney(have) + ").");
                 return;
             }
-            if (!EconomyBridge.adjustBalance(player, -reward)) {
+            // The listing does not exist yet, so the undo has to reach forward to the id we are
+            // about to mint. A listing is server-side data, so pulling it back is clean.
+            //
+            // The callback cannot fire before the listing exists: it is delivered via the server's
+            // task queue from a background thread, and we are currently on the server thread, so
+            // it cannot run until this method returns.
+            escrowedListingId = UUID.randomUUID();
+            final UUID pendingId = escrowedListingId;
+            if (!EconomyBridge.adjustBalance(player, -reward,
+                OmceProtocol.TX_JOB_POST_ESCROW, OmceParty.system("escrow.jobs"),
+                "Escrow for a new job listing",
+                () -> revertJobPost(player, pendingId, reward))) {
                 sendMessage(sender, TextFormatting.RED, "Could not hold the escrow; listing not posted.");
                 return;
             }
         }
         long now = System.currentTimeMillis();
         JobListing listing = new JobListing(
-            UUID.randomUUID(),
+            escrowedListingId != null ? escrowedListingId : UUID.randomUUID(),
             player.getUniqueID(),
             player.getName(),
             description,
@@ -974,7 +1066,13 @@ public class CommandSum extends CommandBase {
             refund += l.reward;
         }
         if (refund > 0.0) {
-            EconomyBridge.adjustBalance(player, refund);
+            // takeByPoster already removed the listings, so a refused credit would destroy the
+            // escrow. Restore them if that happens.
+            final double reclaimed = refund;
+            EconomyBridge.adjustBalance(player, refund,
+                OmceProtocol.TX_JOB_REFUND, OmceParty.system("escrow.jobs"),
+                "Reclaimed escrow from " + mine.size() + " removed job listing(s)",
+                () -> restoreClearedListings(player, mine, reclaimed));
         }
         sendMessage(sender, TextFormatting.GREEN,
             "Removed " + mine.size() + " listing(s)"
@@ -1221,7 +1319,11 @@ public class CommandSum extends CommandBase {
                 + ", have $" + String.format(Locale.ROOT, "%.2f", balance) + ".");
             return;
         }
-        if (!EconomyBridge.adjustBalance(player, -plot.getPrice())) {
+        if (!EconomyBridge.adjustBalance(player, -plot.getPrice(),
+            OmceProtocol.TX_PLOT_PURCHASE,
+            OmceParty.plot("plot:" + plot.getPlotId(), plot.getDisplayName()),
+            "Bought plot " + plot.getDisplayName(),
+            () -> revertPlotPurchase(player, data, plot))) {
             sendMessage(sender, TextFormatting.RED, "Charge failed; purchase aborted.");
             return;
         }

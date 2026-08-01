@@ -3,6 +3,8 @@ package com.micatechnologies.minecraft.sum.jobs;
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
+import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
 import io.netty.buffer.ByteBuf;
 import java.util.Locale;
 import java.util.UUID;
@@ -98,7 +100,16 @@ public class PacketJobAction implements IMessage {
             EntityPlayerMP poster = server == null ? null
                 : server.getPlayerList().getPlayerByUUID(l.posterUuid);
             if (l.reward > 0.0 && poster != null) {
-                EconomyBridge.adjustBalance(poster, l.reward);
+                // The listing held the escrow, so the refund comes from the job, not a faucet —
+                // this is the credit half of the debit taken at post time.
+                //
+                // The listing is removed further down, taking the escrow record with it, so a
+                // refused refund would destroy it. Restore the listing in that case.
+                EconomyBridge.adjustBalance(poster, l.reward,
+                    OmceProtocol.TX_JOB_REFUND, OmceParty.job(l.id, l.posterUuid),
+                    "Job listing cancelled; escrow refunded",
+                    () -> restoreListing(poster, l,
+                        "The escrow refund was declined — your listing was restored."));
                 tell(poster, TextFormatting.GREEN,
                     "Listing cancelled — $" + money(l.reward) + " escrow refunded.");
             } else if (l.reward > 0.0) {
@@ -180,7 +191,14 @@ public class PacketJobAction implements IMessage {
                 return;
             }
             // Pay the escrow to the worker. The poster was already charged at post time.
-            if (l.reward > 0.0 && !EconomyBridge.adjustBalance(worker, l.reward)) {
+            //
+            // The listing is removed immediately below, taking the escrow record with it, so a
+            // refused payout would leave the worker unpaid with nothing to retry against.
+            if (l.reward > 0.0 && !EconomyBridge.adjustBalance(worker, l.reward,
+                OmceProtocol.TX_JOB_PAYOUT, OmceParty.job(l.id, l.posterUuid),
+                "Job completed for " + l.posterName,
+                () -> restoreListing(player, l,
+                    "The payout was declined — the job was restored for another attempt."))) {
                 tell(player, TextFormatting.RED, "Payout failed — the worker could not be credited.");
                 return;
             }
@@ -219,6 +237,24 @@ public class PacketJobAction implements IMessage {
             if (server == null) return;
             EntityPlayerMP other = server.getPlayerList().getPlayerByUUID(otherUuid);
             if (other != null) tell(other, color, "[jobs] " + text);
+        }
+
+        /**
+         * Puts a listing back on the board after a refused credit, so the escrow it represents is
+         * not silently destroyed.
+         *
+         * <p>Re-adds only if it is genuinely gone; a listing that is somehow still present means
+         * the removal never happened, and duplicating it would create escrow rather than preserve
+         * it.
+         */
+        private static void restoreListing(EntityPlayerMP notify, JobListing listing,
+            String message) {
+            JobBoardSavedData data = JobBoardSavedData.get(notify.world);
+            if (data.getById(listing.id) != null) {
+                return;
+            }
+            data.addListing(listing);
+            tell(notify, TextFormatting.RED, message);
         }
 
         private static void tell(EntityPlayerMP player, TextFormatting color, String text) {
