@@ -113,6 +113,30 @@ public final class Bills {
     /** @return the preferred-backend {@link Item} for {@code denomination}, or null if missing.
      *  Used when the ATM withdraws and needs to produce physical bills. */
     @Nullable
+    /**
+     * Greedy largest-first decomposition of a dollar amount into whole bills, each stack capped
+     * at 64. Returns {@code [denomination, count]} pairs. Amounts below $1 are floored away,
+     * since there is no sub-dollar bill.
+     *
+     * <p>Pure, so the arithmetic is unit-testable without the item registry. Lives here rather
+     * than beside any one caller because both the ATM (returning a refused deposit) and the shop
+     * (dropping a broken till) need it.
+     */
+    public static java.util.List<int[]> breakIntoBills(double funds) {
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        double remaining = funds;
+        for (int denom : DENOMINATIONS) {
+            int count = (int) Math.floor(remaining / denom);
+            while (count > 0) {
+                int give = Math.min(count, 64);
+                out.add(new int[]{denom, give});
+                count -= give;
+                remaining -= (double) give * denom;
+            }
+        }
+        return out;
+    }
+
     public static Item billItem(int denomination) {
         resolveIfNeeded();
         return preferredBillByDenom.get(denomination);
