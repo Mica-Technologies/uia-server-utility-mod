@@ -37,22 +37,27 @@ import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
  */
 public class AtmPacketTransaction implements IMessage {
 
-    /** Withdraw a note of {@code amount} dollars from the bank as a physical bill. */
+    /** Withdraw {@code amount} dollars from the bank as physical bills. Whole dollars only. */
     public static final int ACTION_WITHDRAW_CASH = 0;
     /** Deposit every bill the player is carrying into the bank. */
     public static final int ACTION_DEPOSIT_CASH = 1;
     /** Move {@code amount} dollars from the bank into the wallet. */
     public static final int ACTION_WITHDRAW_TO_WALLET = 2;
-    /** Move {@code amount} dollars from the wallet into the bank; 0 means "everything". */
+    /** Move {@code amount} dollars from the wallet into the bank; a non-positive amount
+     *  means "everything". */
     public static final int ACTION_DEPOSIT_WALLET = 3;
 
     private int action;
-    private int amount;
+
+    /** Dollars, not cents. A double because a player may type an arbitrary amount including
+     *  cents; only cash withdrawals are constrained to whole dollars, and that is checked
+     *  server-side. */
+    private double amount;
 
     public AtmPacketTransaction() {
     }
 
-    public AtmPacketTransaction(int action, int amount) {
+    public AtmPacketTransaction(int action, double amount) {
         this.action = action;
         this.amount = amount;
     }
@@ -60,20 +65,20 @@ public class AtmPacketTransaction implements IMessage {
     @Override
     public void fromBytes(ByteBuf buf) {
         this.action = buf.readInt();
-        this.amount = buf.readInt();
+        this.amount = buf.readDouble();
     }
 
     @Override
     public void toBytes(ByteBuf buf) {
         buf.writeInt(this.action);
-        buf.writeInt(this.amount);
+        buf.writeDouble(this.amount);
     }
 
     int getAction() {
         return action;
     }
 
-    int getAmount() {
+    double getAmount() {
         return amount;
     }
 
@@ -114,23 +119,53 @@ public class AtmPacketTransaction implements IMessage {
         }
 
         /**
-         * Bank to physical note. The bill is handed over only once the withdrawal has settled,
+         * Bank to physical notes. The bills are handed over only once the withdrawal has settled,
          * because an item in a player's inventory cannot reliably be taken back.
+         *
+         * <p>Any amount is allowed, not just a single denomination: the total is broken into notes
+         * the same way a real cash machine would. Whole dollars only, since there is no sub-dollar
+         * bill to pay the remainder with.
          */
-        private void withdrawCash(EntityPlayerMP player, int denomination) {
-            Item bill = Bills.billItem(denomination);
-            if (bill == null) {
-                tellError(player, "$" + denomination + " bill is not available in this pack.");
+        private void withdrawCash(EntityPlayerMP player, double amount) {
+            if (amount <= 0.0) {
+                tellError(player, "Enter an amount to withdraw.");
                 return;
             }
-            BankService.withdraw(player, denomination, cashParty(player),
-                "ATM withdrawal of $" + denomination + " in cash", result -> {
+            // Floor rather than round, so the suggested amount is never more than they asked for.
+            // The epsilon absorbs float noise on a value that is really a whole number.
+            int dollars = (int) Math.floor(amount + 0.0001);
+            if (dollars < 1) {
+                // Checked before the whole-dollar message, which would otherwise suggest "$0".
+                tellError(player, "The smallest note is $1 — withdraw to your wallet instead.");
+                return;
+            }
+            if (Math.abs(amount - dollars) > 0.0001) {
+                tellError(player, "Cash comes in whole dollars — try $" + dollars
+                    + ", or withdraw to your wallet instead.");
+                return;
+            }
+            java.util.List<int[]> notes = Bills.breakIntoBills(dollars);
+            if (notes.isEmpty()) {
+                tellError(player, "That's too small to withdraw as cash.");
+                return;
+            }
+            for (int[] pair : notes) {
+                if (Bills.billItem(pair[0]) == null) {
+                    tellError(player, "$" + pair[0] + " bills aren't available in this pack, so $"
+                        + dollars + " can't be paid out in cash.");
+                    return;
+                }
+            }
+            BankService.withdraw(player, dollars, cashParty(player),
+                "ATM withdrawal of $" + dollars + " in cash", result -> {
                     if (!result.ok) {
                         tellError(player, result.error);
                         return;
                     }
-                    giveBills(player, bill, 1);
-                    tell(player, TextFormatting.GREEN, "Withdrew $" + denomination + " in cash.");
+                    for (int[] pair : notes) {
+                        giveBills(player, Bills.billItem(pair[0]), pair[1]);
+                    }
+                    tell(player, TextFormatting.GREEN, "Withdrew $" + dollars + " in cash.");
                 });
         }
 
@@ -138,13 +173,14 @@ public class AtmPacketTransaction implements IMessage {
          * Bank to wallet. Nothing physical changes hands, but the credit still waits for the
          * withdrawal to settle.
          */
-        private void withdrawToWallet(EntityPlayerMP player, int amount) {
-            if (amount <= 0) {
+        private void withdrawToWallet(EntityPlayerMP player, double rawAmount) {
+            double amount = roundToCents(rawAmount);
+            if (amount <= 0.0) {
                 tellError(player, "Enter an amount to withdraw.");
                 return;
             }
             BankService.withdraw(player, amount, walletParty(player),
-                "ATM withdrawal of $" + amount + " to wallet", result -> {
+                "ATM withdrawal of $" + money(amount) + " to wallet", result -> {
                     if (!result.ok) {
                         tellError(player, result.error);
                         return;
@@ -159,7 +195,8 @@ public class AtmPacketTransaction implements IMessage {
                         tellError(player, "Withdrawal failed; the money is still in your account.");
                         return;
                     }
-                    tell(player, TextFormatting.GREEN, "Moved $" + amount + " to your wallet.");
+                    tell(player, TextFormatting.GREEN,
+                        "Moved $" + money(amount) + " to your wallet.");
                 });
         }
 
@@ -197,16 +234,22 @@ public class AtmPacketTransaction implements IMessage {
         }
 
         /** Wallet into the bank. A non-positive amount deposits the whole wallet. */
-        private void depositWallet(EntityPlayerMP player, int amount) {
+        private void depositWallet(EntityPlayerMP player, double rawAmount) {
             double available = WalletService.getTotal(player);
             if (Double.isNaN(available) || available <= 0.0) {
                 tellError(player, "Your wallet is empty.");
                 return;
             }
-            double toDeposit = amount <= 0 ? available : Math.min(amount, available);
+            double requested = roundToCents(rawAmount);
+            if (requested > available) {
+                tellError(player, "Your wallet only holds $" + money(available) + ".");
+                return;
+            }
+            // Capped at the wallet total so "deposit everything" stays a single click, and a
+            // rounding artefact on a typed amount can never ask for more than is there.
+            double toDeposit = requested <= 0.0 ? available : Math.min(requested, available);
             if (!WalletService.spend(player, toDeposit)) {
-                tellError(player, "Your wallet could not cover $"
-                    + String.format(Locale.ROOT, "%.2f", toDeposit) + ".");
+                tellError(player, "Your wallet could not cover $" + money(toDeposit) + ".");
                 return;
             }
             final double moved = toDeposit;
@@ -218,8 +261,8 @@ public class AtmPacketTransaction implements IMessage {
                         tellError(player, result.error);
                         return;
                     }
-                    tell(player, TextFormatting.GREEN, "Deposited $"
-                        + String.format(Locale.ROOT, "%.2f", moved) + " from your wallet.");
+                    tell(player, TextFormatting.GREEN,
+                        "Deposited $" + money(moved) + " from your wallet.");
                 });
         }
 
@@ -268,6 +311,15 @@ public class AtmPacketTransaction implements IMessage {
         /** The wallet as a counterparty. Also virtual: SUM owns the wallet, not the service. */
         private static OmceParty walletParty(EntityPlayerMP player) {
             return OmceParty.system("wallet." + player.getUniqueID());
+        }
+
+        /** Rounds a typed amount to whole cents, so float noise never reaches a balance. */
+        private static double roundToCents(double value) {
+            return Math.floor(value * 100.0 + 0.5) / 100.0;
+        }
+
+        private static String money(double value) {
+            return String.format(Locale.ROOT, "%,.2f", value);
         }
 
         private static void tell(EntityPlayerMP player, TextFormatting color, String text) {
