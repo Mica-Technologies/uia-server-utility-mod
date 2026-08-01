@@ -95,3 +95,14 @@ logs/
 # Never committed (license + repo-hygiene reasons). See example-source/README.md.
 example-source/
 .rosetta-natives/
+
+### LaTeX (docs/*.tex build artifacts) ###
+
+*.aux
+*.lof
+*.lot
+*.fls
+*.toc
+*.fdb_latexmk
+*.synctex.gz
+*.out
