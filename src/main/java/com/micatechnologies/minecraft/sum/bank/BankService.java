@@ -118,6 +118,21 @@ public final class BankService {
         return BankSavedData.get(player.world).getBalance(player.getUniqueID());
     }
 
+    /**
+     * Why the bank is unusable for this player, or null when it is fine.
+     *
+     * <p>Only a remote service can explain itself -- the local backend creates an account on
+     * demand, so it never has a reason to give.
+     */
+    @Nullable
+    public static String getUnavailableNotice(EntityPlayer player) {
+        if (player == null) {
+            return null;
+        }
+        OmceEconomyService remote = EconomyBridge.getRemoteService();
+        return remote == null ? null : remote.getAccountNotice(player.getUniqueID());
+    }
+
     /** True when the bank can be transacted with right now. */
     public static boolean isAvailable(EntityPlayer player) {
         return !Double.isNaN(getBalance(player));

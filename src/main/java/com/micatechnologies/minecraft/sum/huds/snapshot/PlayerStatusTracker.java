@@ -101,6 +101,8 @@ public class PlayerStatusTracker {
             .totalBillValueFor(player.getUniqueID());
         // The bank account may live on a remote service, so only the server can read it.
         double bankBalance = com.micatechnologies.minecraft.sum.bank.BankService.getBalance(player);
+        String bankNotice =
+            com.micatechnologies.minecraft.sum.bank.BankService.getUnavailableNotice(player);
 
         String plotName = "";
         String plotOwner = "";
@@ -134,7 +136,7 @@ public class PlayerStatusTracker {
             }
         }
 
-        return new PlayerStatusSnapshot(vaultBillValue, bankBalance, plotName, plotOwner,
+        return new PlayerStatusSnapshot(vaultBillValue, bankBalance, bankNotice, plotName, plotOwner,
             jobsAvailable, loyaltyTicks, nextMilestoneTicks);
     }
 }
