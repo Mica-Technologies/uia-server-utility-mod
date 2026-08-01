@@ -1,13 +1,11 @@
 package com.micatechnologies.minecraft.sum.atm;
 
 import com.micatechnologies.minecraft.sum.Sum;
-import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
-import com.micatechnologies.minecraft.sum.omceapi.OmceMoney;
+import com.micatechnologies.minecraft.sum.bank.BankService;
+import com.micatechnologies.minecraft.sum.economy.WalletService;
 import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
-import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
-import com.micatechnologies.minecraft.sum.omceapi.OmceTransactionRequest;
-import com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService;
 import io.netty.buffer.ByteBuf;
+import java.util.Locale;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -18,15 +16,35 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 /**
- * Client -> server packet for ATM withdraw and deposit operations. Sent when the player clicks
- * a button in the ATM GUI. The server validates the request (player exists, EconomyInc is
- * available, balance/inventory permits the operation), mutates state, and {@code sync()}s the
- * IMoney capability so the client sees the new balance on the next frame.
+ * Client -&gt; server packet for ATM operations. Everything here moves money in or out of the
+ * player's <b>bank account</b>; the ATM is the only place the bank and the wallet meet.
+ *
+ * <p>Four flows:
+ *
+ * <ul>
+ *   <li>{@link #ACTION_DEPOSIT_WALLET} - wallet into the bank.</li>
+ *   <li>{@link #ACTION_DEPOSIT_CASH} - every bill the player is carrying into the bank.</li>
+ *   <li>{@link #ACTION_WITHDRAW_TO_WALLET} - bank into the wallet, spendable immediately.</li>
+ *   <li>{@link #ACTION_WITHDRAW_CASH} - bank out as a physical note.</li>
+ * </ul>
+ *
+ * <p>Turning wallet money into cash is deposit-then-withdraw-as-cash, which is why both withdraw
+ * destinations exist.
+ *
+ * <p>{@link BankService} settles inline when the bank is local and after a round trip when a
+ * remote economy owns it, so every grant here happens in a callback and nothing is handed over
+ * before the money has actually moved.
  */
 public class AtmPacketTransaction implements IMessage {
 
-    public static final int ACTION_WITHDRAW = 0;
-    public static final int ACTION_DEPOSIT_ALL = 1;
+    /** Withdraw a note of {@code amount} dollars from the bank as a physical bill. */
+    public static final int ACTION_WITHDRAW_CASH = 0;
+    /** Deposit every bill the player is carrying into the bank. */
+    public static final int ACTION_DEPOSIT_CASH = 1;
+    /** Move {@code amount} dollars from the bank into the wallet. */
+    public static final int ACTION_WITHDRAW_TO_WALLET = 2;
+    /** Move {@code amount} dollars from the wallet into the bank; 0 means "everything". */
+    public static final int ACTION_DEPOSIT_WALLET = 3;
 
     private int action;
     private int amount;
@@ -71,56 +89,82 @@ public class AtmPacketTransaction implements IMessage {
         }
 
         private void handle(EntityPlayerMP player, AtmPacketTransaction msg) {
-            if (!EconomyBridge.isAvailable()) {
-                tellError(player, "Economy mod is not loaded.");
+            if (!BankService.isAvailable(player)) {
+                tellError(player, "Your bank account isn't available right now.");
                 return;
             }
             switch (msg.action) {
-                case ACTION_WITHDRAW:
-                    handleWithdraw(player, msg.amount);
+                case ACTION_WITHDRAW_CASH:
+                    withdrawCash(player, msg.amount);
                     break;
-                case ACTION_DEPOSIT_ALL:
-                    handleDepositAll(player);
+                case ACTION_WITHDRAW_TO_WALLET:
+                    withdrawToWallet(player, msg.amount);
+                    break;
+                case ACTION_DEPOSIT_CASH:
+                    depositCash(player);
+                    break;
+                case ACTION_DEPOSIT_WALLET:
+                    depositWallet(player, msg.amount);
                     break;
                 default:
-                    Sum.LOGGER.warn("[atm] unknown action {} from player {}", msg.action, player.getName());
+                    Sum.LOGGER.warn("[atm] unknown action {} from player {}", msg.action,
+                        player.getName());
                     break;
             }
         }
 
-        private void handleWithdraw(EntityPlayerMP player, int denomination) {
+        /**
+         * Bank to physical note. The bill is handed over only once the withdrawal has settled,
+         * because an item in a player's inventory cannot reliably be taken back.
+         */
+        private void withdrawCash(EntityPlayerMP player, int denomination) {
             Item bill = Bills.billItem(denomination);
             if (bill == null) {
                 tellError(player, "$" + denomination + " bill is not available in this pack.");
                 return;
             }
-            double balance = EconomyBridge.getBalance(player);
-            if (Double.isNaN(balance)) {
-                tellError(player, "No money handler attached to your player.");
-                return;
-            }
-            if (balance < denomination) {
-                tellError(player, "Insufficient funds: balance is $"
-                    + String.format(java.util.Locale.ROOT, "%.2f", balance) + ".");
-                return;
-            }
-            OmceEconomyService remote = EconomyBridge.getRemoteService();
-            if (remote != null) {
-                // A withdrawn bill cannot be taken back, so it must not be issued on an
-                // optimistic write. Charge first and hand over the item only once the service
-                // reports the transaction committed.
-                withdrawViaRemote(remote, player, bill, denomination);
-                return;
-            }
-            if (!EconomyBridge.adjustBalance(player, -denomination,
-                OmceProtocol.TX_ATM_WITHDRAW, cashParty(player), "ATM withdrawal")) {
-                tellError(player, "Withdraw failed.");
-                return;
-            }
-            giveBill(player, bill);
+            BankService.withdraw(player, denomination, cashParty(player),
+                "ATM withdrawal of $" + denomination + " in cash", result -> {
+                    if (!result.ok) {
+                        tellError(player, result.error);
+                        return;
+                    }
+                    giveBills(player, bill, 1);
+                    tell(player, TextFormatting.GREEN, "Withdrew $" + denomination + " in cash.");
+                });
         }
 
-        private void handleDepositAll(EntityPlayerMP player) {
+        /**
+         * Bank to wallet. Nothing physical changes hands, but the credit still waits for the
+         * withdrawal to settle.
+         */
+        private void withdrawToWallet(EntityPlayerMP player, int amount) {
+            if (amount <= 0) {
+                tellError(player, "Enter an amount to withdraw.");
+                return;
+            }
+            BankService.withdraw(player, amount, walletParty(player),
+                "ATM withdrawal of $" + amount + " to wallet", result -> {
+                    if (!result.ok) {
+                        tellError(player, result.error);
+                        return;
+                    }
+                    if (!WalletService.credit(player, amount)) {
+                        // The bank has already paid out, so failing to credit the wallet would
+                        // destroy the money. Put it back and report that nothing happened.
+                        Sum.LOGGER.error("[atm] Wallet credit of ${} for {} failed after the bank "
+                            + "had settled; returning it to the account.", amount, player.getName());
+                        BankService.deposit(player, amount, walletParty(player),
+                            "Reversal: wallet credit failed", back -> { });
+                        tellError(player, "Withdrawal failed; the money is still in your account.");
+                        return;
+                    }
+                    tell(player, TextFormatting.GREEN, "Moved $" + amount + " to your wallet.");
+                });
+        }
+
+        /** Every carried bill into the bank. Bills are taken first, so a refusal must return them. */
+        private void depositCash(EntityPlayerMP player) {
             int total = 0;
             for (int slot = 0; slot < player.inventory.getSizeInventory(); slot++) {
                 ItemStack stack = player.inventory.getStackInSlot(slot);
@@ -138,81 +182,63 @@ public class AtmPacketTransaction implements IMessage {
                 tellError(player, "No bills found in your inventory.");
                 return;
             }
+            player.inventoryContainer.detectAndSendChanges();
+
             final int deposited = total;
-            // The bills are already out of the inventory, so a refused credit must hand back
-            // equivalent value rather than destroying it. This has to cover both failure shapes:
-            // an up-front refusal (the boolean below) and a remote economy refusing after the
-            // optimistic write, which arrives via the rejection callback.
-            if (!EconomyBridge.adjustBalance(player, total,
-                OmceProtocol.TX_ATM_DEPOSIT, cashParty(player), "ATM deposit",
-                () -> returnDepositedBills(player, deposited))) {
-                returnDepositedBills(player, deposited);
+            BankService.deposit(player, deposited, cashParty(player), "ATM cash deposit",
+                result -> {
+                    if (!result.ok) {
+                        returnDepositedBills(player, deposited);
+                        tellError(player, result.error);
+                        return;
+                    }
+                    tell(player, TextFormatting.GREEN, "Deposited $" + deposited + " in cash.");
+                });
+        }
+
+        /** Wallet into the bank. A non-positive amount deposits the whole wallet. */
+        private void depositWallet(EntityPlayerMP player, int amount) {
+            double available = WalletService.getTotal(player);
+            if (Double.isNaN(available) || available <= 0.0) {
+                tellError(player, "Your wallet is empty.");
                 return;
             }
-            player.inventoryContainer.detectAndSendChanges();
-            player.sendMessage(new TextComponentString(
-                TextFormatting.GREEN + "Deposited $" + total + "."));
+            double toDeposit = amount <= 0 ? available : Math.min(amount, available);
+            if (!WalletService.spend(player, toDeposit)) {
+                tellError(player, "Your wallet could not cover $"
+                    + String.format(Locale.ROOT, "%.2f", toDeposit) + ".");
+                return;
+            }
+            final double moved = toDeposit;
+            BankService.deposit(player, moved, walletParty(player), "ATM wallet deposit",
+                result -> {
+                    if (!result.ok) {
+                        // The wallet has already been debited; give it back.
+                        WalletService.credit(player, moved);
+                        tellError(player, result.error);
+                        return;
+                    }
+                    tell(player, TextFormatting.GREEN, "Deposited $"
+                        + String.format(Locale.ROOT, "%.2f", moved) + " from your wallet.");
+                });
         }
 
         /**
-         * Charges the player and hands over the bill only on a committed transaction.
-         *
-         * <p>The callback runs on the server thread, so touching the inventory here is safe.
-         */
-        private void withdrawViaRemote(OmceEconomyService remote, EntityPlayerMP player,
-            Item bill, int denomination) {
-            long amount = OmceMoney.priceToMinorUnits(denomination, remote.getMinorUnitDigits());
-            OmceTransactionRequest request = OmceTransactionRequest.builder(
-                    OmceProtocol.TX_ATM_WITHDRAW, amount,
-                    OmceParty.player(player.getUniqueID(), player.getName(), null),
-                    cashParty(player))
-                .initiator(player.getUniqueID(), player.getName(),
-                    OmceTransactionRequest.ROLE_PLAYER)
-                .reason("ATM withdrawal of $" + denomination)
-                .meta("denomination", Integer.toString(denomination))
-                .build();
-
-            player.sendMessage(new TextComponentString(
-                TextFormatting.GRAY + "Processing withdrawal..."));
-
-            remote.processTransaction(request, result -> {
-                if (result.isFailure() || !result.get().isCommitted()) {
-                    tellError(player, result.isFailure()
-                        ? result.getError().playerMessage(remote.getMinorUnitDigits(),
-                            remote.getCurrencySymbol())
-                        : "Withdrawal was not completed.");
-                    return;
-                }
-                giveBill(player, bill);
-                player.sendMessage(new TextComponentString(
-                    TextFormatting.GREEN + "Withdrew $" + denomination + "."));
-            });
-        }
-
-        /**
-         * Hands back the value of a deposit whose credit was refused.
+         * Hands back the value of a cash deposit whose credit was refused.
          *
          * <p>Denominations are re-derived from the total, which is exact because every bill is a
-         * whole-dollar denomination — the player may not get back the same mix of notes they put
-         * in, but never a different amount.
+         * whole-dollar denomination - the player may get a different mix of notes, never a
+         * different amount.
          */
         private static void returnDepositedBills(EntityPlayerMP player, int total) {
-            Sum.LOGGER.warn("[atm] Deposit of ${} for {} was refused; returning the bills.",
+            Sum.LOGGER.warn("[atm] Cash deposit of ${} for {} was refused; returning the bills.",
                 total, player.getName());
             for (int[] pair : Bills.breakIntoBills(total)) {
                 Item denomItem = Bills.billItem(pair[0]);
                 if (denomItem != null) {
-                    // breakIntoBills already caps each pair at a full stack, so this is one
-                    // ItemStack per pair rather than one per bill.
                     giveBills(player, denomItem, pair[1]);
                 }
             }
-            tellError(player, "Deposit failed; your bills were returned.");
-        }
-
-        /** Adds one bill to the player's inventory, dropping it at their feet if there's no room. */
-        private static void giveBill(EntityPlayerMP player, Item bill) {
-            giveBills(player, bill, 1);
         }
 
         /** Adds {@code count} bills as a single stack, dropping it if the inventory is full. */
@@ -228,8 +254,8 @@ public class AtmPacketTransaction implements IMessage {
         }
 
         /**
-         * The physical-cash counterparty for this ATM. Virtual: the service never sees the bill
-         * items, only the balance side of the exchange.
+         * Physical cash as a transaction counterparty for a remote ledger. Virtual: the service
+         * never sees the bill items, only the balance side of the exchange.
          */
         private static OmceParty cashParty(EntityPlayerMP player) {
             String worldName = (player.world == null || player.world.provider == null)
@@ -237,6 +263,15 @@ public class AtmPacketTransaction implements IMessage {
                 : player.world.provider.getDimensionType().getName();
             return OmceParty.cash(OmceParty.positionId("atm", worldName,
                 (int) player.posX, (int) player.posY, (int) player.posZ));
+        }
+
+        /** The wallet as a counterparty. Also virtual: SUM owns the wallet, not the service. */
+        private static OmceParty walletParty(EntityPlayerMP player) {
+            return OmceParty.system("wallet." + player.getUniqueID());
+        }
+
+        private static void tell(EntityPlayerMP player, TextFormatting color, String text) {
+            player.sendMessage(new TextComponentString(color + text));
         }
 
         private static void tellError(EntityPlayerMP player, String text) {

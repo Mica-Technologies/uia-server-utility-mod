@@ -24,15 +24,15 @@ class AtmPacketTransactionTest {
 
     @Test
     void withdrawRoundTrips() {
-        AtmPacketTransaction out = roundTrip(AtmPacketTransaction.ACTION_WITHDRAW, 50);
-        assertEquals(AtmPacketTransaction.ACTION_WITHDRAW, out.getAction());
+        AtmPacketTransaction out = roundTrip(AtmPacketTransaction.ACTION_WITHDRAW_CASH, 50);
+        assertEquals(AtmPacketTransaction.ACTION_WITHDRAW_CASH, out.getAction());
         assertEquals(50, out.getAmount());
     }
 
     @Test
     void depositAllRoundTrips() {
-        AtmPacketTransaction out = roundTrip(AtmPacketTransaction.ACTION_DEPOSIT_ALL, 0);
-        assertEquals(AtmPacketTransaction.ACTION_DEPOSIT_ALL, out.getAction());
+        AtmPacketTransaction out = roundTrip(AtmPacketTransaction.ACTION_DEPOSIT_CASH, 0);
+        assertEquals(AtmPacketTransaction.ACTION_DEPOSIT_CASH, out.getAction());
         assertEquals(0, out.getAmount());
     }
 
