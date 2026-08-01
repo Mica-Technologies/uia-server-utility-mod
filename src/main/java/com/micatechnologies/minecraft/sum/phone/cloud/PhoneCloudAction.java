@@ -277,18 +277,18 @@ public class PhoneCloudAction implements IMessage {
                     "That player is offline — they must be online to receive a payment.");
                 return;
             }
-            com.micatechnologies.minecraft.sum.economy.MoneyTransfer.Result result =
-                com.micatechnologies.minecraft.sum.economy.MoneyTransfer.transfer(
-                    sender, recipient, msg.amount);
-            if (!result.ok) {
-                tell(sender, TextFormatting.RED, result.error);
-                return;
-            }
-            tell(sender, TextFormatting.GREEN,
-                "Paid $" + money(result.credited) + " to " + recipient.getName()
-                    + (result.fee > 0.0 ? " ($" + money(result.fee) + " fee)" : "") + ".");
-            tell(recipient, TextFormatting.GREEN,
-                "Received $" + money(result.credited) + " from " + sender.getName() + ".");
+            com.micatechnologies.minecraft.sum.economy.MoneyTransfer.transfer(
+                sender, recipient, msg.amount, result -> {
+                    if (!result.ok) {
+                        tell(sender, TextFormatting.RED, result.error);
+                        return;
+                    }
+                    tell(sender, TextFormatting.GREEN,
+                        "Paid $" + money(result.credited) + " to " + recipient.getName()
+                            + (result.fee > 0.0 ? " ($" + money(result.fee) + " fee)" : "") + ".");
+                    tell(recipient, TextFormatting.GREEN,
+                        "Received $" + money(result.credited) + " from " + sender.getName() + ".");
+                });
         }
 
         private static String money(double v) {
