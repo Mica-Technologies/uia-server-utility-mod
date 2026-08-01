@@ -174,10 +174,22 @@ public class AtmPacketTransaction implements IMessage {
          * withdrawal to settle.
          */
         private void withdrawToWallet(EntityPlayerMP player, double rawAmount) {
-            double amount = roundToCents(rawAmount);
-            if (amount <= 0.0) {
+            double requested = roundToCents(rawAmount);
+            if (requested <= 0.0) {
                 tellError(player, "Enter an amount to withdraw.");
                 return;
+            }
+            // Same rule as a deposit: the bank can only pay out what it can represent, and the
+            // wallet must receive exactly that. Rounding up would debit more than it credits.
+            final double amount = BankService.quantise(requested);
+            if (amount <= 0.0) {
+                tellError(player, "The smallest amount this bank pays out is $"
+                    + money(smallestUnit()) + ".");
+                return;
+            }
+            if (amount < requested) {
+                tell(player, TextFormatting.GRAY, "This bank settles in whole units - "
+                    + "withdrawing $" + money(amount) + ".");
             }
             BankService.withdraw(player, amount, walletParty(player),
                 "ATM withdrawal of $" + money(amount) + " to wallet", result -> {
@@ -247,7 +259,21 @@ public class AtmPacketTransaction implements IMessage {
             }
             // Capped at the wallet total so "deposit everything" stays a single click, and a
             // rounding artefact on a typed amount can never ask for more than is there.
-            double toDeposit = requested <= 0.0 ? available : Math.min(requested, available);
+            double requestedOrAll = requested <= 0.0 ? available : Math.min(requested, available);
+            // Snap to what the bank can actually hold, so the wallet gives up exactly what the
+            // bank receives. On a whole-unit currency the odd cents stay in the wallet rather
+            // than being rounded into existence.
+            double toDeposit = BankService.quantise(requestedOrAll);
+            if (toDeposit <= 0.0) {
+                tellError(player, "Your wallet holds less than the smallest amount this bank "
+                    + "accepts ($" + money(smallestUnit()) + ").");
+                return;
+            }
+            if (toDeposit < requestedOrAll) {
+                tell(player, TextFormatting.GRAY, "Depositing $" + money(toDeposit)
+                    + "; the remaining $" + money(requestedOrAll - toDeposit)
+                    + " stays in your wallet.");
+            }
             if (!WalletService.spend(player, toDeposit)) {
                 tellError(player, "Your wallet could not cover $" + money(toDeposit) + ".");
                 return;
@@ -311,6 +337,15 @@ public class AtmPacketTransaction implements IMessage {
         /** The wallet as a counterparty. Also virtual: SUM owns the wallet, not the service. */
         private static OmceParty walletParty(EntityPlayerMP player) {
             return OmceParty.system("wallet." + player.getUniqueID());
+        }
+
+        /** The smallest amount the bank can hold, for an operator-facing message. */
+        private static double smallestUnit() {
+            double unit = 1.0;
+            for (int i = 0; i < BankService.getMinorUnitDigits(); i++) {
+                unit /= 10.0;
+            }
+            return unit;
         }
 
         /** Rounds a typed amount to whole cents, so float noise never reaches a balance. */

@@ -65,6 +65,37 @@ public final class BankService {
     }
 
     /**
+     * Decimal places the bank can actually store.
+     *
+     * <p>A remote service declares its own scale, and it may be coarser than the wallet's.
+     * The local backend stores a double and handles cents.
+     */
+    public static int getMinorUnitDigits() {
+        OmceEconomyService remote = EconomyBridge.getRemoteService();
+        return remote != null ? remote.getMinorUnitDigits() : 2;
+    }
+
+    /**
+     * Rounds an amount <b>down</b> to something the bank can hold exactly.
+     *
+     * <p>Every transfer has to move the same figure on both sides, and the wallet is the
+     * finer-grained one. Depositing $354.50 into a whole-unit bank must move $354 and leave the
+     * 50c in the wallet: rounding the bank side up credits money the wallet never gave up, and
+     * rounding the wallet side up charges for money the bank never received. Down is the only
+     * direction that conserves value, so callers quantise before either side moves.
+     */
+    public static double quantise(double amount) {
+        int digits = getMinorUnitDigits();
+        double factor = 1.0;
+        for (int i = 0; i < digits; i++) {
+            factor *= 10.0;
+        }
+        // The epsilon absorbs float noise on a value that is really already representable,
+        // so 137.0 does not floor to 136.
+        return Math.floor(amount * factor + 1.0e-9) / factor;
+    }
+
+    /**
      * The player's bank balance.
      *
      * <p>Reads never block: the remote backend serves this from the balance cache its background
@@ -159,12 +190,19 @@ public final class BankService {
         OmceParty counterparty, String transactionType, String reason, Consumer<Result> callback) {
         int digits = remote.getMinorUnitDigits();
         long amountMinor;
+        double magnitude = Math.abs(delta);
         try {
-            // A debit is money the player is asking for, so round it up; a credit is an amount
-            // that already exists, so round half-up.
-            amountMinor = delta < 0.0
-                ? OmceMoney.priceToMinorUnits(-delta, digits)
-                : OmceMoney.toMinorUnits(delta, digits);
+            // No rounding here on purpose. Callers quantise first so both sides of a transfer
+            // move the same figure; silently rounding at this boundary is exactly how half a
+            // Buck gets created or destroyed. An amount the service cannot represent reaching
+            // this point is a caller bug, and failing loudly beats papering over it.
+            if (!OmceMoney.isExactlyRepresentable(magnitude, digits)) {
+                Sum.LOGGER.error("[bank] Refusing {}: not representable at {} decimal place(s). "
+                    + "The caller should have quantised it first.", magnitude, digits);
+                callback.accept(Result.fail("That amount can't be represented by the economy."));
+                return;
+            }
+            amountMinor = OmceMoney.toMinorUnits(magnitude, digits);
         } catch (IllegalArgumentException e) {
             callback.accept(Result.fail("That amount can't be represented by the economy."));
             return;

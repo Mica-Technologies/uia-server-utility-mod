@@ -620,18 +620,38 @@ The service declares its scale once, in `/health`:
 - If a request carries a `currency` that is not the service's currency code, the service MUST
   reject it with `CURRENCY_MISMATCH`.
 
-**SUM-side conversion.** SUM stores balances internally as a double-precision dollar value. At the
-API boundary it converts:
+**Client-side conversion.** SUM stores balances internally as a double-precision dollar value. At
+the API boundary it converts:
 
 ```
-amountMinor  = round(dollars × 10^minorUnitDigits)      // half-up
+amountMinor  = dollars × 10^minorUnitDigits
 dollars      = amountMinor / 10^minorUnitDigits
 ```
 
-When `minorUnitDigits` is smaller than SUM's in-game precision (most importantly `0`, a
-whole-unit currency), SUM **rounds every price up to the next representable unit before charging**
-and displays the rounded price in-game, so a player is never quoted a price the service cannot
-settle. SUM logs the effective rounding mode once at startup.
+#### When the service's scale is coarser than the client's
+
+A service settling in whole units while the game keeps cents is the normal case, not an edge one.
+The rule that matters is:
+
+> **An amount crossing the boundary MUST be snapped DOWN to something the service can represent,
+> before either side moves, and both sides MUST then move that same figure.**
+
+Rounding a transfer *up* credits money the client never gave up; rounding the client side up
+charges for money the service never received. Down is the only direction that conserves value, and
+the remainder — always less than one minor unit — stays on the client side.
+
+This was learned the hard way: an early SUM build rounded a deposit half-up, so depositing $354.50
+into a whole-unit service debited the wallet $354.50 and credited the account 355, creating half a
+unit from nothing. SUM now settles $354 and tells the player the 50c stayed in their wallet.
+
+A service SHOULD reject an amount it cannot represent exactly rather than rounding it silently.
+Silent rounding at this boundary is precisely how value is created or destroyed, and a loud refusal
+turns a client bug into an obvious one.
+
+**In-game prices are unaffected.** SUM spends a *local* wallet for shop purchases, plots and job
+escrow, and that wallet always keeps cents regardless of what any service declares. Only bank
+transfers cross this boundary, so a coarse service currency never changes what anything costs in
+game — it only limits the granularity at which money can move between the two.
 
 ### 6.3 Identity and accounts
 
