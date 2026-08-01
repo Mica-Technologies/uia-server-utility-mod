@@ -115,7 +115,9 @@ All config is in `SumConfig.java` using Forge's `Configuration` class. Categorie
 - **`roamer`** -- Walkable block list for Roamer NPCs (string array of registry names)
 - **`roadrunner`** -- Speed boost block mappings (string array of `block=multiplier` entries)
 - **`economy_api`** -- Open MCEconomic API client (off by default). Full protocol spec in
-  `docs/ECONOMIC_API.md`; the `.tex`/`.pdf` alongside it are the same content typeset.
+  `docs/OPEN_MCECONOMIC_API_SPECIFICATION.md` (`.tex`/`.pdf` are the same content typeset).
+  Operator setup -- what to put in this config category and why -- is
+  `docs/OPEN_MCECONOMIC_API_SETUP.tex`/`.pdf`.
 
 ### Economy: wallet vs bank
 

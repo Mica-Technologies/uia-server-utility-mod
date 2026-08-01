@@ -1,0 +1,428 @@
+% =============================================================================
+%  Open MCEconomic API --- setup guide for a SUM (Minecraft) server
+%
+%  Build:  pdflatex OPEN_MCECONOMIC_API_SETUP.tex   (twice, for the contents)
+%
+%  Companion to OPEN_MCECONOMIC_API_SPECIFICATION.tex, which defines the wire
+%  protocol. This document is operational: what to set, where, and why.
+% =============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amssymb}
+\usepackage{microtype}
+\usepackage[margin=2.4cm,headheight=24pt]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------------------------------------------------ palette --
+\definecolor{omceInk}{HTML}{16232B}
+\definecolor{omceAccent}{HTML}{0F6E6E}
+\definecolor{omceAccentDark}{HTML}{0A4D4D}
+\definecolor{omceRule}{HTML}{C9D6D6}
+\definecolor{omceWash}{HTML}{F2F7F7}
+\definecolor{omceWarnWash}{HTML}{FDF3E7}
+\definecolor{omceCodeBg}{HTML}{F7F9FA}
+\definecolor{omceString}{HTML}{9A3A2E}
+\definecolor{omceMuted}{HTML}{5C6B72}
+
+\color{omceInk}
+\hypersetup{colorlinks=true, linkcolor=omceAccentDark, urlcolor=omceAccentDark,
+  pdftitle={Open MCEconomic API --- SUM Setup Guide}}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{omceAccentDark}}{\thesection}{0.7em}{}
+  [\vspace{-0.55em}{\color{omceRule}\rule{\linewidth}{0.6pt}}]
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{omceInk}}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.6em}{0.7em}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{omceRule}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\small\color{omceMuted}Open MCEconomic API --- SUM Setup}
+\fancyhead[R]{\small\color{omceMuted}Protocol 1.0}
+\fancyfoot[C]{\small\color{omceMuted}\thepage}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\keybox}[2]{%
+  \par\vspace{0.5em}\noindent
+  \colorbox{#1}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
+  \vspace{0.35em}\small #2\vspace{0.35em}\end{minipage}}\par\vspace{0.5em}}
+\newcommand{\note}[1]{\keybox{omceWash}{#1}}
+\newcommand{\warn}[1]{\keybox{omceWarnWash}{#1}}
+
+\setlist[itemize]{leftmargin=1.3em,itemsep=0.15em,topsep=0.35em}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=0.15em,topsep=0.35em}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\renewcommand{\arraystretch}{1.25}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize\color{omceInk},
+  stringstyle=\color{omceString},
+  backgroundcolor=\color{omceCodeBg},
+  frame=leftline, framerule=1.6pt, rulecolor=\color{omceRule},
+  framesep=7pt, xleftmargin=10pt, aboveskip=0.9em, belowskip=0.9em,
+  columns=fullflexible, keepspaces=true, breaklines=true,
+}
+
+% =============================================================================
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{3.2cm}
+{\color{omceRule}\rule{\linewidth}{1.2pt}}\\[1.2em]
+{\Huge\bfseries\color{omceAccentDark} Open MCEconomic API\par}
+\vspace{0.6em}
+{\LARGE\color{omceInk} SUM Server Setup Guide\par}
+\vspace{0.9em}
+{\color{omceRule}\rule{\linewidth}{1.2pt}}\\[2.6em]
+
+\begin{tabular}{r@{\hspace{1.2em}}l}
+\color{omceMuted}Applies to   & SUM (Server Utility Mod), Minecraft 1.12.2\\
+\color{omceMuted}Protocol     & Open MCEconomic API 1.0\\
+\color{omceMuted}Companion    & \code{OPEN\_MCECONOMIC\_API\_SPECIFICATION}\\
+\end{tabular}
+
+\vspace{3.2cm}
+\begin{minipage}{0.82\linewidth}
+\small\color{omceMuted}
+Connecting SUM to a remote economy service is optional. With nothing configured, SUM runs a
+complete economy of its own out of the world save --- wallets, bank accounts, ATMs and all. This
+guide covers what changes when you point it at a service instead, and what each setting protects
+you from.
+\end{minipage}
+\vfill
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Decide whether you need this}
+
+SUM's economy works with no service at all. Before configuring anything, it is worth being clear
+about what a remote service actually buys you.
+
+\begin{tabularx}{\linewidth}{L{4.6cm} X}
+\toprule
+\textbf{Without a service} & \textbf{With one}\\
+\midrule
+Bank accounts live in the world save. & Bank accounts live outside Minecraft, and can be shared
+with other systems (a Discord bot, a website, another server).\\
+Balances are per-world. Copy the save, copy the money. & One balance follows the player
+everywhere, including out of the game.\\
+Nothing to run, nothing to secure. & An HTTP service to host, a token to protect, TLS to
+terminate.\\
+\bottomrule
+\end{tabularx}
+
+\note{\textbf{Wallets are never remote.} Whatever you configure, the money players carry --- their
+wallet balance and the bills in their inventory --- stays local to the world save. Shops, plots,
+job escrow and \code{/pay} all spend it, and none of them ever touch the network. Only the
+\textbf{bank account} can be owned by a service, and the ATM is the only place the two meet.}
+
+That boundary is the single most important thing to understand before configuring anything: a
+service outage cannot stop players trading, and a laggy connection cannot slow down a shop.
+
+% =============================================================================
+\section{The minimum viable configuration}
+
+Everything lives in the \code{economy\_api} category of \code{config/sum.cfg}, generated on first
+launch. Four settings turn it on:
+
+\begin{lstlisting}
+economy_api {
+    B:enabled=true
+    S:baseUrl=https://economy.example.net
+    S:authToken=<the token your service operator gave you>
+    S:instanceId=alto-main
+}
+\end{lstlisting}
+
+\begin{tabularx}{\linewidth}{L{3.2cm} X}
+\toprule
+\textbf{Setting} & \textbf{Notes}\\
+\midrule
+\code{enabled}    & Master switch. False by default, so an unconfigured server behaves exactly as
+                    it always has.\\
+\code{baseUrl}    & Root URL \textbf{without} the \code{/api/economic/v1} suffix --- SUM appends
+                    that. Must be \code{https} unless you deliberately opt out (Section~\ref{sec:tls}).\\
+\code{authToken}  & Issued by whoever runs the service. \textbf{A secret.}\\
+\code{instanceId} & Identifies this server on every ledger entry. Give each server sharing a
+                    service a distinct value, so you can tell later which one a transaction came
+                    from.\\
+\bottomrule
+\end{tabularx}
+
+Restart the server. On success the log reads:
+
+\begin{lstlisting}
+[omce] Connected to <service> - currency BUCKS ($, 0 decimal place(s)), status ok.
+[omce] Capabilities: void, events, headerPolicy, autoProvisionAccounts, offlinePlayers
+\end{lstlisting}
+
+If a capability the service lacks changes SUM's behaviour, it says so on the same startup --- for
+example \code{Service has no 'fees' capability}, or a warning that a coarse currency will round
+prices. Those lines are informational, not errors.
+
+% =============================================================================
+\section{Security settings}
+\label{sec:tls}
+
+\subsection{HTTPS is required}
+
+SUM refuses a plaintext \code{baseUrl}. Every request carries the bearer token in a header and
+every response carries account balances; over plain HTTP both are readable and forgeable by
+anything on the path.
+
+\warn{\code{B:enableHttp=true} exists for local development only --- pointing at
+\code{http://127.0.0.1} while testing. It logs a prominent warning on \emph{every} server start
+while enabled, deliberately. Never set it on a server players use.}
+
+\subsection{Self-signed and private-CA certificates}
+
+There is no switch to disable certificate verification, and adding one would defeat the point of
+having it. Instead, supply the certificate:
+
+\begin{lstlisting}
+S:certificatePath=economy-ca.pem
+S:certificatePassword=          # only for .p12/.pfx/.jks, not PEM
+\end{lstlisting}
+
+The path is resolved \textbf{relative to the config file}, so dropping the certificate next to
+\code{sum.cfg} and naming it is enough. Absolute paths work too.
+
+\begin{tabularx}{\linewidth}{L{3.0cm} L{4.0cm} X}
+\toprule
+\textbf{Format} & \textbf{Extensions} & \textbf{Notes}\\
+\midrule
+PEM           & \code{.pem}, \code{.crt}, \code{.cer} & Preferred. One or more certificates.\\
+PKCS\#12      & \code{.p12}, \code{.pfx}              & Needs \code{certificatePassword}.\\
+Java KeyStore & \code{.jks}                           & Needs \code{certificatePassword}.\\
+\bottomrule
+\end{tabularx}
+
+The supplied certificate is added \emph{alongside} the system trust store rather than replacing
+it, so a private CA can coexist with public ones. Hostname verification still applies. An
+unreadable, malformed or expired certificate stops the economy backend from starting at all ---
+that is deliberate, because the alternative is silently falling back to an unverified connection.
+
+\subsection{Where the token may live}
+
+\warn{\textbf{Never ship \code{authToken} in a modpack.} Config files distributed to players are
+readable by them, and a token in one is a published token. Anyone holding it can move money.}
+
+A Minecraft \emph{client} never contacts the service --- it receives balances from its server over
+SUM's own sync packet --- so leaving \code{authToken}, \code{hmacSecret} and
+\code{certificatePassword} blank in a pack config costs nothing. Fill them in only on the
+dedicated server.
+
+Use a different token per server. If one is compromised you can revoke it without disturbing the
+others.
+
+\subsection{Optional request signing}
+
+\begin{lstlisting}
+S:hmacSecret=<shared secret>
+\end{lstlisting}
+
+Adds an HMAC-SHA256 signature to every request. The token proves \emph{who} is calling; the
+signature proves the request was not tampered with or replayed. Only set it if your service
+verifies signatures --- a service that ignores them is no worse off, but a service that requires
+them will reject you without this.
+
+% =============================================================================
+\section{Single-player and LAN worlds}
+
+\warn{Opening a single-player world starts a full \emph{integrated server} inside your game
+client. From SUM's point of view that is a server, and without a guard it would connect to the
+shared economy and spend real balances out of a local save.}
+
+\code{B:allowIntegratedServer} is \code{false} by default, so this cannot happen by accident. With
+it off, a single-player or LAN world silently falls back to SUM's local economy --- everything
+still works, it is just a separate economy belonging to that save.
+
+Set it \code{true} only when you deliberately want a local world to transact against the live
+economy, for instance while testing an integration. Even then SUM still reports itself honestly as
+an integrated server, so the service can refuse it on its own terms.
+
+% =============================================================================
+\section{What happens when the service is down}
+
+\code{S:unavailablePolicy} decides. The default is the conservative one.
+
+\begin{tabularx}{\linewidth}{L{2.4cm} X}
+\toprule
+\textbf{Value} & \textbf{Behaviour}\\
+\midrule
+\code{deny} \emph{(default)} & Cached balances are shown and marked stale; all bank spending is
+  refused with a clear message. \textbf{No money moves without the authority.}\\
+\code{cached} & As above, but transactions are queued in memory and flushed on recovery, up to a
+  bounded queue. Beyond that bound it behaves as \code{deny}.\\
+\code{local}  & Falls back to SUM's own bank balances. \textbf{These will diverge from the service}
+  and need manual reconciliation afterwards. Intended for single-player and offline testing, not
+  for a live server.\\
+\bottomrule
+\end{tabularx}
+
+Remember that only \emph{banking} is affected. Shops, plots, job escrow and \code{/pay} spend the
+local wallet and keep working normally through any outage.
+
+% =============================================================================
+\section{Tuning}
+
+The defaults are sensible for a server of any size; these are worth changing only if you have a
+reason.
+
+\begin{longtable}{L{4.6cm} L{1.7cm} L{8.4cm}}
+\toprule
+\textbf{Setting} & \textbf{Default} & \textbf{Raise or lower it when\ldots}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Setting} & \textbf{Default} & \textbf{Raise or lower it when\ldots}\\
+\midrule
+\endhead
+\code{balanceCacheTtlSeconds} & 30 &
+  Balances look stale in game. Lower it for fresher figures at the cost of more requests. In-game
+  reads always hit this cache, never the network, so this never affects tick time.\\
+\code{eventPollSeconds} & 10 &
+  Changes made outside Minecraft take too long to appear. \code{0} disables the feed and relies on
+  the periodic refresh. Ignored if the service lacks the \code{events} capability.\\
+\code{healthPollSeconds} & 60 &
+  You want faster detection of the service coming back after an outage.\\
+\code{connectTimeoutMs} & 3000 &
+  The service is geographically distant. Nothing here runs on the server thread, so a longer
+  timeout costs latency, never TPS.\\
+\code{readTimeoutMs} & 5000 & As above.\\
+\code{maxRetries} & 2 &
+  Retries reuse the same idempotency key, so a retried payment can never double-charge. Raising it
+  is safe; lowering it makes transient failures more visible to players.\\
+\code{verboseLogging} & false &
+  Diagnosing an integration. Logs every request and response. The token, HMAC secret and signature
+  are never logged regardless.\\
+\bottomrule
+\end{longtable}
+
+% =============================================================================
+\section{Integrity headers}
+
+\code{B:sendIntegrityHeaders} (default \code{true}) sends a small amount of context a service can
+use for stricter policy: whether this server runs in online mode, a per-world id and a monotonic
+counter, a per-boot session id, the online player count, risk-relevant state of the acting player
+(creative, op, cheats), and the mod version.
+
+\note{The world id and counter are the useful pair. The counter lives \emph{in the world save}, so
+restoring a backup takes it back down with it --- a service seeing a counter it has already passed
+knows in-world state was rolled back while its ledger was not. That is the classic duplication
+exploit, and it is the one signal here a service can verify rather than simply believe.}
+
+Nothing invasive is sent, and a conforming service must work without any of it:
+
+\begin{itemize}
+\item No IP addresses, hostnames or network identifiers.
+\item No hardware or installation fingerprints.
+\item No mod list, no world seed, no world contents.
+\item No player identities other than the parties to the transaction.
+\end{itemize}
+
+Set it \code{false} to omit them. A service that \emph{requires} one will then refuse you, and will
+say which header it wanted.
+
+% =============================================================================
+\section{Administration}
+
+\subsection{Two balances, so commands name one}
+
+\begin{lstlisting}
+/sum econ balance [player]          # shows wallet and bank
+/sum econ add <amount> [player]         # wallet (default)
+/sum econ add <amount> [player] --bank  # bank account
+/sum econ set <amount> [player] [--bank]
+\end{lstlisting}
+
+Wallet is the default because it is the balance players spend.
+
+\warn{Bank adjustments are \textbf{refused} while a remote service owns the account. That ledger
+is not SUM's to write to directly; make the correction on the service side, where it can be
+recorded properly.}
+
+\subsection{Player accounts}
+
+How a Minecraft UUID becomes an account is the service's business, not SUM's. A service that
+requires linking returns an instruction, which SUM relays verbatim into chat --- so a player who
+is not linked is told exactly what to do by the service that needs it.
+
+% =============================================================================
+\section{Troubleshooting}
+
+\begin{longtable}{L{5.6cm} L{9.6cm}}
+\toprule
+\textbf{Symptom} & \textbf{Cause and fix}\\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symptom} & \textbf{Cause and fix}\\
+\midrule
+\endhead
+Nothing in the log at all &
+  \code{enabled} is false, or the config was not saved. The backend starts when a \emph{world}
+  loads, not at game launch.\\
+\code{economy\_api.baseUrl uses plaintext http://} &
+  Working as intended. Use \code{https}, supply a certificate via \code{certificatePath}, or set
+  \code{enableHttp} for local testing only.\\
+\code{Economy API is configured, but this is an integrated server} &
+  A single-player or LAN world. Set \code{allowIntegratedServer} if that is genuinely what you
+  want.\\
+\code{Economy API disabled --- could not load certificatePath} &
+  Wrong path (it is relative to the config file), wrong password, or an expired certificate.
+  Deliberately fatal rather than falling back to an unverified connection.\\
+ATM says \emph{Bank unavailable} &
+  The service has not resolved an account for that player yet. Usually means unlinked --- check
+  the log for \code{ACCOUNT\_NOT\_LINKED} and the service's linking instruction.\\
+\code{ENVIRONMENT\_REJECTED} &
+  The service refuses this kind of server: commonly an offline-mode or single-player one.
+  \code{details.reason} names which.\\
+Balances look stale &
+  Lower \code{balanceCacheTtlSeconds}, or check whether the service advertises \code{events} ---
+  without it, outside changes only appear on the periodic refresh.\\
+Prices rounded up in game &
+  The service settles in whole units. Expected; see the specification's conversion section.\\
+\bottomrule
+\end{longtable}
+
+\note{\code{verboseLogging=true} logs every request and response, which is usually enough to see
+what a service is objecting to. It never logs the token or signature, so the output is safe to
+paste when asking for help.}
+
+% =============================================================================
+\section{Before going live}
+
+\begin{itemize}[label=$\square$]
+\item \code{baseUrl} is \code{https}, and \code{enableHttp} is \code{false}.
+\item \code{authToken} is set on the \textbf{server only}, and is not in any config shipped to
+      players.
+\item This server has its own token, not one shared with another server.
+\item \code{instanceId} is distinct from every other server using the same service.
+\item \code{allowIntegratedServer} is \code{false} unless you specifically want local worlds
+      transacting.
+\item \code{unavailablePolicy} is \code{deny} or \code{cached} --- \code{local} will diverge.
+\item A player has actually deposited and withdrawn at an ATM, and the amounts match on both
+      sides.
+\end{itemize}
+
+\end{document}
