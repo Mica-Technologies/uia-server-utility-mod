@@ -3,6 +3,8 @@ package com.micatechnologies.minecraft.sum.plots;
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
+import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
 import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
@@ -97,7 +99,13 @@ public class PacketPlotAction implements IMessage {
                     + ", have $" + String.format(Locale.ROOT, "%.2f", balance) + ".");
                 return;
             }
-            if (!EconomyBridge.adjustBalance(player, -plot.getPrice())) {
+            // Ownership is server-side data, so a late refusal from a remote economy can be
+            // undone cleanly — unlike an item, which would already be in the player's hands.
+            if (!EconomyBridge.adjustBalance(player, -plot.getPrice(),
+                OmceProtocol.TX_PLOT_PURCHASE,
+                OmceParty.plot("plot:" + plot.getPlotId(), plot.getDisplayName()),
+                "Bought plot " + plot.getDisplayName(),
+                () -> revertPurchase(player, data, plot))) {
                 tell(player, TextFormatting.RED, "Charge failed; purchase aborted.");
                 return;
             }
@@ -106,6 +114,28 @@ public class PacketPlotAction implements IMessage {
             data.touch();
             tell(player, TextFormatting.GREEN, "Bought " + plot.getDisplayName()
                 + " for $" + String.format(Locale.ROOT, "%.2f", plot.getPrice()) + ".");
+            refresh(player, data);
+        }
+
+        /**
+         * Undoes a plot purchase whose charge was refused after the fact.
+         *
+         * <p>Only reverts if the plot is still owned by this buyer — if an admin has since
+         * reassigned or relisted it, leaving their change alone is safer than stamping over it.
+         */
+        private void revertPurchase(EntityPlayerMP player, SumPlotsWorldSavedData data,
+            SumPlot plot) {
+            if (!player.getUniqueID().equals(plot.getOwnerUuid())) {
+                Sum.LOGGER.warn("[plots] Purchase of {} was refused, but the plot is no longer "
+                    + "owned by {} — leaving its current state alone.",
+                    plot.getDisplayName(), player.getName());
+                return;
+            }
+            plot.setOwner(null, "");
+            plot.setStatus(PlotStatus.FOR_SALE);
+            data.touch();
+            tell(player, TextFormatting.RED, "The payment for " + plot.getDisplayName()
+                + " was declined — the plot has been returned to sale.");
             refresh(player, data);
         }
 
