@@ -84,7 +84,11 @@ src/main/java/com/micatechnologies/minecraft/sum/
 │   ├── RenderRoamer.java
 │   ├── RoamerWalkableBlocksNavigator.java
 │   └── RoamerWalkableBlocksPathNodeProcessor.java
-└── roadrunner/           # Speed boost on configured blocks
+├── roadrunner/           # Speed boost on configured blocks
+└── omceapi/              # Open MCEconomic API — remote authoritative economy
+    ├── *.java            # Protocol constants + models (no Minecraft imports)
+    ├── client/           # HTTP/TLS/HMAC protocol client (no Minecraft imports)
+    └── service/          # SUM wiring: lifecycle, balance cache, event polling
     └── RoadRunnerHandler.java
 
 src/main/resources/
@@ -110,6 +114,21 @@ src/main/resources/
 All config is in `SumConfig.java` using Forge's `Configuration` class. Categories:
 - **`roamer`** -- Walkable block list for Roamer NPCs (string array of registry names)
 - **`roadrunner`** -- Speed boost block mappings (string array of `block=multiplier` entries)
+- **`economy_api`** -- Open MCEconomic API client (off by default). Full protocol spec in
+  `docs/ECONOMIC_API.md`; the `.tex`/`.pdf` alongside it are the same content typeset.
+
+### Economy backends
+
+`EconomyBridge` is the single facade for all balance operations, routing between three backends in
+priority order: **Open MCEconomic API** (remote, authoritative) -> **EconomyInc** (if loaded) ->
+**SUM's own capability**. Feature code only ever calls the bridge.
+
+The remote backend is server-side only and never runs on a Minecraft client; on an integrated
+(single-player/LAN) server it stays off unless `economy_api.allowIntegratedServer` is set, so a
+local save cannot spend from a shared economy. Because HTTP must not run on the server thread,
+`EconomyBridge.adjustBalance` is optimistic under the remote backend -- its boolean means
+"accepted and dispatched", not "committed". Anything granting an irreversible in-world effect
+should use `OmceEconomyService.processTransaction`, whose callback fires only on `committed`.
 
 ### Key Patterns
 
