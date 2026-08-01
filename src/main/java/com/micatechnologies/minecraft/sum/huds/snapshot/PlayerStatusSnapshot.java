@@ -19,8 +19,12 @@ public final class PlayerStatusSnapshot {
 
     /** Sum of bill values across every safe-deposit box owned by the player in the
      *  player's current dimension. Zero if the player owns no boxes or none contain
-     *  currency bills. */
-    public final long bankBalance;
+     *  currency bills. This is stored cash, not an account balance. */
+    public final long vaultBillValue;
+
+    /** The player's bank account balance. Sent from the server because the account may live on a
+     *  remote economy service the client has no access to. NaN when no account is known yet. */
+    public final double bankBalance;
 
     /** Display name of the SUM plot the player is currently standing in, or "" if
      *  the player is outside any plot. When overlapping plots exist, the first one
@@ -41,9 +45,10 @@ public final class PlayerStatusSnapshot {
      *  -1 when there's no next milestone (config has none, or all are achieved). */
     public final int nextMilestoneTicks;
 
-    public PlayerStatusSnapshot(long bankBalance, String plotName, String plotOwner,
-                                int jobsAvailable, int loyaltyTicks,
+    public PlayerStatusSnapshot(long vaultBillValue, double bankBalance, String plotName,
+                                String plotOwner, int jobsAvailable, int loyaltyTicks,
                                 int nextMilestoneTicks) {
+        this.vaultBillValue = vaultBillValue;
         this.bankBalance = bankBalance;
         this.plotName = plotName == null ? "" : plotName;
         this.plotOwner = plotOwner == null ? "" : plotOwner;
@@ -55,6 +60,6 @@ public final class PlayerStatusSnapshot {
     /** Zero-valued snapshot used as the "no data yet" sentinel — HUDs render "—"
      *  for any field that's clearly default (empty plot name, etc.). */
     public static PlayerStatusSnapshot empty() {
-        return new PlayerStatusSnapshot(0L, "", "", 0, 0, -1);
+        return new PlayerStatusSnapshot(0L, Double.NaN, "", "", 0, 0, -1);
     }
 }

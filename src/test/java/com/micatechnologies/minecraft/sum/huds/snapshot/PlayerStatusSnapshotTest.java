@@ -12,15 +12,15 @@ class PlayerStatusSnapshotTest {
 
     @Test
     void constructorCoalescesNullNames() {
-        PlayerStatusSnapshot s = new PlayerStatusSnapshot(0L, null, null, 0, 0, -1);
+        PlayerStatusSnapshot s = new PlayerStatusSnapshot(0L, 250.75, null, null, 0, 0, -1);
         assertEquals("", s.plotName);
         assertEquals("", s.plotOwner);
     }
 
     @Test
     void constructorPreservesNonNullValues() {
-        PlayerStatusSnapshot s = new PlayerStatusSnapshot(1234L, "Downtown", "alex", 3, 14400, 36000);
-        assertEquals(1234L, s.bankBalance);
+        PlayerStatusSnapshot s = new PlayerStatusSnapshot(1234L, 250.75, "Downtown", "alex", 3, 14400, 36000);
+        assertEquals(1234L, s.vaultBillValue);
         assertEquals("Downtown", s.plotName);
         assertEquals("alex", s.plotOwner);
         assertEquals(3, s.jobsAvailable);
@@ -31,7 +31,7 @@ class PlayerStatusSnapshotTest {
     @Test
     void emptyIsTheZeroSentinel() {
         PlayerStatusSnapshot s = PlayerStatusSnapshot.empty();
-        assertEquals(0L, s.bankBalance);
+        assertEquals(0L, s.vaultBillValue);
         assertEquals("", s.plotName);
         assertEquals("", s.plotOwner);
         assertEquals(0, s.jobsAvailable);
@@ -42,6 +42,6 @@ class PlayerStatusSnapshotTest {
     @Test
     void bankBalanceHoldsFullLongRange() {
         assertEquals(Long.MAX_VALUE,
-            new PlayerStatusSnapshot(Long.MAX_VALUE, "", "", 0, 0, -1).bankBalance);
+            new PlayerStatusSnapshot(Long.MAX_VALUE, 0.0, "", "", 0, 0, -1).vaultBillValue);
     }
 }

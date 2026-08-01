@@ -97,8 +97,10 @@ public class PlayerStatusTracker {
     private static PlayerStatusSnapshot buildSnapshot(EntityPlayerMP player) {
         World world = player.world;
 
-        long bankBalance = SafeDepositSavedData.get(world)
+        long vaultBillValue = SafeDepositSavedData.get(world)
             .totalBillValueFor(player.getUniqueID());
+        // The bank account may live on a remote service, so only the server can read it.
+        double bankBalance = com.micatechnologies.minecraft.sum.bank.BankService.getBalance(player);
 
         String plotName = "";
         String plotOwner = "";
@@ -132,7 +134,7 @@ public class PlayerStatusTracker {
             }
         }
 
-        return new PlayerStatusSnapshot(bankBalance, plotName, plotOwner,
+        return new PlayerStatusSnapshot(vaultBillValue, bankBalance, plotName, plotOwner,
             jobsAvailable, loyaltyTicks, nextMilestoneTicks);
     }
 }
