@@ -3,8 +3,6 @@ package com.micatechnologies.minecraft.sum.omceapi.service;
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.SumConstants;
-import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
-import com.micatechnologies.minecraft.sum.economy.ISumMoney;
 import com.micatechnologies.minecraft.sum.omceapi.OmceAccount;
 import com.micatechnologies.minecraft.sum.omceapi.OmceBalance;
 import com.micatechnologies.minecraft.sum.omceapi.OmceError;
@@ -56,31 +54,18 @@ import net.minecraft.util.text.TextFormatting;
  * Every HTTP call runs on {@link #executor}; nothing here blocks the Minecraft server thread. All
  * in-game reads are served from {@link OmceBalanceCache}, which the executor keeps fresh.
  *
- * <h2>The optimistic write path, and its one honest caveat</h2>
+ * <h2>What this owns</h2>
  *
- * SUM's existing economy call sites are synchronous — {@code EconomyBridge.adjustBalance} returns
- * a boolean and the caller immediately acts on it. To keep those working without blocking a tick,
- * {@link #adjustBalanceOptimistic} checks the cached balance, applies the delta to the cache, and
- * dispatches the real transaction in the background, reconciling when the response lands.
+ * Player <b>bank accounts</b> only. Wallets are local to the world save and never reach the
+ * network, so shops, plots, job escrow and payments settle synchronously without this class being
+ * involved at all. Money crosses between wallet and bank only at an ATM, through
+ * {@link com.micatechnologies.minecraft.sum.bank.BankService}.
  *
- * <p>That is correct for reversible effects and for anything the service ultimately confirms, but
- * not on its own: a caller that granted something on the strength of the optimistic {@code true}
- * has to deal with a later refusal. SUM handles that in one of three ways, chosen by what was
- * granted:
+ * <p>That boundary is why every mutating call here goes through {@link #processTransaction},
+ * which reports only once the service says {@code committed}. An ATM is always about to hand the
+ * player something irreversible - a bill, or wallet credit - so nothing may be granted on an
+ * unconfirmed write.
  *
- * <ul>
- *   <li><b>Wait for confirmation</b> ({@link #processTransaction}) where the grant is an item in a
- *       player's hands — an ATM bill, shop goods. There is nothing reliable to take back once
- *       delivered, so nothing is delivered until the service says {@code committed}.</li>
- *   <li><b>Undo on rejection</b> (the {@code onRejected} callback on
- *       {@link #adjustBalanceOptimistic}) where the grant is server-side state the caller owns —
- *       plot ownership, a job listing, a shop till, a loyalty milestone. Those revert cleanly.</li>
- *   <li><b>Settle atomically</b> ({@link #transferBetweenPlayers}) where money moves between two
- *       players, so there is no window in which one side has landed and the other has not.</li>
- * </ul>
- *
- * <p>A refusal that reaches {@code onOptimisticRejection} always corrects the cached balance,
- * messages the player, and logs with the idempotency key so it can be reconciled.
  */
 public final class OmceEconomyService {
 
@@ -463,7 +448,7 @@ public final class OmceEconomyService {
             }
             onSuccess();
             for (OmceBalance balance : balances.get()) {
-                acceptBalance(balance);
+                cache.applyAuthoritative(balance);
             }
         }
     }
@@ -527,11 +512,8 @@ public final class OmceEconomyService {
         for (OmceEventPage.Event event : page.getEvents()) {
             if (event.isBalanceChange()) {
                 OmceBalance balance = event.getBalance();
-                if (cache.applyAuthoritative(balance)) {
-                    mirrorToClient(balance.getPlayerUuid());
-                    if (event.getReason() != null) {
-                        notifyPlayer(event.getPlayerUuid(), TextFormatting.GREEN + event.getReason());
-                    }
+                if (cache.applyAuthoritative(balance) && event.getReason() != null) {
+                    notifyPlayer(event.getPlayerUuid(), TextFormatting.GREEN + event.getReason());
                 }
             }
         }
@@ -667,7 +649,7 @@ public final class OmceEconomyService {
     private void applyResultToCache(OmceResult<OmceTransactionResult> result) {
         if (result.isOk()) {
             for (OmceBalance balance : result.get().getBalances()) {
-                acceptBalance(balance);
+                cache.applyAuthoritative(balance);
             }
             return;
         }
@@ -679,82 +661,6 @@ public final class OmceEconomyService {
             if (balance != Long.MIN_VALUE && config.isVerboseLogging()) {
                 Sum.LOGGER.info("[omce] Rejection reported balance {}; a refresh will follow.", balance);
             }
-        }
-    }
-
-    /**
-     * Moves money between two players as a <b>single atomic transaction</b>.
-     *
-     * <p>The obvious implementation — debit the sender, then credit the recipient — is wrong under
-     * an asynchronous economy. Both calls return optimistically, so a sender's debit that the
-     * service later refuses leaves the recipient credited from nothing. One transaction with two
-     * settled parties makes that impossible: the service applies both sides or neither.
-     *
-     * <p>Fees ride along on the same transaction where the service supports them. Where it does
-     * not, the transfer is settled for the net amount and the fee is collected separately; if that
-     * second movement fails the sender simply is not charged the fee, which costs the economy a
-     * sink but never creates money.
-     *
-     * @param amountMinor total charged to the sender, in minor units.
-     * @param feeMinor skimmed from what the recipient receives; 0 for none.
-     * @param callback receives the outcome on the server thread.
-     */
-    public void transferBetweenPlayers(EntityPlayer from, EntityPlayer to, long amountMinor,
-        long feeMinor, Consumer<OmceResult<OmceTransactionResult>> callback) {
-        if (from == null || to == null || !running.get()) {
-            complete(callback, OmceResult.fail(OmceProtocol.ERR_NOT_CONNECTED,
-                "The economy client is not running.", false));
-            return;
-        }
-        OmceHealth h = health.get();
-        boolean serviceHandlesFees = h != null && h.getCapabilities().hasFees();
-
-        OmceParty sender = OmceParty.player(from.getUniqueID(), from.getName(),
-            accountIdOf(from.getUniqueID()));
-        OmceParty recipient = OmceParty.player(to.getUniqueID(), to.getName(),
-            accountIdOf(to.getUniqueID()));
-
-        // With no fee support the settled transfer is the net amount; the fee follows separately.
-        long settled = (serviceHandlesFees || feeMinor <= 0L) ? amountMinor : amountMinor - feeMinor;
-        OmceTransactionRequest.Builder builder = OmceTransactionRequest
-            .builder(OmceProtocol.TX_PLAYER_TRANSFER, settled, sender, recipient)
-            .initiator(from.getUniqueID(), from.getName(), OmceTransactionRequest.ROLE_PLAYER)
-            .reason("Payment to " + to.getName());
-        if (serviceHandlesFees && feeMinor > 0L) {
-            builder.fee(feeMinor, OmceParty.system("sink.pay_fee"));
-        }
-        OmceTransactionRequest request = builder.build();
-
-        long trailingFee = (serviceHandlesFees || feeMinor <= 0L) ? 0L : feeMinor;
-        submit(() -> {
-            OmceResult<OmceTransactionResult> result = dispatch(request);
-            applyResultToCache(result);
-            mirrorToClient(from.getUniqueID());
-            mirrorToClient(to.getUniqueID());
-            if (result.isOk() && trailingFee > 0L) {
-                collectTransferFee(from, trailingFee);
-            }
-            complete(callback, result);
-        }, "transfer:" + from.getName() + "->" + to.getName());
-    }
-
-    /** Collects the /pay fee as its own movement, for services without the {@code fees} capability. */
-    private void collectTransferFee(EntityPlayer from, long feeMinor) {
-        OmceTransactionRequest feeRequest = OmceTransactionRequest
-            .builder(OmceProtocol.TX_PLAYER_TRANSFER, feeMinor,
-                OmceParty.player(from.getUniqueID(), from.getName(), accountIdOf(from.getUniqueID())),
-                OmceParty.system("sink.pay_fee"))
-            .initiator(from.getUniqueID(), from.getName(), OmceTransactionRequest.ROLE_PLAYER)
-            .reason("Transfer fee")
-            .build();
-        OmceResult<OmceTransactionResult> feeResult = dispatch(feeRequest);
-        applyResultToCache(feeResult);
-        mirrorToClient(from.getUniqueID());
-        if (feeResult.isFailure()) {
-            // Not worth failing the payment over: the transfer itself already settled correctly
-            // and no money was created, the sink just went uncollected.
-            Sum.LOGGER.warn("[omce] Transfer fee of {} from {} was not collected: {}",
-                feeMinor, from.getName(), feeResult.getError());
         }
     }
 
@@ -806,161 +712,9 @@ public final class OmceEconomyService {
                 return;
             }
             applyResultToCache(result);
-            mirrorToClient(uuid);
             Sum.LOGGER.info("[omce] Reversed transaction {} for {} ({}).",
                 original.getTransactionId(), name, reason);
         }, "refund:" + original.getTransactionId());
-    }
-
-    /**
-     * Synchronous-looking balance adjustment for SUM's existing call sites.
-     *
-     * <p>Checks the cached balance, applies the delta optimistically so the HUD reacts at once,
-     * and dispatches the real transaction in the background. See this class's javadoc for why this
-     * is not sufficient for irreversible effects.
-     *
-     * @return false only when the request can be rejected up front — no account, frozen account,
-     *     insufficient cached funds, or a degraded service under a {@code deny} policy.
-     */
-    public boolean adjustBalanceOptimistic(EntityPlayer player, double deltaDollars,
-        String transactionType, OmceParty counterparty,
-        @Nullable String reason, @Nullable Runnable onRejected) {
-        if (player == null || !running.get()) {
-            return false;
-        }
-        UUID uuid = player.getUniqueID();
-        OmceBalanceCache.Entry entry = cache.get(uuid);
-        if (entry == null || entry.getAccountId() == null) {
-            return false;
-        }
-        if (!OmceProtocol.ACCOUNT_ACTIVE.equals(entry.getStatus())) {
-            return false;
-        }
-        if (isDegraded() && "deny".equals(SumConfig.getEconomyApiUnavailablePolicy())) {
-            return false;
-        }
-
-        int digits = getMinorUnitDigits();
-        long deltaMinor;
-        try {
-            // A debit is a price the player pays, so round it away from zero; a credit is an
-            // existing amount, so round it half-up. Rounding a charge down would leak value.
-            deltaMinor = deltaDollars < 0.0d
-                ? -OmceMoney.priceToMinorUnits(-deltaDollars, digits)
-                : OmceMoney.toMinorUnits(deltaDollars, digits);
-        } catch (IllegalArgumentException e) {
-            Sum.LOGGER.warn("[omce] Refusing an unrepresentable amount {}: {}", deltaDollars,
-                e.getMessage());
-            return false;
-        }
-        if (deltaMinor == 0L) {
-            return true;
-        }
-        if (deltaMinor < 0L && entry.getEffectiveAvailable() + deltaMinor < 0L) {
-            // Courtesy check against the cache; the service revalidates and its answer wins.
-            return false;
-        }
-
-        com.micatechnologies.minecraft.sum.omceapi.OmceParty self =
-            OmceParty.player(uuid, player.getName(),
-                entry.getAccountId());
-        long amount = Math.abs(deltaMinor);
-        OmceTransactionRequest request = OmceTransactionRequest
-            .builder(transactionType, amount,
-                deltaMinor < 0L ? self : counterparty,
-                deltaMinor < 0L ? counterparty : self)
-            .initiator(uuid, player.getName(), OmceTransactionRequest.ROLE_PLAYER)
-            .reason(reason)
-            .build();
-
-        cache.addPending(uuid, deltaMinor);
-        mirrorToClient(uuid);
-        boolean accepted = submit(() -> {
-            OmceResult<OmceTransactionResult> result = dispatch(request);
-            cache.settlePending(uuid, deltaMinor);
-            applyResultToCache(result);
-            // Mirror again after settling, so the client converges on the authoritative figure
-            // whether the transaction was confirmed or rolled back.
-            mirrorToClient(uuid);
-            if (result.isFailure()) {
-                onOptimisticRejection(uuid, request, result.getError());
-                // Let the caller undo whatever in-world state it granted on the strength of our
-                // optimistic "true". Runs on the server thread; see EconomyBridge#adjustBalance.
-                if (onRejected != null) {
-                    complete(ignored -> onRejected.run(), null);
-                }
-            }
-        }, "adjust:" + transactionType);
-
-        if (!accepted) {
-            cache.settlePending(uuid, deltaMinor);
-            mirrorToClient(uuid);
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Handles a transaction that SUM already reported as successful in-game but the service then
-     * refused. The cached balance is corrected by {@link OmceBalanceCache#settlePending}; this
-     * tells the player and makes sure an operator sees it, because any in-world side effect the
-     * caller performed has <b>not</b> been undone.
-     */
-    private void onOptimisticRejection(UUID uuid, OmceTransactionRequest request,
-        @Nullable OmceError error) {
-        Sum.LOGGER.error("[omce] Transaction {} ({}) was REJECTED after SUM had already applied it "
-            + "in-game: {}. The cached balance has been corrected, but any items or blocks the "
-            + "action granted were not reverted. Idempotency key {}.",
-            request.getType(), request.getAmount(), error, request.getIdempotencyKey());
-        notifyPlayer(uuid, TextFormatting.RED + "Economy error: "
-            + (error == null ? "the transaction was refused."
-                : error.playerMessage(getMinorUnitDigits(), getCurrencySymbol())));
-        // Force a re-read so the player's HUD converges on the truth rather than our estimate.
-        submit(() -> loadBalances(Collections.singletonList(uuid)), "refresh-after-rejection");
-    }
-
-    /**
-     * Pushes a player's remote balance into their client's copy.
-     *
-     * <p>Necessary because SUM's client-side GUIs and HUDs read a local {@link ISumMoney} mirror
-     * that is only ever populated by {@code PacketSyncSumMoney}. The remote backend does not touch
-     * that capability — it owns the balance itself — so without this step every client on a
-     * dedicated server would render {@code $0.00} while the server knew the real figure.
-     *
-     * <p>Writing through the existing capability and its {@code sync} rather than inventing a
-     * second packet keeps one code path to the client, and leaves the local capability holding a
-     * sensible value if the remote backend is ever turned off.
-     */
-    private void mirrorToClient(@Nullable UUID uuid) {
-        if (uuid == null || CapabilitySumMoney.CAPABILITY == null) {
-            return;
-        }
-        OmceBalanceCache.Entry entry = cache.get(uuid);
-        if (entry == null || entry.getAccountId() == null) {
-            return;
-        }
-        double dollars = OmceMoney.toDollars(entry.getEffectiveBalance(), getMinorUnitDigits());
-        server.addScheduledTask(() -> {
-            if (server.getPlayerList() == null) {
-                return;
-            }
-            EntityPlayerMP player = server.getPlayerList().getPlayerByUUID(uuid);
-            if (player == null) {
-                return;
-            }
-            ISumMoney money = player.getCapability(CapabilitySumMoney.CAPABILITY, null);
-            if (money != null) {
-                money.setBalance(dollars);
-                money.sync(player);
-            }
-        });
-    }
-
-    /** Applies an authoritative balance and, if it was fresh, pushes it to the player's client. */
-    private void acceptBalance(@Nullable OmceBalance balance) {
-        if (balance != null && cache.applyAuthoritative(balance)) {
-            mirrorToClient(balance.getPlayerUuid());
-        }
     }
 
     /** Sends a chat line to a player, hopping to the server thread first. */
