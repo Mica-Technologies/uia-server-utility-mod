@@ -2,9 +2,7 @@ package com.micatechnologies.minecraft.sum.loyalty;
 
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConfig;
-import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
-import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
-import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
+import com.micatechnologies.minecraft.sum.economy.WalletService;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -168,21 +166,13 @@ public class LoyaltyHandler {
                 milestone.getMinutes(), milestone.getValue());
             return false;
         }
-        if (!EconomyBridge.isAvailable()) {
+        if (!WalletService.isAvailable()) {
             Sum.LOGGER.warn("[loyalty] no economy backend available; skipping {}min milestone for {}",
                 milestone.getMinutes(), player.getName());
             return false;
         }
-        // Money entering the economy from nothing — a faucet, so the remote ledger can tell
-        // loyalty payouts apart from player-to-player movement when auditing inflation.
-        //
-        // The caller marks this milestone as fired on a true return, and a remote economy can
-        // refuse afterwards. Unmark it in that case so the reward is retried on the next check
-        // rather than silently lost forever — these are once-per-player rewards.
-        if (!EconomyBridge.adjustBalance(player, amount,
-            OmceProtocol.TX_LOYALTY_REWARD, OmceParty.system("faucet.loyalty"),
-            "Loyalty milestone: " + milestone.getMinutes() + " minutes",
-            () -> unmarkMilestone(player, milestone, sessionTrack))) {
+        // Rewards land in the wallet, which is where the player can spend them.
+        if (!WalletService.credit(player, amount)) {
             return false;
         }
         notify(player, TextFormatting.GOLD + "[Loyalty] " + TextFormatting.GREEN
@@ -190,42 +180,6 @@ public class LoyaltyHandler {
             + " for reaching " + milestone.getMinutes() + " minutes "
             + (sessionTrack ? "this session." : "online."));
         return true;
-    }
-
-    /**
-     * Clears a milestone's "already fired" mark after a refused reward, so it is retried on the
-     * next check (at most {@value #CHECK_INTERVAL_TICKS} ticks later).
-     *
-     * <p>Lifetime milestones live in player NBT; session ones live in the in-memory map. Both are
-     * touched only from the server thread, and the rejection callback is delivered there too.
-     */
-    private void unmarkMilestone(EntityPlayer player, LoyaltyMilestone milestone,
-        boolean sessionTrack) {
-        if (sessionTrack) {
-            SessionState session = sessions.get(player.getUniqueID());
-            if (session != null) {
-                session.firedMinutes.remove(milestone.getMinutes());
-            }
-            return;
-        }
-        NBTTagCompound persisted = persisted(player);
-        if (!persisted.hasKey(NBT_ROOT, Constants.NBT.TAG_COMPOUND)) {
-            return;
-        }
-        NBTTagCompound state = persisted.getCompoundTag(NBT_ROOT);
-        NBTTagList fired = state.getTagList(NBT_FIRED, Constants.NBT.TAG_INT);
-        NBTTagList kept = new NBTTagList();
-        for (int i = 0; i < fired.tagCount(); i++) {
-            int minutes = fired.getIntAt(i);
-            if (minutes != milestone.getMinutes()) {
-                kept.appendTag(new NBTTagInt(minutes));
-            }
-        }
-        state.setTag(NBT_FIRED, kept);
-        persisted.setTag(NBT_ROOT, state);
-        player.getEntityData().setTag(EntityPlayer.PERSISTED_NBT_TAG, persisted);
-        Sum.LOGGER.warn("[loyalty] {}min reward for {} was refused by the economy; it will be "
-            + "retried.", milestone.getMinutes(), player.getName());
     }
 
     private boolean fireCommandReward(EntityPlayer player, LoyaltyMilestone milestone, boolean sessionTrack) {

@@ -4,9 +4,7 @@ import com.micatechnologies.minecraft.sum.SumConstants;
 import com.micatechnologies.minecraft.sum.SumRegistry;
 import com.micatechnologies.minecraft.sum.SumTab;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
-import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
-import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
-import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
+import com.micatechnologies.minecraft.sum.economy.WalletService;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.block.Block;
@@ -100,31 +98,12 @@ public class BlockJobBoard extends Block {
             refund += l.reward;
         }
         if (refund > 0.0) {
-            // takeExpiredFor has already removed the listings, so a refused credit would destroy
-            // the escrow outright. Put them back if that happens; the next board interaction will
-            // retry the reclaim.
-            final double reclaimed = refund;
-            EconomyBridge.adjustBalance(player, refund,
-                OmceProtocol.TX_JOB_REFUND, OmceParty.system("escrow.jobs"),
-                "Reclaimed escrow from " + expired.size() + " expired job listing(s)",
-                () -> restoreExpired(player, expired, reclaimed));
+            WalletService.credit(player, refund);
             TextComponentString msg = new TextComponentString(TextFormatting.GREEN
                 + "Reclaimed $" + String.format(Locale.ROOT, "%.2f", refund)
                 + " escrow from " + expired.size() + " expired listing(s).");
             player.sendMessage(msg);
         }
-    }
-
-    /** Puts expired listings back on the board after a refused escrow reclaim. */
-    private static void restoreExpired(EntityPlayerMP player, List<JobListing> expired,
-        double refund) {
-        JobBoardSavedData data = JobBoardSavedData.get(player.world);
-        for (JobListing listing : expired) {
-            data.addListing(listing);
-        }
-        player.sendMessage(new TextComponentString(TextFormatting.RED
-            + "The $" + String.format(Locale.ROOT, "%.2f", refund)
-            + " escrow reclaim was declined — your expired listings were restored."));
     }
 
     @Override

@@ -1,8 +1,6 @@
 package com.micatechnologies.minecraft.sum.economy;
 
 import com.micatechnologies.minecraft.sum.Sum;
-import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
-import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
 import com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService;
 import java.lang.reflect.Method;
 import javax.annotation.Nullable;
@@ -11,30 +9,32 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.fml.common.Loader;
 
 /**
- * Unified facade for SUM's balance operations. Internally routes between three backends, in
- * priority order:
+ * Facade for the <b>wallet</b> - the money a player carries and spends in-game. Routes between
+ * two backends:
  *
  * <ol>
- *   <li><b>Open MCEconomic API</b> (preferred when configured and connected) - a remote service
- *       owns balances and the ledger; SUM reads a cache it keeps fresh. See
- *       {@link OmceEconomyService}.</li>
- *   <li><b>EconomyInc</b> (when loaded) - reflection-only access to the mod's {@code IMoney}
- *       capability.</li>
- *   <li><b>SUM</b> (fallback) - SUM's own {@link ISumMoney} capability attached to every
- *       player.</li>
+ *   <li><b>EconomyInc</b> (preferred when loaded) - reflection-only access to the mod's
+ *       {@code IMoney} capability.</li>
+ *   <li><b>SUM</b> (fallback when EconomyInc is absent) - SUM's own {@link ISumMoney}
+ *       capability attached to every player.</li>
  * </ol>
  *
  * <p>Callers always go through {@link #getBalance}, {@link #adjustBalance}, and
  * {@link #isAvailable}; they never need to know which backend is active.
  *
- * <p><b>A note on the remote backend.</b> The local backends mutate a balance synchronously and
- * cannot fail after the fact. The remote one cannot: HTTP must not run on the server thread, so
- * {@link #adjustBalance} applies the change to a local cache and settles it in the background.
- * The boolean it returns therefore means "accepted, and the service will be asked", not
- * "committed". Call sites that grant an irreversible in-world effect — handing over bills,
- * transferring items, assigning ownership — should use
- * {@link OmceEconomyService#processTransaction}, whose callback fires only once the service has
- * confirmed. {@link #adjustBalance} remains correct for reversible effects.
+ * <p><b>Both backends are local and synchronous.</b> A wallet lives in the world save, so a
+ * purchase settles immediately and cannot be refused after the fact. That is deliberate: shops,
+ * plots, job escrow and payments all spend the wallet, and none of them should depend on a
+ * network round trip.
+ *
+ * <p>This class deliberately does <i>not</i> route to a remote economy service. When one is
+ * configured it owns the player's <b>bank account</b>, not their wallet - see
+ * {@link com.micatechnologies.minecraft.sum.bank.BankService}. Money crosses between the two only
+ * at an ATM. {@link #getRemoteService()} is exposed here purely because this class owns that
+ * client's lifecycle.
+ *
+ * <p>This class handles the invisible balance only. For the wallet total including carried bills,
+ * use {@link WalletService}.
  *
  * <p>EconomyInc 1.6.2 signatures locked via javap on the production jar:
  * <ul>
@@ -106,8 +106,8 @@ public final class EconomyBridge {
     public static void setRemoteService(@Nullable OmceEconomyService service) {
         remote = service;
         if (service != null) {
-            Sum.LOGGER.info("[economy] Open MCEconomic API backend active; it takes priority over "
-                + "EconomyInc and SUM's local capability.");
+            Sum.LOGGER.info("[economy] Open MCEconomic API active; it owns bank accounts. "
+                + "Wallets stay local, so in-game purchases never touch the network.");
         }
     }
 
@@ -116,13 +116,14 @@ public final class EconomyBridge {
         remote = null;
     }
 
-    /** True when a connected remote economy service owns balances. */
+    /** True when a connected remote economy service owns players' <b>bank accounts</b>.
+     *  Wallets are always local, so this never affects {@link #getBalance}. */
     public static boolean isRemoteBackend() {
         OmceEconomyService service = remote;
         return service != null && service.isRunning();
     }
 
-    /** The remote client, or null when it is not the active backend. */
+    /** The remote economy client, or null when the bank is backed by the world save. */
     @Nullable
     public static OmceEconomyService getRemoteService() {
         return isRemoteBackend() ? remote : null;
@@ -143,7 +144,7 @@ public final class EconomyBridge {
     /** True if any backend can answer balance queries. Used by features that need to
      *  decide whether to show "Economy mod required" or proceed with the operation. */
     public static boolean isAvailable() {
-        return isRemoteBackend() || isEconomyIncBackend() || isSumBackend();
+        return isEconomyIncBackend() || isSumBackend();
     }
 
     @Nullable
@@ -165,12 +166,6 @@ public final class EconomyBridge {
      */
     public static double getBalance(EntityPlayer player) {
         if (player == null) return Double.NaN;
-        OmceEconomyService service = getRemoteService();
-        if (service != null) {
-            // Cache read only — never network. This runs on the server thread and, on a physical
-            // client, on the render thread from GUIs.
-            return service.getCachedBalanceDollars(player.getUniqueID());
-        }
         if (isEconomyIncBackend()) {
             Object handler = resolveEconomyIncHandler(player);
             if (handler != null) {
@@ -200,65 +195,11 @@ public final class EconomyBridge {
      * @return true on success; false if no backend is available or the result would go negative.
      */
     public static boolean adjustBalance(EntityPlayer player, double delta) {
-        // No transaction context supplied, so the remote ledger gets a generic classification.
-        // Prefer the overload below wherever the feature is known; a ledger of "adjustment"
-        // entries is technically correct and practically useless to an operator auditing it.
-        return adjustBalance(player, delta, null, null, null);
-    }
-
-    /**
-     * Adjusts the player's balance, telling the remote ledger what the money was for.
-     *
-     * <p>The extra arguments are ignored by the local backends, which have no ledger — they exist
-     * so a remote service records a shop purchase as a shop purchase rather than an unexplained
-     * adjustment.
-     *
-     * @param transactionType an {@code OmceProtocol.TX_*} constant, or null for a generic entry.
-     * @param counterparty the other side of the movement (the shop, job, plot, cash, or system
-     *     sink), or null to use an unclassified system counterparty.
-     * @param reason short human-readable description for the audit log; may be null.
-     * @return true on success. With the remote backend this means "accepted and dispatched" —
-     *     see this class's javadoc.
-     */
-    public static boolean adjustBalance(EntityPlayer player, double delta,
-        @Nullable String transactionType, @Nullable OmceParty counterparty,
-        @Nullable String reason) {
-        return adjustBalance(player, delta, transactionType, counterparty, reason, null);
-    }
-
-    /**
-     * As above, with a callback for the one failure mode only the remote backend has.
-     *
-     * <p>Under the remote backend this method returns before the service has answered, so a
-     * caller that granted something on the strength of that {@code true} needs a way to undo it if
-     * the service later refuses. {@code onRejected} runs on the server thread in that case.
-     *
-     * <p>It is only useful where the grant is server-side state the caller can actually revert —
-     * plot ownership, a job listing. Where the grant is an item in a player's hands there is
-     * nothing reliable to undo (they may have dropped, stashed, or consumed it), so those call
-     * sites must instead wait for confirmation via
-     * {@link OmceEconomyService#processTransaction}. The local backends cannot fail after
-     * returning true, so they ignore this argument.
-     *
-     * @param onRejected undo action, or null if the caller has nothing to revert.
-     */
-    public static boolean adjustBalance(EntityPlayer player, double delta,
-        @Nullable String transactionType, @Nullable OmceParty counterparty,
-        @Nullable String reason, @Nullable Runnable onRejected) {
         if (player == null) return false;
-        OmceEconomyService service = getRemoteService();
-        if (service != null) {
-            boolean credit = delta >= 0.0;
-            String type = transactionType != null ? transactionType
-                : (credit ? OmceProtocol.TX_ADMIN_CREDIT : OmceProtocol.TX_ADMIN_DEBIT);
-            OmceParty other = counterparty != null ? counterparty
-                : OmceParty.system(credit ? "faucet.sum" : "sink.sum");
-            return service.adjustBalanceOptimistic(player, delta, type, other, reason, onRejected);
-        }
         return adjustLocalBalance(player, delta);
     }
 
-    /** The pre-existing EconomyInc / SUM-capability path, unchanged. */
+    /** The EconomyInc / SUM-capability path. */
     private static boolean adjustLocalBalance(EntityPlayer player, double delta) {
         if (isEconomyIncBackend()) {
             Object handler = resolveEconomyIncHandler(player);

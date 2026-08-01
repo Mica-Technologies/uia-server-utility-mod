@@ -1,6 +1,6 @@
 package com.micatechnologies.minecraft.sum.shop;
 
-import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import com.micatechnologies.minecraft.sum.economy.WalletService;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
@@ -49,13 +49,9 @@ public class PacketShopBuy implements IMessage {
             if (player.getDistanceSq(msg.pos.getX() + 0.5, msg.pos.getY() + 0.5, msg.pos.getZ() + 0.5) > 64.0) {
                 return;
             }
-            double balanceBefore = EconomyBridge.getBalance(player);
-            double cost = shop.getSaleCost();
-            // Under a remote economy the result arrives a round trip later, on the server thread;
-            // under a local one the callback fires inline. Either way the message is sent from
-            // the callback, so the player is never told "purchased" before it is true.
-            shop.attemptPurchase(player,
-                result -> player.sendMessage(TileEntityShop.describe(result, cost, balanceBefore)));
+            double balanceBefore = WalletService.getTotal(player);
+            TileEntityShop.BuyResult result = shop.attemptPurchase(player);
+            player.sendMessage(TileEntityShop.describe(result, shop.getSaleCost(), balanceBefore));
         }
     }
 }

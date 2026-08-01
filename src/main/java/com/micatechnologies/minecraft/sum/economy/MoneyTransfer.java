@@ -1,28 +1,18 @@
 package com.micatechnologies.minecraft.sum.economy;
 
 import com.micatechnologies.minecraft.sum.SumConfig;
-import com.micatechnologies.minecraft.sum.omceapi.OmceMoney;
-import com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService;
 import java.util.Locale;
-import java.util.function.Consumer;
 import net.minecraft.entity.player.EntityPlayer;
 
 /**
  * Player-to-player money transfer, shared by the {@code /pay} command and the phone "Pay" app so
- * the validation, rounding, fee, and settlement logic live in one place.
+ * the validation, rounding, fee, and rollback logic live in one place.
  *
- * <p>Both participants must be online. The sender is charged the full {@code amount}; the
- * recipient receives {@code amount} minus the configured {@link SumConfig#getPayFeePercent() fee},
- * which vanishes as a money sink.
+ * <p>Moves money between {@link WalletService wallets}, not bank accounts — paying someone hands
+ * them cash, and both sides can spend it immediately. Both participants must be online.
  *
- * <p><b>Why the result is delivered by callback.</b> Against a remote economy the transfer is sent
- * as a <i>single</i> transaction naming both players, which the service applies in full or not at
- * all. That answer is not available when this method returns, so callers receive it later.
- *
- * <p>The obvious alternative — debit the sender, then credit the recipient — is unsound here.
- * Both calls would return optimistically, so a sender's debit that the service later refused would
- * leave the recipient credited out of nothing. Local backends have no such gap and still take the
- * two-step path in {@link #transferLocally}.
+ * <p>The sender is charged the full {@code amount}; the recipient receives {@code amount} minus
+ * the configured {@link SumConfig#getPayFeePercent() fee}, which vanishes as a money sink.
  */
 public final class MoneyTransfer {
 
@@ -48,141 +38,61 @@ public final class MoneyTransfer {
             return new Result(false, error, 0.0, 0.0, 0.0);
         }
 
-        static Result success(double amount, double credited, double fee) {
+        public static Result success(double amount, double credited, double fee) {
             return new Result(true, null, amount, credited, fee);
         }
     }
 
     /**
-     * Validates and performs the transfer, delivering the outcome to {@code callback} on the
-     * server thread.
+     * Validates and performs the transfer.
      *
-     * <p>Callback-based rather than returning a {@link Result} because a remote economy settles
-     * asynchronously and the answer is not known when this method returns. A local backend invokes
-     * the callback inline, so its callers behave exactly as before.
+     * <p>Synchronous: both wallets are local, so the sender's charge cannot be refused after the
+     * fact. The sender is charged first; if crediting the recipient fails they are refunded, so no
+     * money is created or destroyed.
      */
-    public static void transfer(EntityPlayer from, EntityPlayer to, double rawAmount,
-        Consumer<Result> callback) {
+    public static Result transfer(EntityPlayer from, EntityPlayer to, double rawAmount) {
         if (!SumConfig.isPayEnabled()) {
-            callback.accept(Result.fail("Player-to-player payments are disabled on this server."));
-            return;
+            return Result.fail("Player-to-player payments are disabled on this server.");
         }
         if (from == null || to == null) {
-            callback.accept(Result.fail("Invalid payment participants."));
-            return;
+            return Result.fail("Invalid payment participants.");
         }
         if (from == to || from.getUniqueID().equals(to.getUniqueID())) {
-            callback.accept(Result.fail("You can't pay yourself."));
-            return;
+            return Result.fail("You can't pay yourself.");
         }
-        if (!EconomyBridge.isAvailable()) {
-            callback.accept(Result.fail("No economy backend is loaded."));
-            return;
+        if (!WalletService.isAvailable()) {
+            return Result.fail("No economy backend is loaded.");
         }
 
         // Amount validation, rounding, and fee math are pure — factored into computeAmounts so
         // they can be unit-tested without an economy backend or live players.
         Result computed = computeAmounts(rawAmount, SumConfig.getPayFeePercent());
         if (!computed.ok) {
-            callback.accept(computed);
-            return;
+            return computed;
         }
         double amount = computed.amount;
         double credited = computed.credited;
         double fee = computed.fee;
 
-        double balance = EconomyBridge.getBalance(from);
+        double balance = WalletService.getTotal(from);
         if (Double.isNaN(balance)) {
-            callback.accept(Result.fail("You don't have a balance handler attached."));
-            return;
+            return Result.fail("You don't have a wallet.");
         }
         if (balance < amount) {
-            callback.accept(Result.fail("Insufficient funds. Need $" + money(amount)
-                + ", have $" + money(balance) + "."));
-            return;
+            return Result.fail("Insufficient funds. Need $" + money(amount)
+                + ", have $" + money(balance) + ".");
         }
 
-        OmceEconomyService remote = EconomyBridge.getRemoteService();
-        if (remote != null) {
-            transferViaRemote(remote, from, to, amount, credited, fee, callback);
-            return;
+        // Charge the sender first; the wallet refuses to overdraw, so a false here means abort.
+        if (!WalletService.spend(from, amount)) {
+            return Result.fail("Payment failed — your wallet could not be charged.");
         }
-        callback.accept(transferLocally(from, to, amount, credited, fee));
-    }
-
-    /**
-     * Settles the transfer as one atomic transaction against the remote economy.
-     *
-     * <p>Debiting the sender and crediting the recipient as two independent optimistic calls would
-     * be unsound: both return before the service has answered, so a refused debit would leave the
-     * recipient credited from nothing. A single transaction with two settled parties is applied by
-     * the service in full or not at all.
-     */
-    private static void transferViaRemote(OmceEconomyService remote, EntityPlayer from,
-        EntityPlayer to, double amount, double credited, double fee, Consumer<Result> callback) {
-        int digits = remote.getMinorUnitDigits();
-        long[] units;
-        try {
-            units = toSettlementUnits(amount, fee, digits);
-        } catch (IllegalArgumentException e) {
-            callback.accept(Result.fail("That amount can't be represented by the economy."));
-            return;
-        }
-        final long amountMinor = units[0];
-        final long settledFee = units[1];
-        remote.transferBetweenPlayers(from, to, amountMinor, settledFee, result -> {
-            if (result.isFailure()) {
-                callback.accept(Result.fail(result.getError()
-                    .playerMessage(digits, remote.getCurrencySymbol())));
-                return;
-            }
-            if (!result.get().isCommitted()) {
-                callback.accept(Result.fail("The payment was not completed."));
-                return;
-            }
-            // Report the figures the service actually settled rather than our pre-rounding ones.
-            double settledAmount = OmceMoney.toDollars(amountMinor, digits);
-            callback.accept(Result.success(settledAmount,
-                OmceMoney.toDollars(amountMinor - settledFee, digits),
-                OmceMoney.toDollars(settledFee, digits)));
-        });
-    }
-
-    /**
-     * The original two-step path, still correct for local backends: they settle synchronously and
-     * cannot fail after returning true, so the refund branch here is genuinely reachable only when
-     * the credit itself is rejected up front.
-     */
-    private static Result transferLocally(EntityPlayer from, EntityPlayer to, double amount,
-        double credited, double fee) {
-        if (!EconomyBridge.adjustBalance(from, -amount)) {
-            return Result.fail("Payment failed — your balance could not be charged.");
-        }
-        if (credited > 0.0 && !EconomyBridge.adjustBalance(to, credited)) {
-            EconomyBridge.adjustBalance(from, amount);
+        // Credit the recipient; refund the sender on failure so the books stay balanced.
+        if (credited > 0.0 && !WalletService.credit(to, credited)) {
+            WalletService.credit(from, amount);
             return Result.fail("Payment failed — the recipient could not be credited. You were refunded.");
         }
         return Result.success(amount, credited, fee);
-    }
-
-    /**
-     * Converts a transfer's dollar amount and fee into the protocol's integer minor units.
-     *
-     * <p>The two round in opposite directions on purpose. The sender's charge rounds <i>up</i>, so
-     * a coarse currency never settles for less than they agreed to pay. The fee rounds half-up and
-     * is then clamped to the charge, so the recipient's share ({@code amount - fee}) can never go
-     * negative and the pair always sums back to exactly what the sender was charged.
-     *
-     * @return {@code [amountMinor, feeMinor]}, with {@code 0 <= feeMinor <= amountMinor}.
-     * @throws IllegalArgumentException if either value is unrepresentable at this scale.
-     */
-    static long[] toSettlementUnits(double amount, double fee, int digits) {
-        long amountMinor = OmceMoney.priceToMinorUnits(amount, digits);
-        long feeMinor = fee <= 0.0 ? 0L : OmceMoney.toMinorUnits(fee, digits);
-        if (feeMinor > amountMinor) {
-            feeMinor = amountMinor;
-        }
-        return new long[] { amountMinor, feeMinor };
     }
 
     /**
