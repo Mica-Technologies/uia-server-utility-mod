@@ -2018,35 +2018,24 @@ Non-normative guidance for building the service.
 
 ---
 
-## 11. SUM configuration
+## 11. Client configuration
 
-The client is configured under the `economy_api` category in SUM's Forge config file. All keys are
-server-side; none are synced to clients.
+How a client is configured is not part of the protocol — a service never sees it, and each client
+will name its settings differently.
 
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `enabled` | boolean | `false` | Master switch. When `false`, no remote connection is made and SUM uses its existing local economy backends. |
-| `allowIntegratedServer` | boolean | `false` | Whether a single-player or LAN world may contact the service. Off by default so a local save cannot spend from the shared economy (§3.4). Minecraft clients never contact the service regardless. |
-| `sendIntegrityHeaders` | boolean | `true` | Send the optional anomaly-detection headers of §4.3 (online-mode, world id and sequence, session id, player count, initiator state, mod version). `X-MCE-Environment` is always sent and is not covered by this switch. |
-| `baseUrl` | string | `""` | Service root, without the `/api/economic/v1` suffix — e.g. `https://economy.example.net`. **Must be `https://`** unless `enableHttp` is set. |
-| `authToken` | string | `""` | Bearer token. **A secret** — protect this file accordingly. |
-| `instanceId` | string | `"default"` | Identifies this Minecraft server to the service. Sent as `X-MCE-Instance`. Give each server a distinct value. |
-| `hmacSecret` | string | `""` | Enables HMAC request signing when non-empty (§5.2). |
-| `certificatePath` | string | `""` | Path to a certificate or CA bundle to trust in addition to the system trust store, for self-signed or private-CA services. **Relative to the SUM config file**; absolute paths also accepted. PEM, PKCS#12, or JKS (§5.4). |
-| `certificatePassword` | string | `""` | Password for `certificatePath` when it is a PKCS#12 or JKS keystore. Not needed for PEM. **A secret.** |
-| `enableHttp` | boolean | `false` | Permits a plaintext `http://` base URL. **Local development only** — the token and every balance travel in the clear. Logs a warning on every startup while enabled. |
-| `connectTimeoutMs` | integer | `3000` | TCP + TLS connect timeout. |
-| `readTimeoutMs` | integer | `5000` | Response read timeout. |
-| `maxRetries` | integer | `2` | Retries per operation for retryable failures, using the same idempotency key. |
-| `balanceCacheTtlSeconds` | integer | `30` | Age at which a cached balance is refreshed. |
-| `eventPollSeconds` | integer | `10` | `/getEvents` poll interval. `0` disables the feed. |
-| `healthPollSeconds` | integer | `60` | `/health` interval. |
-| `unavailablePolicy` | string | `"deny"` | `deny`, `cached`, or `local`. See §8.5. |
-| `verboseLogging` | boolean | `false` | Logs every request and response. Never logs the token or signature. |
+For SUM specifically, see **`OPEN_MCECONOMIC_API_SETUP.tex`** in this directory, which walks
+through the `economy_api` config category, TLS and certificate handling, and the deployment
+choices an operator has to make.
 
-Changing any of these requires a server restart to take effect.
+Whatever a client calls them, three behaviours are load-bearing enough that this document names
+them, because a service can be broken by getting them wrong:
 
----
+- **The base URL must be `https`** in any deployment where client and service do not share a
+  trusted private network (§5.4).
+- **Only the logical server may hold the bearer token** (§3.2). A token shipped to a game client
+  is a published token.
+- **A client must declare its environment truthfully** (§4.2), even when an operator has
+  deliberately enabled a configuration the service might refuse.
 
 ## 12. Conformance
 

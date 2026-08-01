@@ -1,11 +1,11 @@
 % =============================================================================
 %  Open MCEconomic API --- protocol specification
 %
-%  Build:  pdflatex ECONOMIC_API.tex   (run twice for the table of contents)
-%          or: latexmk -pdf ECONOMIC_API.tex
+%  Build:  pdflatex OPEN_MCECONOMIC_API_SPECIFICATION.tex   (run twice for the table of contents)
+%          or: latexmk -pdf OPEN_MCECONOMIC_API_SPECIFICATION.tex
 %
 %  Uses only widely-available LaTeX2e packages; no manual installs required.
-%  The authoritative source of this content is docs/ECONOMIC_API.md --- keep
+%  The authoritative source of this content is docs/OPEN_MCECONOMIC_API_SPECIFICATION.md --- keep
 %  the two in sync when the protocol changes.
 % =============================================================================
 \documentclass[11pt,a4paper]{article}
@@ -2088,58 +2088,26 @@ optional.}
 \section{Client configuration}
 \label{sec:config}
 
-SUM's client is configured under the \code{economy\_api} category in its Forge config file. All
-keys are server-side; none are synced to clients. Changing any of them requires a server restart.
+How a client is configured is not part of the protocol --- a service never sees it, and each
+client names its settings differently.
 
-\begin{longtable}{L{4.4cm} L{1.5cm} L{1.6cm} L{6.4cm}}
-\toprule
-\textbf{Key} & \textbf{Type} & \textbf{Default} & \textbf{Description}\\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Key} & \textbf{Type} & \textbf{Default} & \textbf{Description}\\
-\midrule
-\endhead
-\code{enabled} & boolean & \code{false} &
-  Master switch. When \code{false}, no remote connection is made and the local backends are used.\\
-\code{allowIntegratedServer} & boolean & \code{false} &
-  Whether a single-player or LAN world may contact the service. Off by default so a local save
-  cannot spend from the shared economy. Minecraft clients never contact it regardless.\\
-\code{sendIntegrityHeaders} & boolean & \code{true} &
-  Send the optional anomaly-detection headers of Section~\ref{sec:integrity}.
-  \code{X-MCE-Environment} is always sent and is not covered by this switch.\\
-\code{baseUrl} & string & \code{""} &
-  Service root, without the \code{/api/economic/v1} suffix. \textbf{Must be \code{https://}} unless \code{enableHttp} is set.\\
-\code{authToken} & string & \code{""} &
-  Bearer token. \textbf{A secret} --- protect this file accordingly.\\
-\code{instanceId} & string & \code{"default"} &
-  Identifies this Minecraft server; sent as \code{X-MCE-Instance}. Give each server a distinct value.\\
-\code{hmacSecret} & string & \code{""} &
-  Enables HMAC request signing when non-empty. \textbf{A secret.}\\
-\code{certificatePath} & string & \code{""} &
-  Certificate or CA bundle to trust in addition to the system trust store, for self-signed or
-  private-CA services. \textbf{Relative to the config file}; absolute paths also accepted. PEM,
-  PKCS\#12, or JKS.\\
-\code{certificatePassword} & string & \code{""} &
-  Password for \code{certificatePath} when it is a PKCS\#12 or JKS keystore. Not needed for PEM.
-  \textbf{A secret.}\\
-\code{enableHttp} & boolean & \code{false} &
-  Permits a plaintext \code{http://} base URL. \textbf{Local development only} --- the token and
-  every balance travel in the clear. Logs a warning on every startup while enabled.\\
-\code{connectTimeoutMs} & integer & \code{3000} & TCP and TLS connect timeout.\\
-\code{readTimeoutMs} & integer & \code{5000} & Response read timeout.\\
-\code{maxRetries} & integer & \code{2} &
-  Retries per operation for retryable failures, using the same idempotency key.\\
-\code{balanceCacheTtlSeconds} & integer & \code{30} & Age at which a cached balance is refreshed.\\
-\code{eventPollSeconds} & integer & \code{10} & \code{/getEvents} poll interval; \code{0} disables.\\
-\code{healthPollSeconds} & integer & \code{60} & \code{/health} interval.\\
-\code{unavailablePolicy} & string & \code{"deny"} & \code{deny}, \code{cached}, or \code{local}.\\
-\code{verboseLogging} & boolean & \code{false} &
-  Logs every request and response. Never logs the token or signature.\\
-\bottomrule
-\end{longtable}
+For SUM specifically, see \textbf{\code{OPEN\_MCECONOMIC\_API\_SETUP}} alongside this document,
+which walks through the \code{economy\_api} config category, TLS and certificate handling, and the
+deployment choices an operator has to make.
 
-% =============================================================================
+Whatever a client calls them, three behaviours are load-bearing enough to name here, because a
+service can be broken by a client getting them wrong:
+
+\begin{itemize}
+\item \textbf{The base URL \req{} be \code{https}} in any deployment where client and service do
+      not share a trusted private network (Section~\ref{sec:tls}).
+\item \textbf{Only the logical server may hold the bearer token}
+      (Section~\ref{sec:notoken}). A token shipped to a game client is a published token.
+\item \textbf{A client \req{} declare its environment truthfully}
+      (Section~\ref{sec:reqheaders}), even when an operator has deliberately enabled a
+      configuration the service might refuse.
+\end{itemize}
+
 \section{Conformance}
 \label{sec:conformance}
 

@@ -2,7 +2,7 @@ package com.micatechnologies.minecraft.sum.omceapi;
 
 /**
  * Wire constants for the Open MCEconomic API. Everything in this class is dictated by
- * {@code docs/ECONOMIC_API.md} — if a value here disagrees with that document, the document wins.
+ * {@code docs/OPEN_MCECONOMIC_API_SPECIFICATION.md} — if a value here disagrees with that document, the document wins.
  *
  * <p>Deliberately free of Minecraft imports: the {@code omceapi} and {@code omceapi.client}
  * packages implement the protocol and nothing else, so they stay unit-testable without a running

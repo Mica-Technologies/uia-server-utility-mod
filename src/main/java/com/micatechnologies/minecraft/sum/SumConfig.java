@@ -280,7 +280,7 @@ public class SumConfig {
     // Open MCEconomic API — remote authoritative economy backend.
     //
     // When enabled, a remote HTTP service owns player balances and the transaction ledger, and
-    // SUM becomes a client of it. The full wire protocol is specified in docs/ECONOMIC_API.md;
+    // SUM becomes a client of it. The full wire protocol is specified in docs/OPEN_MCECONOMIC_API_SPECIFICATION.md;
     // this category is the client half of section 10 of that document.
     // ------------------------------------------------------------------------------------------
 
@@ -291,7 +291,7 @@ public class SumConfig {
         "Master toggle for the Open MCEconomic API. When true, a remote HTTP service is the "
             + "authority for every player balance and SUM only mirrors it; when false (default), "
             + "SUM uses its local economy backends and never contacts the network. Requires "
-            + "'baseUrl' and 'authToken' to be set. See docs/ECONOMIC_API.md.";
+            + "'baseUrl' and 'authToken' to be set. See docs/OPEN_MCECONOMIC_API_SPECIFICATION.md.";
     private static final boolean FIELD_DEFAULT_ECONOMY_API_ENABLED = false;
 
     private static final String FIELD_KEY_ECONOMY_API_ALLOW_INTEGRATED = "allowIntegratedServer";
@@ -907,7 +907,7 @@ public class SumConfig {
     }
 
     // ------------------------------------------------------------------------------------------
-    // Open MCEconomic API accessors. Protocol reference: docs/ECONOMIC_API.md
+    // Open MCEconomic API accessors. Protocol reference: docs/OPEN_MCECONOMIC_API_SPECIFICATION.md
     // ------------------------------------------------------------------------------------------
 
     /** Operator's master toggle. See {@link #isEconomyApiUsable()} for the "actually configured
