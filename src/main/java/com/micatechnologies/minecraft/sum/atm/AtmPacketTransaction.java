@@ -2,6 +2,11 @@ package com.micatechnologies.minecraft.sum.atm;
 
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import com.micatechnologies.minecraft.sum.omceapi.OmceMoney;
+import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
+import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
+import com.micatechnologies.minecraft.sum.omceapi.OmceTransactionRequest;
+import com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
@@ -99,15 +104,20 @@ public class AtmPacketTransaction implements IMessage {
                     + String.format(java.util.Locale.ROOT, "%.2f", balance) + ".");
                 return;
             }
-            if (!EconomyBridge.adjustBalance(player, -denomination)) {
+            OmceEconomyService remote = EconomyBridge.getRemoteService();
+            if (remote != null) {
+                // A withdrawn bill cannot be taken back, so it must not be issued on an
+                // optimistic write. Charge first and hand over the item only once the service
+                // reports the transaction committed.
+                withdrawViaRemote(remote, player, bill, denomination);
+                return;
+            }
+            if (!EconomyBridge.adjustBalance(player, -denomination,
+                OmceProtocol.TX_ATM_WITHDRAW, cashParty(player), "ATM withdrawal")) {
                 tellError(player, "Withdraw failed.");
                 return;
             }
-            ItemStack stack = new ItemStack(bill, 1);
-            if (!player.inventory.addItemStackToInventory(stack)) {
-                player.dropItem(stack, false);
-            }
-            player.inventoryContainer.detectAndSendChanges();
+            giveBill(player, bill);
         }
 
         private void handleDepositAll(EntityPlayerMP player) {
@@ -128,18 +138,105 @@ public class AtmPacketTransaction implements IMessage {
                 tellError(player, "No bills found in your inventory.");
                 return;
             }
-            if (!EconomyBridge.adjustBalance(player, total)) {
-                // Restoring the consumed bills here would require re-resolving denominations;
-                // the most likely cause is a missing IMoney capability, in which case simply
-                // letting the server log the failure and refunding via /sum econ add is fine.
-                tellError(player, "Deposit failed; please contact an administrator.");
-                Sum.LOGGER.warn("[atm] Deposit lost ${} for {} (no IMoney capability).",
-                    total, player.getName());
+            final int deposited = total;
+            // The bills are already out of the inventory, so a refused credit must hand back
+            // equivalent value rather than destroying it. This has to cover both failure shapes:
+            // an up-front refusal (the boolean below) and a remote economy refusing after the
+            // optimistic write, which arrives via the rejection callback.
+            if (!EconomyBridge.adjustBalance(player, total,
+                OmceProtocol.TX_ATM_DEPOSIT, cashParty(player), "ATM deposit",
+                () -> returnDepositedBills(player, deposited))) {
+                returnDepositedBills(player, deposited);
                 return;
             }
             player.inventoryContainer.detectAndSendChanges();
             player.sendMessage(new TextComponentString(
                 TextFormatting.GREEN + "Deposited $" + total + "."));
+        }
+
+        /**
+         * Charges the player and hands over the bill only on a committed transaction.
+         *
+         * <p>The callback runs on the server thread, so touching the inventory here is safe.
+         */
+        private void withdrawViaRemote(OmceEconomyService remote, EntityPlayerMP player,
+            Item bill, int denomination) {
+            long amount = OmceMoney.priceToMinorUnits(denomination, remote.getMinorUnitDigits());
+            OmceTransactionRequest request = OmceTransactionRequest.builder(
+                    OmceProtocol.TX_ATM_WITHDRAW, amount,
+                    OmceParty.player(player.getUniqueID(), player.getName(), null),
+                    cashParty(player))
+                .initiator(player.getUniqueID(), player.getName(),
+                    OmceTransactionRequest.ROLE_PLAYER)
+                .reason("ATM withdrawal of $" + denomination)
+                .meta("denomination", Integer.toString(denomination))
+                .build();
+
+            player.sendMessage(new TextComponentString(
+                TextFormatting.GRAY + "Processing withdrawal..."));
+
+            remote.processTransaction(request, result -> {
+                if (result.isFailure() || !result.get().isCommitted()) {
+                    tellError(player, result.isFailure()
+                        ? result.getError().playerMessage(remote.getMinorUnitDigits(),
+                            remote.getCurrencySymbol())
+                        : "Withdrawal was not completed.");
+                    return;
+                }
+                giveBill(player, bill);
+                player.sendMessage(new TextComponentString(
+                    TextFormatting.GREEN + "Withdrew $" + denomination + "."));
+            });
+        }
+
+        /**
+         * Hands back the value of a deposit whose credit was refused.
+         *
+         * <p>Denominations are re-derived from the total, which is exact because every bill is a
+         * whole-dollar denomination — the player may not get back the same mix of notes they put
+         * in, but never a different amount.
+         */
+        private static void returnDepositedBills(EntityPlayerMP player, int total) {
+            Sum.LOGGER.warn("[atm] Deposit of ${} for {} was refused; returning the bills.",
+                total, player.getName());
+            for (int[] pair : Bills.breakIntoBills(total)) {
+                Item denomItem = Bills.billItem(pair[0]);
+                if (denomItem != null) {
+                    // breakIntoBills already caps each pair at a full stack, so this is one
+                    // ItemStack per pair rather than one per bill.
+                    giveBills(player, denomItem, pair[1]);
+                }
+            }
+            tellError(player, "Deposit failed; your bills were returned.");
+        }
+
+        /** Adds one bill to the player's inventory, dropping it at their feet if there's no room. */
+        private static void giveBill(EntityPlayerMP player, Item bill) {
+            giveBills(player, bill, 1);
+        }
+
+        /** Adds {@code count} bills as a single stack, dropping it if the inventory is full. */
+        private static void giveBills(EntityPlayerMP player, Item bill, int count) {
+            if (count <= 0) {
+                return;
+            }
+            ItemStack stack = new ItemStack(bill, count);
+            if (!player.inventory.addItemStackToInventory(stack)) {
+                player.dropItem(stack, false);
+            }
+            player.inventoryContainer.detectAndSendChanges();
+        }
+
+        /**
+         * The physical-cash counterparty for this ATM. Virtual: the service never sees the bill
+         * items, only the balance side of the exchange.
+         */
+        private static OmceParty cashParty(EntityPlayerMP player) {
+            String worldName = (player.world == null || player.world.provider == null)
+                ? "world"
+                : player.world.provider.getDimensionType().getName();
+            return OmceParty.cash(OmceParty.positionId("atm", worldName,
+                (int) player.posX, (int) player.posY, (int) player.posZ));
         }
 
         private static void tellError(EntityPlayerMP player, String text) {
