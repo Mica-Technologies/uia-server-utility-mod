@@ -50,8 +50,12 @@ public class PacketShopBuy implements IMessage {
                 return;
             }
             double balanceBefore = EconomyBridge.getBalance(player);
-            TileEntityShop.BuyResult result = shop.attemptPurchase(player);
-            player.sendMessage(TileEntityShop.describe(result, shop.getSaleCost(), balanceBefore));
+            double cost = shop.getSaleCost();
+            // Under a remote economy the result arrives a round trip later, on the server thread;
+            // under a local one the callback fires inline. Either way the message is sent from
+            // the callback, so the player is never told "purchased" before it is true.
+            shop.attemptPurchase(player,
+                result -> player.sendMessage(TileEntityShop.describe(result, cost, balanceBefore)));
         }
     }
 }

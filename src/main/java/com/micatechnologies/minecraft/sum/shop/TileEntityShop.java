@@ -1,8 +1,15 @@
 package com.micatechnologies.minecraft.sum.shop;
 
+import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.atm.Bills;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
+import com.micatechnologies.minecraft.sum.omceapi.OmceMoney;
+import com.micatechnologies.minecraft.sum.omceapi.OmceParty;
+import com.micatechnologies.minecraft.sum.omceapi.OmceProtocol;
+import com.micatechnologies.minecraft.sum.omceapi.OmceTransactionRequest;
+import com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService;
 import java.util.UUID;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -33,9 +40,17 @@ import net.minecraft.util.text.TextFormatting;
  *       owner refills.</li>
  * </ul>
  *
- * <p><b>Buy flow.</b> A non-owner buyer triggers {@link #attemptPurchase}. The TE validates
- * configured/has-stock/buyer-has-funds, then decrements stock + buyer balance, increments
+ * <p><b>Buy flow.</b> A non-owner buyer triggers {@link #attemptPurchase}, which validates
+ * configured/has-stock/buyer-has-funds, charges the buyer, then decrements stock, increments
  * accumulated funds, and gifts a fresh stack copied from the template (size = saleAmount).
+ *
+ * <p>The result arrives via callback rather than a return value because payment timing depends on
+ * the economy backend. A local backend settles inline and the callback fires immediately. A remote
+ * one cannot: HTTP must not run on the server thread, so the charge is dispatched and the goods
+ * are handed over only once the service confirms it. Delivering optimistically would let a refusal
+ * arrive after the item was already in the buyer's inventory, where there is nothing reliable to
+ * take back — they may have dropped, stashed, or consumed it — and the till would have been
+ * credited from money that was never taken.
  *
  * <p><b>Infinite-stock flag.</b> Admin-only toggle. When set, stock checks/decrements are
  * skipped and every buy succeeds against an unlimited well of items.
@@ -131,6 +146,36 @@ public class TileEntityShop extends TileEntity implements IInventory {
         return getStackInSlot(TEMPLATE_SLOT);
     }
 
+    // --- Economy ledger identity ---
+
+    /**
+     * This shop as a transaction counterparty.
+     *
+     * <p>The shop is a <i>virtual</i> party: a remote service records it on the ledger entry but
+     * holds no balance for it, because the till ({@link #fundsAccumulated}) lives here in the tile
+     * entity's NBT. Purchases debit the buyer against this party and the later payout credits the
+     * owner from it, so money is conserved across the pair.
+     *
+     * <p>The id encodes world and position so it stays stable across restarts and is meaningful to
+     * an operator reading the ledger.
+     */
+    private OmceParty shopParty() {
+        String worldName = (world == null || world.provider == null)
+            ? "world"
+            : world.provider.getDimensionType().getName();
+        String id = OmceParty.positionId("shop", worldName, pos.getX(), pos.getY(), pos.getZ());
+        return OmceParty.shop(id, ownerName.isEmpty() ? null : ownerName + "'s shop", ownerUuid);
+    }
+
+    /** Short audit-log description of what was bought. */
+    private String purchaseReason() {
+        ItemStack template = getSaleTemplate();
+        if (template.isEmpty()) {
+            return "Shop purchase";
+        }
+        return "Bought " + saleAmount + "x " + template.getItem().getRegistryName();
+    }
+
     // --- Funds ---
 
     /**
@@ -141,13 +186,35 @@ public class TileEntityShop extends TileEntity implements IInventory {
         if (!isOwner(player) || fundsAccumulated <= 0.0) {
             return 0.0;
         }
-        if (!EconomyBridge.adjustBalance(player, fundsAccumulated)) {
+        final double amount = fundsAccumulated;
+        // The till is emptied below on the strength of an optimistic credit. If a remote economy
+        // later refuses it the money would simply be gone, so put it back.
+        if (!EconomyBridge.adjustBalance(player, amount,
+            OmceProtocol.TX_SHOP_PAYOUT, shopParty(), "Withdrew shop takings",
+            () -> restoreFunds(player, amount))) {
             return 0.0;
         }
-        double amount = fundsAccumulated;
         this.fundsAccumulated = 0.0;
         markDirtyAndSync();
         return amount;
+    }
+
+    /**
+     * Returns takings to the till after a refused payout.
+     *
+     * <p>Adds rather than assigns, so sales that completed while the payout was in flight are not
+     * discarded.
+     */
+    private void restoreFunds(EntityPlayer owner, double amount) {
+        if (isInvalid()) {
+            Sum.LOGGER.error("[shop] Payout of {} to {} was refused, but the shop no longer exists. "
+                + "The money was not returned — reconcile manually.", amount, owner.getName());
+            return;
+        }
+        this.fundsAccumulated += amount;
+        markDirtyAndSync();
+        owner.sendMessage(new TextComponentString(TextFormatting.RED
+            + "The withdrawal was declined — the funds are back in the shop."));
     }
 
     // --- Stock helpers ---
@@ -197,22 +264,144 @@ public class TileEntityShop extends TileEntity implements IInventory {
      * before returning a failure code, except for INVENTORY_FULL, which drops the items at the
      * buyer's feet).
      */
-    public BuyResult attemptPurchase(EntityPlayerMP buyer) {
-        if (!isConfigured()) return BuyResult.UNCONFIGURED;
-        if (isOwner(buyer)) return BuyResult.OWNER_CANT_BUY;
-        if (!EconomyBridge.isAvailable()) return BuyResult.ECONOMY_UNAVAILABLE;
-        if (!hasEnoughStock()) return BuyResult.OUT_OF_STOCK;
+    public void attemptPurchase(EntityPlayerMP buyer, Consumer<BuyResult> callback) {
+        BuyResult precondition = checkPreconditions(buyer);
+        if (precondition != null) {
+            callback.accept(precondition);
+            return;
+        }
 
+        if (saleCost <= 0.0) {
+            // A free shop has nothing to settle. Skip the economy entirely rather than sending a
+            // zero-amount transaction, which the protocol lets a service reject outright.
+            callback.accept(grantPurchase(buyer));
+            return;
+        }
+
+        OmceEconomyService remote = EconomyBridge.getRemoteService();
+        if (remote != null) {
+            // A delivered item cannot be taken back — the buyer may drop, stash, or consume it
+            // long before we could react. So under a remote economy nothing is granted until the
+            // service confirms the charge, even though that costs a round trip.
+            purchaseViaRemote(remote, buyer, callback);
+            return;
+        }
+
+        // Local backends settle synchronously and cannot fail after returning true, so the
+        // original inline flow is still correct for them.
+        if (!EconomyBridge.adjustBalance(buyer, -saleCost,
+            OmceProtocol.TX_SHOP_PURCHASE, shopParty(), purchaseReason())) {
+            callback.accept(BuyResult.INSUFFICIENT_FUNDS);
+            return;
+        }
+        BuyResult result = grantPurchase(buyer);
+        if (result != BuyResult.OK) {
+            EconomyBridge.adjustBalance(buyer, saleCost,
+                OmceProtocol.TX_SHOP_PURCHASE, shopParty(),
+                "Refund: shop ran out of stock mid-purchase");
+        }
+        callback.accept(result);
+    }
+
+    /** @return a failing {@link BuyResult}, or null when the purchase may proceed. */
+    @Nullable
+    private BuyResult checkPreconditions(EntityPlayerMP buyer) {
+        BuyResult shopState = checkShopState(buyer);
+        if (shopState != null) {
+            return shopState;
+        }
         double balance = EconomyBridge.getBalance(buyer);
         if (Double.isNaN(balance) || balance < saleCost) {
             return BuyResult.INSUFFICIENT_FUNDS;
         }
+        return null;
+    }
 
-        if (!EconomyBridge.adjustBalance(buyer, -saleCost)) {
-            return BuyResult.INSUFFICIENT_FUNDS;
+    /**
+     * The shop-side half of {@link #checkPreconditions}, without the affordability check.
+     *
+     * <p>Separate because the post-charge revalidation must not re-test the balance: the buyer has
+     * just been debited, so someone who spent exactly what they had now reads as broke and would
+     * have their completed purchase refunded out from under them.
+     */
+    @Nullable
+    private BuyResult checkShopState(EntityPlayerMP buyer) {
+        if (!isConfigured()) return BuyResult.UNCONFIGURED;
+        if (isOwner(buyer)) return BuyResult.OWNER_CANT_BUY;
+        if (!EconomyBridge.isAvailable()) return BuyResult.ECONOMY_UNAVAILABLE;
+        if (!hasEnoughStock()) return BuyResult.OUT_OF_STOCK;
+        return null;
+    }
+
+    /**
+     * Charges the buyer through the remote economy and grants the goods only once the service
+     * reports the transaction committed.
+     *
+     * <p>Preconditions are re-checked inside the callback: it runs on the server thread a few
+     * hundred milliseconds later, by which time another buyer may have taken the last of the
+     * stock or the owner may have reconfigured the shop. If that happens the charge is voided
+     * rather than the goods being conjured.
+     */
+    private void purchaseViaRemote(OmceEconomyService remote, EntityPlayerMP buyer,
+        Consumer<BuyResult> callback) {
+        long amount = OmceMoney.priceToMinorUnits(saleCost, remote.getMinorUnitDigits());
+        OmceTransactionRequest request = OmceTransactionRequest.builder(
+                OmceProtocol.TX_SHOP_PURCHASE, amount,
+                OmceParty.player(buyer.getUniqueID(), buyer.getName(), null),
+                shopParty())
+            .initiator(buyer.getUniqueID(), buyer.getName(), OmceTransactionRequest.ROLE_PLAYER)
+            .reason(purchaseReason())
+            .meta("shopOwner", ownerName)
+            .build();
+
+        UUID buyerUuid = buyer.getUniqueID();
+        remote.processTransaction(request, result -> {
+            if (result.isFailure() || !result.get().isCommitted()) {
+                callback.accept(BuyResult.INSUFFICIENT_FUNDS);
+                return;
+            }
+            // Re-resolve the buyer: this runs a round trip later, and the reference we captured is
+            // stale if they relogged. Delivering into a discarded inventory would take their money
+            // and give them nothing.
+            EntityPlayerMP current = resolvePlayer(buyerUuid);
+            if (current == null) {
+                remote.refund(result.get().getTransaction(), buyer,
+                    "Refund: buyer left before delivery");
+                callback.accept(BuyResult.ECONOMY_UNAVAILABLE);
+                return;
+            }
+            if (isInvalid() || checkShopState(current) != null) {
+                // The shop changed under us while the charge was in flight. Give the money back;
+                // no goods have left, so this is a clean reversal.
+                remote.refund(result.get().getTransaction(), current,
+                    "Refund: shop state changed before delivery");
+                callback.accept(BuyResult.OUT_OF_STOCK);
+                return;
+            }
+            BuyResult granted = grantPurchase(current);
+            if (granted != BuyResult.OK) {
+                remote.refund(result.get().getTransaction(), current,
+                    "Refund: shop ran out of stock mid-purchase");
+            }
+            callback.accept(granted);
+        });
+    }
+
+    /** @return the online player with this UUID, or null if they are no longer connected. */
+    @Nullable
+    private EntityPlayerMP resolvePlayer(UUID uuid) {
+        if (world == null || world.getMinecraftServer() == null
+            || world.getMinecraftServer().getPlayerList() == null) {
+            return null;
         }
+        return world.getMinecraftServer().getPlayerList().getPlayerByUUID(uuid);
+    }
 
-        // From this point we've taken the buyer's money — any failure must refund.
+    /**
+     * Decrements stock, credits the till, and hands over the goods. Called only once payment is
+     * settled, so a non-OK return here means the caller must refund.
+     */
+    private BuyResult grantPurchase(EntityPlayerMP buyer) {
         ItemStack template = getSaleTemplate();
         ItemStack toGive = template.copy();
         toGive.setCount(saleAmount);
@@ -232,7 +421,6 @@ public class TileEntityShop extends TileEntity implements IInventory {
             }
             if (needed > 0) {
                 // Should not happen given hasEnoughStock above, but defend in depth.
-                EconomyBridge.adjustBalance(buyer, saleCost);
                 return BuyResult.OUT_OF_STOCK;
             }
         }
@@ -438,24 +626,13 @@ public class TileEntityShop extends TileEntity implements IInventory {
     }
 
     /**
-     * Greedy largest-first decomposition of a funds amount into whole bills, each stack capped at
-     * 64. Pure ({@code [denom, count]} pairs) so the bill-making arithmetic is unit-testable
-     * without the item registry; {@link #collectDrops} maps the pairs to bill items. Fractional
-     * cents below $1 are dropped (floored).
+     * Greedy largest-first decomposition of a funds amount into whole bills. Delegates to
+     * {@link com.micatechnologies.minecraft.sum.atm.Bills#breakIntoBills}, which is the single
+     * home for this arithmetic now that the ATM needs it too; retained here so the existing
+     * tests and {@link #collectDrops} keep their local entry point.
      */
     static java.util.List<int[]> breakIntoBills(double funds) {
-        java.util.List<int[]> out = new java.util.ArrayList<>();
-        double remaining = funds;
-        for (int denom : new int[]{500, 200, 100, 50, 20, 10, 5, 1}) {
-            int count = (int) Math.floor(remaining / denom);
-            while (count > 0) {
-                int give = Math.min(count, 64);
-                out.add(new int[]{denom, give});
-                count -= give;
-                remaining -= (double) give * denom;
-            }
-        }
-        return out;
+        return com.micatechnologies.minecraft.sum.atm.Bills.breakIntoBills(funds);
     }
 
     // --- utilities ---
