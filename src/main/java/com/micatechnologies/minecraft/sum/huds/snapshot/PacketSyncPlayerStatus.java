@@ -30,7 +30,8 @@ public class PacketSyncPlayerStatus implements IMessage {
 
     @Override
     public void toBytes(ByteBuf buf) {
-        buf.writeLong(snapshot.bankBalance);
+        buf.writeLong(snapshot.vaultBillValue);
+        buf.writeDouble(snapshot.bankBalance);
         ByteBufUtils.writeUTF8String(buf, snapshot.plotName);
         ByteBufUtils.writeUTF8String(buf, snapshot.plotOwner);
         buf.writeInt(snapshot.jobsAvailable);
@@ -40,13 +41,14 @@ public class PacketSyncPlayerStatus implements IMessage {
 
     @Override
     public void fromBytes(ByteBuf buf) {
-        long bankBalance = buf.readLong();
+        long vaultBillValue = buf.readLong();
+        double bankBalance = buf.readDouble();
         String plotName = ByteBufUtils.readUTF8String(buf);
         String plotOwner = ByteBufUtils.readUTF8String(buf);
         int jobsAvailable = buf.readInt();
         int loyaltyTicks = buf.readInt();
         int nextMilestoneTicks = buf.readInt();
-        this.snapshot = new PlayerStatusSnapshot(bankBalance, plotName, plotOwner,
+        this.snapshot = new PlayerStatusSnapshot(vaultBillValue, bankBalance, plotName, plotOwner,
             jobsAvailable, loyaltyTicks, nextMilestoneTicks);
     }
 

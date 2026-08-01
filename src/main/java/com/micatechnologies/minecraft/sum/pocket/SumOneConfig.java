@@ -14,7 +14,8 @@ import com.micatechnologies.minecraft.sum.huds.presets.HudPresets;
 import java.lang.reflect.Modifier;
 import com.micatechnologies.minecraft.sum.huds.ActiveEffectsHud;
 import com.micatechnologies.minecraft.sum.huds.ArmourHud;
-import com.micatechnologies.minecraft.sum.huds.BankBalanceHud;
+import com.micatechnologies.minecraft.sum.huds.BankHud;
+import com.micatechnologies.minecraft.sum.huds.VaultHud;
 import com.micatechnologies.minecraft.sum.huds.BiomeHud;
 import com.micatechnologies.minecraft.sum.huds.BlockAboveHud;
 import com.micatechnologies.minecraft.sum.huds.BorderDistanceHud;
@@ -215,7 +216,10 @@ public class SumOneConfig extends Config {
     // the snapshot bridge to be visible client-side at all.
 
     @HUD(name = "Bank Balance", category = "HUDs", subcategory = "SUM")
-    public BankBalanceHud bankBalanceHud = new BankBalanceHud();
+    public BankHud bankBalanceHud = new BankHud();
+
+    @HUD(name = "Vault Contents", category = "HUDs", subcategory = "SUM")
+    public VaultHud vaultHud = new VaultHud();
 
     @HUD(name = "Plot Info", category = "HUDs", subcategory = "SUM")
     public PlotInfoHud plotInfoHud = new PlotInfoHud();
