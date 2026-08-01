@@ -276,6 +276,148 @@ public class SumConfig {
             + "by default since some servers want AFK farms to keep running.";
     private static final boolean FIELD_DEFAULT_AFK_PAUSE_ALL = false;
 
+    // ------------------------------------------------------------------------------------------
+    // Open MCEconomic API — remote authoritative economy backend.
+    //
+    // When enabled, a remote HTTP service owns player balances and the transaction ledger, and
+    // SUM becomes a client of it. The full wire protocol is specified in docs/ECONOMIC_API.md;
+    // this category is the client half of section 10 of that document.
+    // ------------------------------------------------------------------------------------------
+
+    private static final String CATEGORY_ECONOMY_API = "economy_api";
+
+    private static final String FIELD_KEY_ECONOMY_API_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_ENABLED =
+        "Master toggle for the Open MCEconomic API. When true, a remote HTTP service is the "
+            + "authority for every player balance and SUM only mirrors it; when false (default), "
+            + "SUM uses its local economy backends and never contacts the network. Requires "
+            + "'baseUrl' and 'authToken' to be set. See docs/ECONOMIC_API.md.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_API_ENABLED = false;
+
+    private static final String FIELD_KEY_ECONOMY_API_ALLOW_INTEGRATED = "allowIntegratedServer";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_ALLOW_INTEGRATED =
+        "When false (default), the economy API is only contacted by a DEDICATED server. Opening a "
+            + "single-player or LAN world runs an integrated server inside your game client, and "
+            + "without this guard that world would connect to the shared economy service and spend "
+            + "real balances from a local save. Set true only if you deliberately want a "
+            + "single-player world to transact against the live economy. Physical Minecraft "
+            + "clients NEVER contact the service regardless of this setting - they receive "
+            + "balances from their server over SUM's own sync packet.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_API_ALLOW_INTEGRATED = false;
+
+    private static final String FIELD_KEY_ECONOMY_API_BASE_URL = "baseUrl";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_BASE_URL =
+        "Root URL of the economy service, WITHOUT the /api/economic/v1 suffix - for example "
+            + "'https://economy.example.net'. Must be https:// unless 'enableHttp' is true.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_BASE_URL = "";
+
+    private static final String FIELD_KEY_ECONOMY_API_AUTH_TOKEN = "authToken";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_AUTH_TOKEN =
+        "Bearer token issued by the economy service operator, sent on every request. THIS IS A "
+            + "SECRET: anyone holding it can move money. Protect this config file accordingly and "
+            + "use a per-server token so one Minecraft server can be revoked on its own.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_AUTH_TOKEN = "";
+
+    private static final String FIELD_KEY_ECONOMY_API_INSTANCE_ID = "instanceId";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_INSTANCE_ID =
+        "Identifies this Minecraft server to the economy service (sent as the X-MCE-Instance "
+            + "header and recorded on every ledger entry). Give each server sharing a service a "
+            + "distinct value, e.g. 'alto-main' or 'alto-creative'.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_INSTANCE_ID = "default";
+
+    private static final String FIELD_KEY_ECONOMY_API_HMAC_SECRET = "hmacSecret";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_HMAC_SECRET =
+        "Optional shared secret for HMAC-SHA256 request signing, layered on top of the bearer "
+            + "token. Leave blank to disable signing. THIS IS A SECRET. Only set it if the "
+            + "economy service verifies signatures.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_HMAC_SECRET = "";
+
+    private static final String FIELD_KEY_ECONOMY_API_CERT_PATH = "certificatePath";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_CERT_PATH =
+        "Optional path to a certificate or CA bundle to trust IN ADDITION to the system trust "
+            + "store, for services using a self-signed or private-CA certificate. Resolved "
+            + "relative to this config file; absolute paths also work. Accepts PEM (.pem/.crt/"
+            + ".cer), PKCS#12 (.p12/.pfx), or JKS (.jks). Leave blank to use only the system "
+            + "trust store. Certificate and hostname verification are ALWAYS performed - supply "
+            + "the certificate here instead of trying to disable verification.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_CERT_PATH = "";
+
+    private static final String FIELD_KEY_ECONOMY_API_CERT_PASSWORD = "certificatePassword";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_CERT_PASSWORD =
+        "Password for 'certificatePath' when it points at a PKCS#12 or JKS keystore. Not needed "
+            + "for PEM files. THIS IS A SECRET.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_CERT_PASSWORD = "";
+
+    private static final String FIELD_KEY_ECONOMY_API_ENABLE_HTTP = "enableHttp";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_ENABLE_HTTP =
+        "When true, allows a plaintext http:// baseUrl. LOCAL DEVELOPMENT ONLY - the auth token "
+            + "and every player balance travel in the clear and can be read or forged by anything "
+            + "on the network path. Leave false (default) in production; for a self-signed "
+            + "certificate use 'certificatePath' instead of turning this on.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_API_ENABLE_HTTP = false;
+
+    private static final String FIELD_KEY_ECONOMY_API_INTEGRITY_HEADERS = "sendIntegrityHeaders";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_INTEGRITY_HEADERS =
+        "When true (default), sends optional anomaly-detection headers the economy service may use "
+            + "for strict policies: whether this server runs in online-mode, a per-world id and "
+            + "monotonic sequence number (which lets the service spot a world rollback, the "
+            + "classic duplication exploit), a per-boot session id, the online player count, "
+            + "risk-relevant state of the acting player (creative/op/cheats), and the mod version. "
+            + "No IP addresses, machine fingerprints, mod lists, player rosters, or world data are "
+            + "ever sent. Set false to omit them; services must work without them.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_API_INTEGRITY_HEADERS = true;
+
+    private static final String FIELD_KEY_ECONOMY_API_CONNECT_TIMEOUT = "connectTimeoutMs";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_CONNECT_TIMEOUT =
+        "Milliseconds to wait for the TCP and TLS connection to the economy service before giving "
+            + "up. All requests run off the game thread, so this never stalls a tick.";
+    private static final int FIELD_DEFAULT_ECONOMY_API_CONNECT_TIMEOUT = 3000;
+
+    private static final String FIELD_KEY_ECONOMY_API_READ_TIMEOUT = "readTimeoutMs";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_READ_TIMEOUT =
+        "Milliseconds to wait for a response body after the request is sent.";
+    private static final int FIELD_DEFAULT_ECONOMY_API_READ_TIMEOUT = 5000;
+
+    private static final String FIELD_KEY_ECONOMY_API_MAX_RETRIES = "maxRetries";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_MAX_RETRIES =
+        "How many times to retry a retryable failure (timeout, 429, 5xx) before giving up. Retries "
+            + "reuse the same idempotency key, so a retried payment can never double-charge.";
+    private static final int FIELD_DEFAULT_ECONOMY_API_MAX_RETRIES = 2;
+
+    private static final String FIELD_KEY_ECONOMY_API_BALANCE_TTL = "balanceCacheTtlSeconds";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_BALANCE_TTL =
+        "How old a cached balance may get before SUM refreshes it from the service. In-game "
+            + "balance reads (HUDs, ATM, shop GUIs) always hit this cache, never the network.";
+    private static final int FIELD_DEFAULT_ECONOMY_API_BALANCE_TTL = 30;
+
+    private static final String FIELD_KEY_ECONOMY_API_EVENT_POLL = "eventPollSeconds";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_EVENT_POLL =
+        "How often to poll the service's change feed, which is how balance changes made OUTSIDE "
+            + "Minecraft reach the game. Set 0 to disable polling and rely on the periodic balance "
+            + "refresh instead. Ignored if the service doesn't advertise the 'events' capability.";
+    private static final int FIELD_DEFAULT_ECONOMY_API_EVENT_POLL = 10;
+
+    private static final String FIELD_KEY_ECONOMY_API_HEALTH_POLL = "healthPollSeconds";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_HEALTH_POLL =
+        "How often to re-check the service's /health endpoint for liveness and capability changes.";
+    private static final int FIELD_DEFAULT_ECONOMY_API_HEALTH_POLL = 60;
+
+    private static final String FIELD_KEY_ECONOMY_API_UNAVAILABLE_POLICY = "unavailablePolicy";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_UNAVAILABLE_POLICY =
+        "What to do while the economy service is unreachable. 'deny' (default) shows stale cached "
+            + "balances and refuses all spending, so no money moves without the authority. "
+            + "'cached' additionally queues transactions in memory and flushes them on recovery. "
+            + "'local' falls back to SUM's built-in balances, which WILL diverge from the service "
+            + "and need manual reconciliation - intended for single-player and offline testing.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_UNAVAILABLE_POLICY = "deny";
+    private static final String[] ECONOMY_API_UNAVAILABLE_POLICIES = { "deny", "cached", "local" };
+
+    private static final String FIELD_KEY_ECONOMY_API_VERBOSE = "verboseLogging";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_VERBOSE =
+        "When true, logs every economy API request and response for troubleshooting. The auth "
+            + "token, HMAC secret, and signature are never logged regardless of this setting.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_API_VERBOSE = false;
+
     private static String[] roamerWalkableBlocks;
     private static Set<String> roamerWalkableBlockSet;
     // Resolved lazily on first use. Block instances aren't available at preInit, since the block
@@ -321,10 +463,34 @@ public class SumConfig {
     private static boolean afkAnnounce;
     private static boolean afkPauseWorldWhenAllAfk;
 
+    private static boolean economyApiEnabled;
+    private static boolean economyApiAllowIntegratedServer;
+    private static String economyApiBaseUrl;
+    private static String economyApiAuthToken;
+    private static String economyApiInstanceId;
+    private static String economyApiHmacSecret;
+    private static String economyApiCertificatePath;
+    private static String economyApiCertificatePassword;
+    private static boolean economyApiEnableHttp;
+    private static boolean economyApiSendIntegrityHeaders;
+    private static int economyApiConnectTimeoutMs;
+    private static int economyApiReadTimeoutMs;
+    private static int economyApiMaxRetries;
+    private static int economyApiBalanceCacheTtlSeconds;
+    private static int economyApiEventPollSeconds;
+    private static int economyApiHealthPollSeconds;
+    private static String economyApiUnavailablePolicy;
+    private static boolean economyApiVerboseLogging;
+
     private static Configuration config;
+
+    /** Directory holding the config file. {@link #getEconomyApiCertificateFile()} resolves the
+     *  operator's relative certificate path against this. */
+    private static File configDirectory;
 
     static void init(File configFile) {
         if (config == null) {
+            configDirectory = configFile.getParentFile();
             config = new Configuration(configFile);
             loadConfig();
         }
@@ -436,9 +602,84 @@ public class SumConfig {
             FIELD_KEY_AFK_PAUSE_ALL, CATEGORY_AFK,
             FIELD_DEFAULT_AFK_PAUSE_ALL, FIELD_DESCRIPTION_AFK_PAUSE_ALL);
 
+        economyApiEnabled = config.getBoolean(
+            FIELD_KEY_ECONOMY_API_ENABLED, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_ENABLED, FIELD_DESCRIPTION_ECONOMY_API_ENABLED);
+        economyApiAllowIntegratedServer = config.getBoolean(
+            FIELD_KEY_ECONOMY_API_ALLOW_INTEGRATED, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_ALLOW_INTEGRATED,
+            FIELD_DESCRIPTION_ECONOMY_API_ALLOW_INTEGRATED);
+        economyApiBaseUrl = trimTrailingSlashes(config.getString(
+            FIELD_KEY_ECONOMY_API_BASE_URL, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_BASE_URL, FIELD_DESCRIPTION_ECONOMY_API_BASE_URL));
+        economyApiAuthToken = config.getString(
+            FIELD_KEY_ECONOMY_API_AUTH_TOKEN, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_AUTH_TOKEN, FIELD_DESCRIPTION_ECONOMY_API_AUTH_TOKEN).trim();
+        economyApiInstanceId = config.getString(
+            FIELD_KEY_ECONOMY_API_INSTANCE_ID, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_INSTANCE_ID, FIELD_DESCRIPTION_ECONOMY_API_INSTANCE_ID).trim();
+        economyApiHmacSecret = config.getString(
+            FIELD_KEY_ECONOMY_API_HMAC_SECRET, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_HMAC_SECRET, FIELD_DESCRIPTION_ECONOMY_API_HMAC_SECRET).trim();
+        economyApiCertificatePath = config.getString(
+            FIELD_KEY_ECONOMY_API_CERT_PATH, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_CERT_PATH, FIELD_DESCRIPTION_ECONOMY_API_CERT_PATH).trim();
+        economyApiCertificatePassword = config.getString(
+            FIELD_KEY_ECONOMY_API_CERT_PASSWORD, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_CERT_PASSWORD, FIELD_DESCRIPTION_ECONOMY_API_CERT_PASSWORD);
+        economyApiEnableHttp = config.getBoolean(
+            FIELD_KEY_ECONOMY_API_ENABLE_HTTP, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_ENABLE_HTTP, FIELD_DESCRIPTION_ECONOMY_API_ENABLE_HTTP);
+        economyApiSendIntegrityHeaders = config.getBoolean(
+            FIELD_KEY_ECONOMY_API_INTEGRITY_HEADERS, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_INTEGRITY_HEADERS,
+            FIELD_DESCRIPTION_ECONOMY_API_INTEGRITY_HEADERS);
+        economyApiConnectTimeoutMs = config.getInt(
+            FIELD_KEY_ECONOMY_API_CONNECT_TIMEOUT, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_CONNECT_TIMEOUT, 250, 60000,
+            FIELD_DESCRIPTION_ECONOMY_API_CONNECT_TIMEOUT);
+        economyApiReadTimeoutMs = config.getInt(
+            FIELD_KEY_ECONOMY_API_READ_TIMEOUT, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_READ_TIMEOUT, 250, 60000,
+            FIELD_DESCRIPTION_ECONOMY_API_READ_TIMEOUT);
+        economyApiMaxRetries = config.getInt(
+            FIELD_KEY_ECONOMY_API_MAX_RETRIES, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_MAX_RETRIES, 0, 10,
+            FIELD_DESCRIPTION_ECONOMY_API_MAX_RETRIES);
+        economyApiBalanceCacheTtlSeconds = config.getInt(
+            FIELD_KEY_ECONOMY_API_BALANCE_TTL, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_BALANCE_TTL, 1, 3600,
+            FIELD_DESCRIPTION_ECONOMY_API_BALANCE_TTL);
+        economyApiEventPollSeconds = config.getInt(
+            FIELD_KEY_ECONOMY_API_EVENT_POLL, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_EVENT_POLL, 0, 3600,
+            FIELD_DESCRIPTION_ECONOMY_API_EVENT_POLL);
+        economyApiHealthPollSeconds = config.getInt(
+            FIELD_KEY_ECONOMY_API_HEALTH_POLL, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_HEALTH_POLL, 5, 3600,
+            FIELD_DESCRIPTION_ECONOMY_API_HEALTH_POLL);
+        economyApiUnavailablePolicy = config.getString(
+            FIELD_KEY_ECONOMY_API_UNAVAILABLE_POLICY, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_UNAVAILABLE_POLICY,
+            FIELD_DESCRIPTION_ECONOMY_API_UNAVAILABLE_POLICY, ECONOMY_API_UNAVAILABLE_POLICIES)
+            .trim().toLowerCase(java.util.Locale.ROOT);
+        economyApiVerboseLogging = config.getBoolean(
+            FIELD_KEY_ECONOMY_API_VERBOSE, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_VERBOSE, FIELD_DESCRIPTION_ECONOMY_API_VERBOSE);
+
         if (config.hasChanged()) {
             config.save();
         }
+    }
+
+    /** Strips trailing slashes from a base URL so endpoint paths can be appended directly. */
+    private static String trimTrailingSlashes(String url) {
+        if (url == null) return "";
+        String trimmed = url.trim();
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     public static boolean isSleepVoteEnabled() {
@@ -663,6 +904,179 @@ public class SumConfig {
 
     public static boolean isPayEnabled() {
         return payEnabled;
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // Open MCEconomic API accessors. Protocol reference: docs/ECONOMIC_API.md
+    // ------------------------------------------------------------------------------------------
+
+    /** Operator's master toggle. See {@link #isEconomyApiUsable()} for the "actually configured
+     *  and safe to connect" check the client should gate on. */
+    public static boolean isEconomyApiEnabled() {
+        return economyApiEnabled;
+    }
+
+    /**
+     * Whether an integrated server (single-player or LAN host) may contact the economy service.
+     * Off by default: single-player runs a server inside the game client, and a shared economy
+     * should not be spendable from a local world save. Physical clients never contact the service
+     * at all — see {@link #isEconomyApiActiveOn(net.minecraft.server.MinecraftServer)}.
+     */
+    public static boolean isEconomyApiAllowedOnIntegratedServer() {
+        return economyApiAllowIntegratedServer;
+    }
+
+    /**
+     * The single gate the economy client should call before constructing the remote backend.
+     *
+     * <p>SUM's balances are server-authoritative and pushed to clients over
+     * {@code PacketSyncSumMoney}, so the remote backend belongs on the logical server only. This
+     * additionally refuses integrated servers unless the operator opted in, so opening a
+     * single-player world with a production config does not transact against the live economy.
+     *
+     * @param server the running server, or null if none (pure client context).
+     * @return true only when the config is usable and this side should own the remote connection.
+     */
+    public static boolean isEconomyApiActiveOn(net.minecraft.server.MinecraftServer server) {
+        if (server == null || !isEconomyApiUsable()) {
+            return false;
+        }
+        return server.isDedicatedServer() || economyApiAllowIntegratedServer;
+    }
+
+    /** Service root with no trailing slash and no {@code /api/economic/v1} suffix. */
+    public static String getEconomyApiBaseUrl() {
+        return economyApiBaseUrl;
+    }
+
+    public static String getEconomyApiAuthToken() {
+        return economyApiAuthToken;
+    }
+
+    public static String getEconomyApiInstanceId() {
+        return economyApiInstanceId;
+    }
+
+    /** Blank when HMAC request signing is disabled. */
+    public static String getEconomyApiHmacSecret() {
+        return economyApiHmacSecret;
+    }
+
+    public static boolean isEconomyApiHmacEnabled() {
+        return !economyApiHmacSecret.isEmpty();
+    }
+
+    /** Raw configured value; use {@link #getEconomyApiCertificateFile()} to resolve it. */
+    public static String getEconomyApiCertificatePath() {
+        return economyApiCertificatePath;
+    }
+
+    /**
+     * Resolves {@code certificatePath} against the SUM config directory, so operators can drop a
+     * self-signed certificate next to the config file and reference it by name.
+     *
+     * @return the certificate file, or null if no certificate is configured. The file is not
+     *     checked for existence here — the economy client reports that as a startup error so the
+     *     operator sees a specific message rather than a silent fallback to system trust.
+     */
+    public static File getEconomyApiCertificateFile() {
+        if (economyApiCertificatePath.isEmpty()) {
+            return null;
+        }
+        File candidate = new File(economyApiCertificatePath);
+        if (candidate.isAbsolute() || configDirectory == null) {
+            return candidate;
+        }
+        return new File(configDirectory, economyApiCertificatePath);
+    }
+
+    public static String getEconomyApiCertificatePassword() {
+        return economyApiCertificatePassword;
+    }
+
+    /**
+     * Whether to send the optional anomaly-detection headers a service may use for strict
+     * policies. See the field description for exactly what is and is not included; services must
+     * function without them.
+     */
+    public static boolean isEconomyApiSendIntegrityHeaders() {
+        return economyApiSendIntegrityHeaders;
+    }
+
+    /** True only when the operator has explicitly opted into plaintext HTTP. Development only. */
+    public static boolean isEconomyApiHttpEnabled() {
+        return economyApiEnableHttp;
+    }
+
+    public static int getEconomyApiConnectTimeoutMs() {
+        return economyApiConnectTimeoutMs;
+    }
+
+    public static int getEconomyApiReadTimeoutMs() {
+        return economyApiReadTimeoutMs;
+    }
+
+    public static int getEconomyApiMaxRetries() {
+        return economyApiMaxRetries;
+    }
+
+    public static int getEconomyApiBalanceCacheTtlSeconds() {
+        return economyApiBalanceCacheTtlSeconds;
+    }
+
+    /** 0 disables change-feed polling. */
+    public static int getEconomyApiEventPollSeconds() {
+        return economyApiEventPollSeconds;
+    }
+
+    public static int getEconomyApiHealthPollSeconds() {
+        return economyApiHealthPollSeconds;
+    }
+
+    /** One of {@code deny}, {@code cached}, {@code local}. */
+    public static String getEconomyApiUnavailablePolicy() {
+        return economyApiUnavailablePolicy;
+    }
+
+    public static boolean isEconomyApiVerboseLogging() {
+        return economyApiVerboseLogging;
+    }
+
+    /**
+     * Validates the economy API configuration as a unit. Enabling the feature with a blank URL or
+     * token, or pointing it at a plaintext endpoint without {@code enableHttp}, is a
+     * misconfiguration rather than something to fail on at the first request.
+     *
+     * @return null if the configuration is usable, otherwise an operator-facing explanation of
+     *     what is wrong. Callers log this once at startup and leave the remote backend inert.
+     */
+    public static String validateEconomyApiConfig() {
+        if (!economyApiEnabled) {
+            return null;
+        }
+        if (economyApiBaseUrl.isEmpty()) {
+            return "economy_api.enabled is true but economy_api.baseUrl is blank.";
+        }
+        String lower = economyApiBaseUrl.toLowerCase(java.util.Locale.ROOT);
+        boolean https = lower.startsWith("https://");
+        boolean http = lower.startsWith("http://");
+        if (!https && !http) {
+            return "economy_api.baseUrl must start with https:// (got '" + economyApiBaseUrl + "').";
+        }
+        if (http && !economyApiEnableHttp) {
+            return "economy_api.baseUrl uses plaintext http://, which is refused for security. "
+                + "Use https://, or for a self-signed certificate set economy_api.certificatePath. "
+                + "Set economy_api.enableHttp=true only for local development.";
+        }
+        if (economyApiAuthToken.isEmpty()) {
+            return "economy_api.enabled is true but economy_api.authToken is blank.";
+        }
+        return null;
+    }
+
+    /** True when the API is enabled and its configuration passes {@link #validateEconomyApiConfig()}. */
+    public static boolean isEconomyApiUsable() {
+        return economyApiEnabled && validateEconomyApiConfig() == null;
     }
 
     public static double getPayFeePercent() {
