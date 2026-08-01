@@ -69,16 +69,19 @@ public class CommandPay extends CommandBase {
             return;
         }
 
-        MoneyTransfer.Result result = MoneyTransfer.transfer(from, to, amount);
-        if (!result.ok) {
-            sendMessage(from, TextFormatting.RED, result.error);
-            return;
-        }
-        sendMessage(from, TextFormatting.GREEN,
-            "Paid $" + money(result.credited) + " to " + to.getName()
-                + (result.fee > 0.0 ? " ($" + money(result.fee) + " fee)" : "") + ".");
-        sendMessage(to, TextFormatting.GREEN,
-            "Received $" + money(result.credited) + " from " + from.getName() + ".");
+        // Both messages are sent from the callback so neither player is told the payment
+        // succeeded before the economy has actually settled it.
+        MoneyTransfer.transfer(from, to, amount, result -> {
+            if (!result.ok) {
+                sendMessage(from, TextFormatting.RED, result.error);
+                return;
+            }
+            sendMessage(from, TextFormatting.GREEN,
+                "Paid $" + money(result.credited) + " to " + to.getName()
+                    + (result.fee > 0.0 ? " ($" + money(result.fee) + " fee)" : "") + ".");
+            sendMessage(to, TextFormatting.GREEN,
+                "Received $" + money(result.credited) + " from " + from.getName() + ".");
+        });
     }
 
     @Override
