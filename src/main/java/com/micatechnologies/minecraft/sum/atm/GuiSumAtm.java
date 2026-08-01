@@ -2,6 +2,8 @@ package com.micatechnologies.minecraft.sum.atm;
 
 import com.micatechnologies.minecraft.sum.bank.BankService;
 import com.micatechnologies.minecraft.sum.economy.WalletService;
+import com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusSnapshot;
+import com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker;
 import java.io.IOException;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiButton;
@@ -286,6 +288,17 @@ public class GuiSumAtm extends GuiScreen {
         return !Double.isNaN(BankService.getBalance(player));
     }
 
+    /**
+     * The service's explanation for an unusable account, from the periodic status snapshot.
+     *
+     * <p>Comes over the snapshot rather than being worked out here because only the server can
+     * ask the economy service why; the client has no connection to it at all.
+     */
+    private String bankNotice() {
+        PlayerStatusSnapshot snap = PlayerStatusTracker.latest;
+        return (snap == null || snap.bankNotice == null) ? "" : snap.bankNotice;
+    }
+
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         this.drawDefaultBackground();
@@ -298,8 +311,21 @@ public class GuiSumAtm extends GuiScreen {
         if (!isBankAvailable()) {
             drawCenteredString(this.fontRenderer, I18n.format("sum.atm.no_bank"),
                 this.width / 2, guiTop + 40, TEXT_ERROR);
-            drawCenteredString(this.fontRenderer, I18n.format("sum.atm.no_bank.hint"),
-                this.width / 2, guiTop + 56, TEXT_DIM);
+            // Prefer the economy service's own explanation, which usually names the exact
+            // command to run. The generic fallback reads as a network fault, and the real
+            // reason is nearly always that the player has not linked their account.
+            String notice = bankNotice();
+            if (notice.isEmpty()) {
+                drawCenteredString(this.fontRenderer, I18n.format("sum.atm.no_bank.hint"),
+                    this.width / 2, guiTop + 56, TEXT_DIM);
+            } else {
+                int y = guiTop + 56;
+                for (String line : this.fontRenderer.listFormattedStringToWidth(
+                        notice, GUI_WIDTH - 16)) {
+                    drawCenteredString(this.fontRenderer, line, this.width / 2, y, TEXT_DIM);
+                    y += 11;
+                }
+            }
             super.drawScreen(mouseX, mouseY, partialTicks);
             return;
         }

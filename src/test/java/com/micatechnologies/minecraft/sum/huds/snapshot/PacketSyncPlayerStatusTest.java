@@ -25,7 +25,7 @@ class PacketSyncPlayerStatusTest {
     @Test
     void populatedSnapshotRoundTrips() {
         PlayerStatusSnapshot r = roundTrip(
-            new PlayerStatusSnapshot(9999L, 250.75, "Downtown", "alex", 4, 14400, 36000));
+            new PlayerStatusSnapshot(9999L, 250.75, "", "Downtown", "alex", 4, 14400, 36000));
         assertEquals(9999L, r.vaultBillValue);
         assertEquals("Downtown", r.plotName);
         assertEquals("alex", r.plotOwner);
@@ -45,6 +45,6 @@ class PacketSyncPlayerStatusTest {
     @Test
     void unicodePlotNameSurvives() {
         assertEquals("Café №5",
-            roundTrip(new PlayerStatusSnapshot(0L, 250.75, "Café №5", "", 0, 0, -1)).plotName);
+            roundTrip(new PlayerStatusSnapshot(0L, 250.75, "", "Café №5", "", 0, 0, -1)).plotName);
     }
 }

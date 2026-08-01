@@ -12,14 +12,14 @@ class PlayerStatusSnapshotTest {
 
     @Test
     void constructorCoalescesNullNames() {
-        PlayerStatusSnapshot s = new PlayerStatusSnapshot(0L, 250.75, null, null, 0, 0, -1);
+        PlayerStatusSnapshot s = new PlayerStatusSnapshot(0L, 250.75, "", null, null, 0, 0, -1);
         assertEquals("", s.plotName);
         assertEquals("", s.plotOwner);
     }
 
     @Test
     void constructorPreservesNonNullValues() {
-        PlayerStatusSnapshot s = new PlayerStatusSnapshot(1234L, 250.75, "Downtown", "alex", 3, 14400, 36000);
+        PlayerStatusSnapshot s = new PlayerStatusSnapshot(1234L, 250.75, "", "Downtown", "alex", 3, 14400, 36000);
         assertEquals(1234L, s.vaultBillValue);
         assertEquals("Downtown", s.plotName);
         assertEquals("alex", s.plotOwner);
@@ -42,6 +42,6 @@ class PlayerStatusSnapshotTest {
     @Test
     void bankBalanceHoldsFullLongRange() {
         assertEquals(Long.MAX_VALUE,
-            new PlayerStatusSnapshot(Long.MAX_VALUE, 0.0, "", "", 0, 0, -1).vaultBillValue);
+            new PlayerStatusSnapshot(Long.MAX_VALUE, 0.0, "", "", "", 0, 0, -1).vaultBillValue);
     }
 }

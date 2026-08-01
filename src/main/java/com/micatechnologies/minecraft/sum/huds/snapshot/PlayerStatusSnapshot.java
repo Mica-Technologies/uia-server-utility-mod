@@ -26,6 +26,12 @@ public final class PlayerStatusSnapshot {
      *  remote economy service the client has no access to. NaN when no account is known yet. */
     public final double bankBalance;
 
+    /** Why the bank is unusable, or "" when it is fine. Sent because only the server can ask the
+     *  economy service why, and the ATM would otherwise have to guess -- it used to say "could not
+     *  be reached", which reads as a network fault when the real answer is usually that the player
+     *  has not linked their account. */
+    public final String bankNotice;
+
     /** Display name of the SUM plot the player is currently standing in, or "" if
      *  the player is outside any plot. When overlapping plots exist, the first one
      *  returned by {@code getPlotsContaining} wins. */
@@ -45,11 +51,12 @@ public final class PlayerStatusSnapshot {
      *  -1 when there's no next milestone (config has none, or all are achieved). */
     public final int nextMilestoneTicks;
 
-    public PlayerStatusSnapshot(long vaultBillValue, double bankBalance, String plotName,
-                                String plotOwner, int jobsAvailable, int loyaltyTicks,
-                                int nextMilestoneTicks) {
+    public PlayerStatusSnapshot(long vaultBillValue, double bankBalance, String bankNotice,
+                                String plotName, String plotOwner, int jobsAvailable,
+                                int loyaltyTicks, int nextMilestoneTicks) {
         this.vaultBillValue = vaultBillValue;
         this.bankBalance = bankBalance;
+        this.bankNotice = bankNotice == null ? "" : bankNotice;
         this.plotName = plotName == null ? "" : plotName;
         this.plotOwner = plotOwner == null ? "" : plotOwner;
         this.jobsAvailable = jobsAvailable;
@@ -60,6 +67,6 @@ public final class PlayerStatusSnapshot {
     /** Zero-valued snapshot used as the "no data yet" sentinel — HUDs render "—"
      *  for any field that's clearly default (empty plot name, etc.). */
     public static PlayerStatusSnapshot empty() {
-        return new PlayerStatusSnapshot(0L, Double.NaN, "", "", 0, 0, -1);
+        return new PlayerStatusSnapshot(0L, Double.NaN, "", "", "", 0, 0, -1);
     }
 }

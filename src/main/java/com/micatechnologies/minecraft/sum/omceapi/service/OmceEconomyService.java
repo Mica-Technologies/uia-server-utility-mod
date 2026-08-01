@@ -89,6 +89,16 @@ public final class OmceEconomyService {
     /** Latest successful handshake. Null until the first {@code /health} succeeds. */
     private final AtomicReference<OmceHealth> health = new AtomicReference<>(null);
 
+    /**
+     * Why a player has no usable account, keyed by UUID. Populated from
+     * {@code /resolveAccounts}, which is the only place the service explains itself.
+     *
+     * <p>Without this the ATM can only say "could not be reached", which reads as a network
+     * fault when the real answer is usually "you have not linked your account yet" -- along
+     * with the exact command to fix it.
+     */
+    private final java.util.Map<UUID, String> accountNotices = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** Cursor for the change feed; null starts from "now" on the next poll. */
     private final AtomicReference<String> eventCursor = new AtomicReference<>(null);
 
@@ -427,10 +437,14 @@ public final class OmceEconomyService {
         for (OmceAccount account : resolved.get()) {
             if (account.isUsable()) {
                 cache.putAccountId(account.getPlayerUuid(), account.getAccountId(), account.getStatus());
+                accountNotices.remove(account.getPlayerUuid());
                 usable.add(account.getPlayerUuid());
-            } else if (config.isVerboseLogging()) {
-                Sum.LOGGER.info("[omce] {} has no usable economy account ({}).",
-                    account.getPlayerUuid(), account.getReason());
+            } else {
+                accountNotices.put(account.getPlayerUuid(), describeUnusable(account));
+                if (config.isVerboseLogging()) {
+                    Sum.LOGGER.info("[omce] {} has no usable economy account ({}).",
+                        account.getPlayerUuid(), account.getReason());
+                }
             }
         }
         loadBalances(usable);
@@ -542,6 +556,34 @@ public final class OmceEconomyService {
             return Double.NaN;
         }
         return OmceMoney.toDollars(entry.getEffectiveBalance(), getMinorUnitDigits());
+    }
+
+    /**
+     * A short player-facing explanation of why their account is unusable, or null when it is
+     * fine. Prefers the service's own wording: it knows how its accounts are created, and SUM
+     * would only be guessing.
+     */
+    @Nullable
+    public String getAccountNotice(UUID playerUuid) {
+        return playerUuid == null ? null : accountNotices.get(playerUuid);
+    }
+
+    private static String describeUnusable(OmceAccount account) {
+        String instructions = account.getLinkInstructions();
+        if (instructions != null && !instructions.isEmpty()) {
+            return instructions;
+        }
+        String reason = account.getReason();
+        if (OmceProtocol.ERR_ACCOUNT_NOT_LINKED.equals(reason)) {
+            return "Your account isn't linked yet.";
+        }
+        if (OmceProtocol.ERR_ACCOUNT_FROZEN.equals(reason)) {
+            return "Your account is frozen. Contact an administrator.";
+        }
+        if (OmceProtocol.ERR_UNKNOWN_ACCOUNT.equals(reason)) {
+            return "You don't have an economy account yet.";
+        }
+        return "Your account isn't available.";
     }
 
     /** True when a usable account is cached for this player. */
