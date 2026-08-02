@@ -670,8 +670,22 @@ Therefore:
 
 **Unlinked players.** If a service requires players to link a Minecraft account before they can
 transact, an unresolved player MUST produce `ACCOUNT_NOT_LINKED` — a distinct code from
-`UNKNOWN_ACCOUNT` — and SHOULD include a human-readable linking instruction in
-`error.details.linkInstructions`, which SUM relays verbatim into chat.
+`UNKNOWN_ACCOUNT`, which is reserved for identities the service cannot place at all, such as a
+malformed `accountId`. A well-formed UUID the service simply has no link for is the former: the
+player exists and has a route to fixing it.
+
+Such a response SHOULD carry a human-readable linking instruction, which SUM relays verbatim
+into chat. It goes in one of two places depending on the response shape, and a service that
+returns unlinked players through both MUST populate both:
+
+- **Error envelopes** (`/getBalance`, `/processTransaction`, `/voidTransaction`) — in
+  `error.details.linkInstructions`.
+- **Per-entry lists** (`/resolveAccounts` `accounts[]`, `/getBalances` `unresolved[]`) — as a
+  `linkInstructions` field on the entry itself. These are 200 responses where one bad player
+  must not fail the batch, so there is no error object to hang it from.
+
+Omitting it leaves the player with a bare code and no next step, which is the difference between
+an ATM that says how to link and one that appears broken.
 
 **Auto-provisioning.** A service MAY create an account on first sight of a UUID. It declares this
 with the `autoProvisionAccounts` capability. If `false`, SUM will only ever transact for players
@@ -1302,7 +1316,11 @@ truncating.
     }
   ],
   "unresolved": [
-    { "playerUuid": "0f2b0c33-6f0f-4d1c-9a80-2d3f1b7d9e11", "reason": "ACCOUNT_NOT_LINKED" }
+    {
+      "playerUuid": "0f2b0c33-6f0f-4d1c-9a80-2d3f1b7d9e11",
+      "reason": "ACCOUNT_NOT_LINKED",
+      "linkInstructions": "Run !mclink 0f2b0c33-6f0f-4d1c-9a80-2d3f1b7d9e11 in Discord."
+    }
   ]
 }
 ```
