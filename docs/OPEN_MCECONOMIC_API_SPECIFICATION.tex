@@ -854,8 +854,25 @@ its primary key --- it may key accounts however it likes. Therefore:
 
 \textbf{Unlinked players.} If a service requires players to link a Minecraft account before
 transacting, an unresolved player \req{} produce \code{ACCOUNT\_NOT\_LINKED} --- a distinct code
-from \code{UNKNOWN\_ACCOUNT} --- and \rec{} include a human-readable instruction in
-\code{error.details.linkInstructions}, which the client relays verbatim into chat.
+from \code{UNKNOWN\_ACCOUNT}, which is reserved for identities the service cannot place at all,
+such as a malformed \code{accountId}. A well-formed UUID the service simply has no link for is
+the former: the player exists and has a route to fixing it.
+
+Such a response \rec{} carry a human-readable linking instruction, which the client relays
+verbatim into chat. It goes in one of two places depending on the response shape, and a service
+returning unlinked players through both \req{} populate both:
+
+\begin{itemize}
+  \item \textbf{Error envelopes} (\code{/getBalance}, \code{/processTransaction},
+        \code{/voidTransaction}) --- in \code{error.details.linkInstructions}.
+  \item \textbf{Per-entry lists} (\code{/resolveAccounts} \code{accounts[]},
+        \code{/getBalances} \code{unresolved[]}) --- as a \code{linkInstructions} field on the
+        entry itself. These are 200 responses where one bad player must not fail the batch, so
+        there is no error object to hang it from.
+\end{itemize}
+
+Omitting it leaves the player with a bare code and no next step, which is the difference between
+an ATM that says how to link and one that appears broken.
 
 \textbf{Auto-provisioning.} A service \opt{} create an account on first sight of a UUID, declaring
 this with the \code{autoProvisionAccounts} capability.
@@ -1421,7 +1438,9 @@ At least one of the two \req{} be non-empty. Combined length \textbf{MUST NOT} e
       "currency": "SUM", "version": 4271, "status": "active" }
   ],
   "unresolved": [
-    { "playerUuid": "0f2b0c33-6f0f-4d1c-9a80-2d3f1b7d9e11", "reason": "ACCOUNT_NOT_LINKED" }
+    { "playerUuid": "0f2b0c33-6f0f-4d1c-9a80-2d3f1b7d9e11",
+      "reason": "ACCOUNT_NOT_LINKED",
+      "linkInstructions": "Run !mclink 0f2b0c33-... in Discord." }
   ]
 }
 \end{lstlisting}

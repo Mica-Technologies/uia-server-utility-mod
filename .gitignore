@@ -106,3 +106,6 @@ example-source/
 *.fdb_latexmk
 *.synctex.gz
 *.out
+# pdflatex writes this next to every .tex it builds; its siblings above were all
+# listed but this one was missed, so a doc rebuild left it staged for commit.
+docs/*.log
