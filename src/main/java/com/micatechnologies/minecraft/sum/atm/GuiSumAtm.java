@@ -283,9 +283,25 @@ public class GuiSumAtm extends GuiScreen {
             : "sum.atm.destination.wallet");
     }
 
+    /**
+     * The player's bank balance, from the periodic status snapshot. NaN when the server has no
+     * usable account for them yet.
+     *
+     * <p>Must come from the snapshot, not {@link BankService}: on the client there is no remote
+     * economy service to consult, so {@code BankService.getBalance} silently falls back to the
+     * client's own {@code BankSavedData} — which is empty on every remote-economy server and
+     * answers $0.00 for everyone. That made an unlinked account render as a real, empty one:
+     * the balance line showed $0.00 and {@link #isBankAvailable()} reported true, so the notice
+     * explaining how to link never displayed.
+     */
+    private double bankBalance() {
+        PlayerStatusSnapshot snap = PlayerStatusTracker.latest;
+        return snap == null ? Double.NaN : snap.bankBalance;
+    }
+
     /** The bank is usable when a balance can be read for this player. */
     private boolean isBankAvailable() {
-        return !Double.isNaN(BankService.getBalance(player));
+        return !Double.isNaN(bankBalance());
     }
 
     /**
@@ -333,7 +349,7 @@ public class GuiSumAtm extends GuiScreen {
         drawCenteredString(this.fontRenderer, I18n.format("sum.atm.balance.heading"),
             this.width / 2, guiTop + 26, TEXT_DIM);
         drawCenteredString(this.fontRenderer,
-            I18n.format("sum.atm.balance.label", money(BankService.getBalance(player))),
+            I18n.format("sum.atm.balance.label", money(bankBalance())),
             this.width / 2, guiTop + 38, TEXT_BALANCE);
 
         // The wallet is shown too: every control here moves money between the two, so seeing
