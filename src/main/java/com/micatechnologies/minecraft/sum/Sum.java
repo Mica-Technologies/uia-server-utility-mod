@@ -143,6 +143,10 @@ public class Sum {
         event.getRegistry().registerAll(SumRegistry.getBlocks().toArray(new Block[0]));
     }
 
+    /**
+     * Intentionally empty. SUM's recipes are JSON under {@code assets/sum/recipes/}, which Forge
+     * loads on its own — this hook only exists for recipes that can't be expressed that way.
+     */
     @SubscribeEvent
     public void registerRecipes(RegistryEvent.Register<IRecipe> event) {
     }

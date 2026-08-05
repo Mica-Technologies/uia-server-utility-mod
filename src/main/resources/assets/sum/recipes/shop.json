@@ -1,0 +1,30 @@
+{
+  "__comment": "Player Shop. The pattern maps onto the block itself: glass window on top, chest of stock in the middle, cash in the dispense slot at the bottom, iron cabinet down both sides. The $20 bill is the point — opening a business costs money, and it puts the block behind the economy rather than beside it. Ore-dict entries (not hard item ids) so pack-added iron/glass/chests work too. Server Shop is deliberately uncraftable: it's an operator fixture, handed out with /give.",
+  "type": "forge:ore_shaped",
+  "pattern": [
+    "IGI",
+    "ICI",
+    "IBI"
+  ],
+  "key": {
+    "I": {
+      "type": "forge:ore_dict",
+      "ore": "ingotIron"
+    },
+    "G": {
+      "type": "forge:ore_dict",
+      "ore": "blockGlass"
+    },
+    "C": {
+      "type": "forge:ore_dict",
+      "ore": "chestWood"
+    },
+    "B": {
+      "item": "sum:bill_20"
+    }
+  },
+  "result": {
+    "item": "sum:shop",
+    "count": 1
+  }
+}
