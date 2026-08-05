@@ -13,6 +13,9 @@ import com.micatechnologies.minecraft.sum.pocket.PocketKeybinds;
 import com.micatechnologies.minecraft.sum.pocket.SumOneConfig;
 import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RenderRoamer;
+import com.micatechnologies.minecraft.sum.shop.TESRShop;
+import com.micatechnologies.minecraft.sum.shop.TileEntityServerShop;
+import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraft.entity.player.EntityPlayer;
@@ -33,6 +36,12 @@ public class SumClientProxy implements SumProxy {
         RenderingRegistry.registerEntityRenderingHandler(EntityRoamer.class, RenderRoamer::new);
         net.minecraftforge.fml.client.registry.ClientRegistry.bindTileEntitySpecialRenderer(
             TileEntityBillsDisplay.class, new TESRBillsDisplay());
+        // Both shop TEs get the same renderer. The dispatcher would find it by walking up from
+        // the subclass anyway; binding it explicitly keeps that from being load-bearing.
+        net.minecraftforge.fml.client.registry.ClientRegistry.bindTileEntitySpecialRenderer(
+            TileEntityShop.class, new TESRShop());
+        net.minecraftforge.fml.client.registry.ClientRegistry.bindTileEntitySpecialRenderer(
+            TileEntityServerShop.class, new TESRShop());
         FavoritesStore.setStorageFile(event.getModConfigurationDirectory());
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
         FavoritesClientHandler.registerKeybinds();

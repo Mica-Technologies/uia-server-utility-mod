@@ -87,6 +87,28 @@ public class TileEntityShop extends TileEntity implements IInventory {
         return ownerUuid != null && ownerUuid.equals(player.getUniqueID());
     }
 
+    // --- Roles ---
+    //
+    // "Manage" (set the template/amount/price, restock, withdraw) and "purchase" are distinct
+    // rights so {@link TileEntityServerShop} can hand management to operators while still making
+    // them pay like everyone else. Everything that gates on a role goes through these three
+    // methods rather than calling isOwner directly.
+
+    /** True for a shop with a player owner who takes the proceeds. */
+    public boolean isServerShop() {
+        return false;
+    }
+
+    /** May configure the shop and empty its till. */
+    public boolean canManage(EntityPlayer player) {
+        return isOwner(player);
+    }
+
+    /** May buy from the shop. An owner restocks their own shop rather than buying from it. */
+    public boolean canPurchase(EntityPlayer player) {
+        return !isOwner(player);
+    }
+
     /** Claims an unowned shop for {@code player}. Idempotent on already-owned shops. */
     public boolean claim(EntityPlayer player) {
         if (ownerUuid != null) return false;
@@ -145,7 +167,7 @@ public class TileEntityShop extends TileEntity implements IInventory {
      * if there was nothing to withdraw (or no wallet backend).
      */
     public double withdrawFunds(EntityPlayer player) {
-        if (!isOwner(player) || fundsAccumulated <= 0.0) {
+        if (!canManage(player) || fundsAccumulated <= 0.0) {
             return 0.0;
         }
         if (!WalletService.credit(player, fundsAccumulated)) {
@@ -155,6 +177,14 @@ public class TileEntityShop extends TileEntity implements IInventory {
         this.fundsAccumulated = 0.0;
         markDirtyAndSync();
         return amount;
+    }
+
+    /**
+     * Adds a completed sale's takings to the till. Split out from {@link #attemptPurchase} so a
+     * shop with no owner to pay can drop them on the floor instead of banking them.
+     */
+    protected void depositFunds(double amount) {
+        this.fundsAccumulated += amount;
     }
 
     // --- Stock helpers ---
@@ -208,7 +238,7 @@ public class TileEntityShop extends TileEntity implements IInventory {
      */
     public BuyResult attemptPurchase(EntityPlayerMP buyer) {
         if (!isConfigured()) return BuyResult.UNCONFIGURED;
-        if (isOwner(buyer)) return BuyResult.OWNER_CANT_BUY;
+        if (!canPurchase(buyer)) return BuyResult.OWNER_CANT_BUY;
         if (!WalletService.isAvailable()) return BuyResult.ECONOMY_UNAVAILABLE;
         if (!hasEnoughStock()) return BuyResult.OUT_OF_STOCK;
 
@@ -241,7 +271,7 @@ public class TileEntityShop extends TileEntity implements IInventory {
             }
         }
 
-        fundsAccumulated += saleCost;
+        depositFunds(saleCost);
 
         if (!buyer.inventory.addItemStackToInventory(toGive)) {
             // Inventory full; drop the leftover at the player's feet rather than swallowing it.

@@ -65,13 +65,17 @@ public class GuiShopOwner extends GuiContainer {
         this.buttonList.add(new GuiButton(BTN_COST_DOWN, left + 100, top + 88, 20, 20, "-"));
         this.buttonList.add(new GuiButton(BTN_COST_UP, left + 130, top + 88, 20, 20, "+"));
 
-        // Withdraw funds — y=112, h=20
-        this.buttonList.add(new GuiButton(BTN_WITHDRAW, left + 8, top + 112, 80, 20, "Withdraw"));
+        // Withdraw funds — y=112, h=20. A server shop has no till to empty, so the button is
+        // omitted and the infinite-stock toggle slides over into the space it would have taken.
+        boolean hasTill = !shop.isServerShop();
+        if (hasTill) {
+            this.buttonList.add(new GuiButton(BTN_WITHDRAW, left + 8, top + 112, 80, 20, "Withdraw"));
+        }
 
         // Toggle infinite (admin only)
         if (player.canUseCommand(2, "sum.shop.infinite")) {
             this.buttonList.add(new GuiButton(BTN_TOGGLE_INFINITE,
-                left + 92, top + 112, 76, 20,
+                left + (hasTill ? 92 : 8), top + 112, 76, 20,
                 shop.isInfiniteStock() ? "Infinite: ON" : "Infinite: OFF"));
         }
     }
@@ -160,8 +164,14 @@ public class GuiShopOwner extends GuiContainer {
             100, 76, TEXT_VALUE);
 
         // Funds + stock readouts under the action button row (buttons end at y=132)
-        String fundsStr = "Funds: $" + String.format(Locale.ROOT, "%.2f", shop.getFundsAccumulated());
-        drawString(this.fontRenderer, fundsStr, 8, 134, TEXT_VALUE);
+        if (shop.isServerShop()) {
+            // Kept short: the stock readout starts at x=110 on this same row.
+            drawString(this.fontRenderer, "Takings: voided", 8, 134, TEXT_DIM);
+        } else {
+            String fundsStr =
+                "Funds: $" + String.format(Locale.ROOT, "%.2f", shop.getFundsAccumulated());
+            drawString(this.fontRenderer, fundsStr, 8, 134, TEXT_VALUE);
+        }
         String stockStr = shop.isInfiniteStock()
             ? "Stock: ∞"
             : ("Stock: " + shop.getStockCount());

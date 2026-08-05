@@ -68,7 +68,7 @@ public class ContainerShopOwner extends Container {
 
     @Override
     public boolean canInteractWith(EntityPlayer player) {
-        return shop.isUsableByPlayer(player) && shop.isOwner(player);
+        return shop.isUsableByPlayer(player) && shop.canManage(player);
     }
 
     @Override

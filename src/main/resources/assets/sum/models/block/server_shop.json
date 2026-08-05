@@ -1,7 +1,6 @@
 {
-  "__comment": "Vending cabinet carved out of a full cube: hood + base + two side pillars + back panel, leaving a 12x10x11 cavity behind a recessed glass pane. Faces that look into the cavity use #interior; TESRShop renders the sale item inside it. UVs are deliberately omitted so every face maps to the same region of the texture it would occupy on a full cube, which keeps #front/#side/#top authored as plain 16x16 block faces.",
+  "__comment": "Same cabinet geometry as sum:block/shop — see that file for why UVs are omitted — with the server-shop livery. Glass and cabinet interior are shared with the player shop.",
   "parent": "block/block",
-  "__display_comment": "Carried over from block/orientable, which this model no longer inherits: turns the storefront toward the camera in first person instead of showing a side.",
   "display": {
     "firstperson_righthand": {
       "rotation": [0, 135, 0],
@@ -10,10 +9,10 @@
     }
   },
   "textures": {
-    "particle": "sum:blocks/shop_side",
-    "front": "sum:blocks/shop_front",
-    "side": "sum:blocks/shop_side",
-    "top": "sum:blocks/shop_top",
+    "particle": "sum:blocks/server_shop_side",
+    "front": "sum:blocks/server_shop_front",
+    "side": "sum:blocks/server_shop_side",
+    "top": "sum:blocks/server_shop_top",
     "interior": "sum:blocks/shop_interior",
     "glass": "sum:blocks/shop_glass"
   },
