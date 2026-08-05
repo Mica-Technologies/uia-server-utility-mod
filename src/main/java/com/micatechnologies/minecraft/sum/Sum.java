@@ -28,6 +28,7 @@ import com.micatechnologies.minecraft.sum.roamer.EntityRoamer;
 import com.micatechnologies.minecraft.sum.roamer.RoamerExitCache;
 import com.micatechnologies.minecraft.sum.roamer.RoamerShelterCache;
 import com.micatechnologies.minecraft.sum.roamer.TileEntityStormShelterSign;
+import com.micatechnologies.minecraft.sum.shop.TileEntityServerShop;
 import com.micatechnologies.minecraft.sum.shop.TileEntityShop;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
@@ -102,6 +103,8 @@ public class Sum {
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "vault_door"));
         GameRegistry.registerTileEntity(TileEntityShop.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "shop"));
+        GameRegistry.registerTileEntity(TileEntityServerShop.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "server_shop"));
         GameRegistry.registerTileEntity(TileEntityBillChanger.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "bill_changer"));
         GameRegistry.registerTileEntity(TileEntityBillsDisplay.class,

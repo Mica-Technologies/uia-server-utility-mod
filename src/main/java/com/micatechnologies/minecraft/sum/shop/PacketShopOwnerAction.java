@@ -13,9 +13,10 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
 /**
- * Owner-only client → server actions for {@link TileEntityShop}: change sale amount/cost,
- * withdraw funds, toggle infinite stock (admin only). The server validates the player owns
- * the shop before applying any action.
+ * Manager-only client → server actions for {@link TileEntityShop}: change sale amount/cost,
+ * withdraw funds, toggle infinite stock (admin only). The server re-checks
+ * {@link TileEntityShop#canManage} before applying any action — the shop's owner for a player
+ * shop, an operator for a {@link TileEntityServerShop}.
  */
 public class PacketShopOwnerAction implements IMessage {
 
@@ -65,8 +66,8 @@ public class PacketShopOwnerAction implements IMessage {
             TileEntity te = player.world.getTileEntity(msg.pos);
             if (!(te instanceof TileEntityShop)) return;
             TileEntityShop shop = (TileEntityShop) te;
-            if (!shop.isOwner(player)) {
-                Sum.LOGGER.warn("[shop] non-owner {} tried to mutate shop at {}",
+            if (!shop.canManage(player)) {
+                Sum.LOGGER.warn("[shop] {} tried to mutate a shop they don't manage at {}",
                     player.getName(), msg.pos);
                 return;
             }

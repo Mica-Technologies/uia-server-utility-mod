@@ -20,6 +20,7 @@ import com.micatechnologies.minecraft.sum.phone.BlockDeskPhone;
 import com.micatechnologies.minecraft.sum.plots.ItemPlotWand;
 import com.micatechnologies.minecraft.sum.roamer.BlockStormShelterSign;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerConfigurator;
+import com.micatechnologies.minecraft.sum.shop.BlockServerShop;
 import com.micatechnologies.minecraft.sum.shop.BlockSumShop;
 import com.micatechnologies.minecraft.sum.trash.BlockTrashCan;
 import com.micatechnologies.minecraft.sum.roamer.ItemRoamerSpawnEgg;
@@ -48,6 +49,7 @@ public class SumTab {
     public static ItemAccountAccess phone;
     public static ItemAccountAccess debitCard;
     public static BlockSumShop shop;
+    public static BlockServerShop serverShop;
     public static BlockBillChanger billChanger;
     public static ItemSumPacket[] packets;
     public static BlockBillsDisplay billsDisplay;
@@ -81,6 +83,7 @@ public class SumTab {
         phone = new ItemAccountAccess("phone", true);
         debitCard = new ItemAccountAccess("debit_card", false);
         shop = new BlockSumShop();
+        serverShop = new BlockServerShop();
         billChanger = new BlockBillChanger();
         packets = new ItemSumPacket[BILL_DENOMINATIONS.length];
         for (int i = 0; i < BILL_DENOMINATIONS.length; i++) {

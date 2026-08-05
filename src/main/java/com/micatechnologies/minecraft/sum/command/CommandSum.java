@@ -1523,7 +1523,8 @@ public class CommandSum extends CommandBase {
             h("Phone", "Right-click to bind, again to open. Home screen with Banking, Notes, Calculator, Weather, Contacts, Messages — contacts/messages/notes live in your server-side cloud and follow you across devices."),
             h("Desk phone", "Place block, right-click to use as a shared phone. Same apps as the phone item except Banking; opens each player's own cloud."),
             h("Debit card", "Right-click to bind, again to open the ATM GUI directly (no phone shell)."),
-            h("Shop block", "Vending machine. Owner sets template+stock+price; buyers see item + price + Buy button."),
+            h("Shop block", "Vending machine. Owner sets template+stock+price; buyers see item + price + Buy button. The sale item is visible through the glass."),
+            h("Server shop", "Ownerless vending machine. Ops sneak + right-click (empty hand) to set it up; everyone, ops included, pays the price. Takings are destroyed, not banked."),
             h("Bill changer", "Drop 64 bills + Bundle → packet. Drop a packet + Unbundle → 64 bills."),
             h("Bills display", "Decorative tray; right-click bills/packet to insert, right-click empty to take."),
             h("Trash can", "Right-click for ephemeral 9-slot inventory. Closing the GUI destroys contents."),
@@ -1541,6 +1542,7 @@ public class CommandSum extends CommandBase {
             h("Permissions: sum.plots.bypass", "Op-2+ default. Lets ops build inside protected plots; revoke via permissions mod if not wanted."),
             h("Permissions: sum.plots.admin", "Lets non-owners run trust/untrust/transfer/sell on any plot."),
             h("Permissions: sum.jobs.remove_any", "Lets a holder remove any job listing, not just their own."),
+            h("Permissions: sum.server_shop.manage", "Op-2+ default. Lets a holder set up and break Server Shop blocks. Does not exempt them from paying."),
         }),
     };
 

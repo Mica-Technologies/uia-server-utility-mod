@@ -79,7 +79,7 @@ Weather 2 Remastered fork) — NOT this repo.
 | `.roamer` | Roamer NPC entity, AI tasks, shelter cache, role enum, atlas + persona variants, render |
 | `.roadrunner` | Speed-boost-on-block handler |
 | `.serverconfig` | Server-config mirror — snapshot, packet (slot 17), bridge (login push), client mirror, GUI viewer |
-| `.shop` | Player vending-machine shop block + owner/buyer GUIs + sync packets |
+| `.shop` | Player + server vending-machine shop blocks, cabinet TESR, owner/buyer GUIs + sync packets |
 | `.signpost` | (Empty — feature moved to CSM) |
 | `.trash` | Trash can block + ephemeral GUI |
 
@@ -92,7 +92,8 @@ Weather 2 Remastered fork) — NOT this repo.
 | `safe_deposit_box` | `BlockSafeDepositBox` | Wall-mounted 3×3 per-(player, position) inventory |
 | `velvet_rope` | `BlockVelvetRope` | Multipart-blockstate decorative stanchion with auto-connecting rope segments |
 | `vault_door` | `BlockVaultDoor` + TE | Single-block passcode-locked door, auto-close after 5s |
-| `shop` | `BlockSumShop` + TE | Player vending machine (template + 3×3 stock, owner + buyer GUIs) |
+| `shop` | `BlockSumShop` + TE | Player vending machine (template + 3×3 stock, owner + buyer GUIs). Glass-fronted cabinet; `TESRShop` shows the sale item inside. |
+| `server_shop` | `BlockServerShop` + `TileEntityServerShop` | Ownerless vending machine. Op-only setup (sneak + right-click, empty hand) and op-only breaking; everyone including ops pays. Takings are destroyed, not banked. |
 | `mailbox` | `BlockMailbox` + TE | Claim-on-first-rightclick; deposit-only for non-owners |
 | `job_board` | `BlockJobBoard` | Server-wide job listings; opens `GuiJobBoard` |
 | `trash_can` | `BlockTrashCan` | Ephemeral 9-slot inventory destroyed on close |

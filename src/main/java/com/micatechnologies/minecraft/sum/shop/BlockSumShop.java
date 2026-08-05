@@ -10,6 +10,7 @@ import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.SoundType;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyDirection;
+import net.minecraft.block.state.BlockFaceShape;
 import net.minecraft.block.state.BlockStateContainer;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
@@ -17,6 +18,7 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumBlockRenderType;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -26,7 +28,10 @@ import net.minecraft.util.Rotation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
+import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
  * Player-owned vending machine. First right-click claims the shop; subsequent right-clicks by
@@ -36,6 +41,14 @@ import net.minecraft.world.World;
  *
  * <p>Breaking the shop drops its stock, template, and accumulated funds (as bills) — owner
  * loss-protection.
+ *
+ * <p>The model is a cabinet rather than a full cube: hood, base and two side pillars around a
+ * cavity closed by a recessed glass pane, with {@link TESRShop} floating the sale item inside
+ * it so passers-by can see the goods without opening anything.
+ *
+ * <p>{@link BlockServerShop} extends this with the ownerless variant, which is why the
+ * registry name is a constructor argument and the interaction handler is the only piece it
+ * needs to replace.
  */
 public class BlockSumShop extends Block implements ITileEntityProvider {
 
@@ -43,13 +56,22 @@ public class BlockSumShop extends Block implements ITileEntityProvider {
         "facing", EnumFacing.Plane.HORIZONTAL);
 
     public BlockSumShop() {
+        this("shop");
+    }
+
+    protected BlockSumShop(String registryName) {
         super(Material.IRON);
-        setRegistryName(SumConstants.MOD_NAMESPACE, "shop");
-        setTranslationKey(SumConstants.MOD_NAMESPACE + ".shop");
+        setRegistryName(SumConstants.MOD_NAMESPACE, registryName);
+        setTranslationKey(SumConstants.MOD_NAMESPACE + "." + registryName);
         setHardness(2.5F);
         setResistance(15.0F);
         setSoundType(SoundType.METAL);
         setCreativeTab(SumTab.TAB);
+        // The cabinet's interior faces sample light at the block's own position. Left at the
+        // material default (fully light-blocking) that position is always pitch black, so the
+        // goods would sit in an unlit box; a glass-fronted display case letting light through
+        // is both the better look and the honest physical description.
+        setLightOpacity(0);
         setDefaultState(blockState.getBaseState().withProperty(FACING, EnumFacing.NORTH));
 
         SumRegistry.registerBlock(this);
@@ -153,14 +175,46 @@ public class BlockSumShop extends Block implements ITileEntityProvider {
         return EnumBlockRenderType.MODEL;
     }
 
+    /**
+     * The glass pane is genuinely semi-transparent (alpha in {@code shop_glass.png}), which
+     * only survives in the translucent pass — {@code CUTOUT} would round it to fully opaque and
+     * put us back to a painted-on window. The opaque cabinet quads sit in the same layer at
+     * alpha 255, exactly as vanilla stained glass does.
+     *
+     * <p>{@code @SideOnly} mirrors the method it overrides, so FML strips it on a dedicated
+     * server rather than leaving an override of a method the server jar doesn't have.
+     */
+    @Override
+    @SideOnly(Side.CLIENT)
+    public BlockRenderLayer getRenderLayer() {
+        return BlockRenderLayer.TRANSLUCENT;
+    }
+
+    /** The model is a cabinet with a cavity, not a solid cube. Collision stays full-block. */
     @Override
     public boolean isFullCube(IBlockState state) {
-        return true;
+        return false;
     }
 
     @Override
     public boolean isOpaqueCube(IBlockState state) {
         // Glass front means we don't fully occlude; let neighbors render their faces.
         return false;
+    }
+
+    /**
+     * Every face except the recessed window is still a flat full-block face, so torches, fences
+     * and the like keep attaching to the cabinet the way they did when this was a full cube.
+     */
+    @Override
+    public BlockFaceShape getBlockFaceShape(IBlockAccess world, IBlockState state, BlockPos pos,
+                                            EnumFacing face) {
+        return face == state.getValue(FACING) ? BlockFaceShape.UNDEFINED : BlockFaceShape.SOLID;
+    }
+
+    @Override
+    public boolean isSideSolid(IBlockState state, IBlockAccess world, BlockPos pos,
+                               EnumFacing side) {
+        return side != state.getValue(FACING);
     }
 }
