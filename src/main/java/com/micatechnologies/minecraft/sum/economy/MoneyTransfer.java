@@ -120,9 +120,15 @@ public final class MoneyTransfer {
         return Result.success(amount, credited, fee);
     }
 
-    /** Rounds a currency value to whole cents (half-up). Package-private for unit testing. */
+    /**
+     * Rounds a currency value to whole cents (half-up).
+     *
+     * <p>Delegates to {@link MoneyMath} so this and the public economy API round identically —
+     * two copies of the rule would let the same amount become different money depending on which
+     * code path a player used. Kept package-private here for the existing unit tests.
+     */
     static double roundToCents(double v) {
-        return Math.floor(v * 100.0 + 0.5) / 100.0;
+        return MoneyMath.roundToCents(v);
     }
 
     private static String money(double v) {
