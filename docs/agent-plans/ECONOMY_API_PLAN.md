@@ -1,16 +1,18 @@
 # SUM Economy API — implementation plan
 
-**Status:** Phases 1–7 and 9 complete; Phase 8 blocked on a human at a game
-client. Written and built 2026-08-09; reviewed, extended and committed
-2026-08-11. Committed on `dev/ogh` (not pushed).
+**Status:** Phases 1–7 and 9 complete; Phase 8 verified on the **local** backend
+and outstanding on the **remote** one. Written and built 2026-08-09; reviewed,
+extended, verified in game and committed 2026-08-11. Committed on `dev/ogh`
+(not pushed).
 **Owner:** Alex (mica-alex).
 
-> **What is left:** in-game verification of money actually moving. Every path
-> needs a live player, so no automated check can cover it. The checklist is
-> `docs/agent_progress/TESTING_PLAN.md` §4.14, and a probe mod is already built
-> and installed to make it a single command. Until that passes, do not enable an
-> economy integration on a production server, and do not tag a release — a tag
-> is what consumers pin to.
+> **What is left:** the remote OMCE backend, plus three local scenarios the probe
+> cannot script — a restart mid-hold, the orphan sweep, and SUM's own
+> transactions posting events. The checklist is
+> `docs/agent_progress/TESTING_PLAN.md` §4.14. Do not enable an economy
+> integration on a production server running a *remote* economy until that half
+> is verified, and do not tag a release before it — a tag is what consumers pin
+> to.
 
 This is the working plan for giving SUM a **public, stable economy API** that other
 mods can compile and depend on. It is a phased build plan, not a design essay:
@@ -730,9 +732,11 @@ real api jar (verify in Phase 8 — untested samples rot immediately).
 - [x] Drop it in `run/mods` alongside SUM; verify `acquire` denies it until it's
       added to `allowedMods`, then grants the exact scopes configured.
       *(24/24 startup checks pass on a dedicated server, re-run 2026-08-11.)*
-- [ ] Exercise every method against the **local** backend: wallet read/spend/
-      credit, bank read/deposit/withdraw, escrow open/release/refund/forfeit.
-      **Needs a live player — `/casinoprobe`.**
+- [x] Exercise every method against the **local** backend: wallet read/spend/
+      credit, escrow open/release/refund/forfeit. **`/casinoprobe` passed 32/32
+      in a dev client, 2026-08-11.** Bank deposit/withdraw is covered only as a
+      correct `MISSING_SCOPE` refusal, since the probe holds `escrow` alone —
+      the successful bank path arrives with the remote-backend run below.
 - [ ] Exercise the same against the **remote** OMCE backend. This is the highest-
       value test in the plan — it is the claim "works with both setups", and it
       is the one most likely to be quietly false. Watch quantisation on a
@@ -740,6 +744,9 @@ real api jar (verify in Phase 8 — untested samples rot immediately).
 - [ ] Kill the server between `escrowOpen` and release; confirm the ticket
       survives and the money is not duplicated.
 - [ ] Verify events fire for both SUM-internal and third-party transactions.
+      **Third-party half done** — 19 movements observed with correct types,
+      amounts and `mycasino` attribution, including `FORFEITED`. SUM's own
+      transactions have not been watched yet.
 - [ ] Verify remote ledger entries carry the `sum.source_mod` metadata.
 - [x] Copy each doc sample into the consumer mod and confirm it compiles.
       *(Both samples are literally probe source files — `SlotMachine.java` and
@@ -854,6 +861,7 @@ Append one row per session. Keep it terse.
 | 2026-08-09 | 8 | External probe mod compiled against the api jar ALONE and booted on a dedicated server: 22/22 startup checks pass. In-game money movement still unverified — `/casinoprobe` built for it | see below |
 | 2026-08-09 | 9 | TESTING_PLAN §1.2/1.5/1.10/2/4.14 and CLAUDE.md updated | see below |
 | 2026-08-09 | 5 | Escrow: `EscrowSavedData`, `EscrowService`, `EscrowEvents`, handle wiring, idling orphan sweep; 16 tests (493 total). Event posting deferred to Phase 4. Not yet exercised in game | see below |
+| 2026-08-11 | 8 | **Money moved.** `/casinoprobe` passed 32/32 in a dev client on the local backend: wallet credit/spend, escrow open → release/refund/forfeit, double-settlement refused, and a forged $1,000,000 ticket paying out the $10 really held. 19 events observed with correct attribution. Fixed the audit log rendering settled holds as `0.0 for unknown` | *(follows)* |
 | 2026-08-11 | 5, 9 | Review pass. Found and closed the `escrowForfeit` gap — a casino could not take a losing wager, and the documented slot machine refunded every loss. Shipped the strict-transaction-types warning; answered all five §10 open questions; dropped cancellable `Pre` events and deferred the ledger, both with reasons. 5 tests (503 total); server re-verified 24/24. The whole feature committed as eight commits beginning at `726ba9b` | `726ba9b`+ |
 
 ---
@@ -902,14 +910,23 @@ bank callback fires **exactly once** even on immediate rejection; that balances
 are never `NaN`; that `quantiseForBank` rounds down; and that both documented
 code samples compile.
 
-**Not proved — no dollar has moved.** Every money path needs a live player:
-wallet spend/credit, escrow open/release/refund/forfeit, bank deposit/withdraw,
-event posting on real transactions, crash-safety of a hold across a restart, the
-orphan sweep, and the whole remote-backend story. `/casinoprobe` exists to make
-that one command; TESTING_PLAN §4.14 is the checklist.
+**Proved on 2026-08-11, in a dev client, with real money:** `/casinoprobe` passed
+32/32 on the local backend. Wallet credit and spend move exact amounts; an
+overspend is refused and changes nothing; escrow open → release, → refund and →
+forfeit each conserve or destroy exactly the stored amount; a second settlement
+of the same ticket is refused and pays nothing; **a ticket forged to claim
+$1,000,000 paid out the $10 that was really held**; and the wallet ends exactly
+where it started. Events fired for all 19 movements with the right types and
+`mycasino` attribution.
 
-This distinction is worth keeping honest. "503 unit tests pass and a consumer mod
-loads" is a real result, and it is *not* the same as "the economy works".
+**Still not proved:** the whole remote-backend story, crash-safety of a hold
+across a restart, the orphan sweep, a *successful* bank deposit/withdraw, and
+that SUM's own transactions post events attributed to `sum`. TESTING_PLAN §4.14
+is the checklist.
+
+The original distinction is still worth keeping. "503 unit tests pass and a
+consumer mod loads" was a real result, and it was *not* the same as "the economy
+works" — which is now known, rather than assumed, for one of the two backends.
 
 **And a worked example of exactly that gap:** the `escrowForfeit` hole (Phase 5,
 2026-08-11) survived every one of those checks. The api jar was self-contained,
@@ -928,7 +945,8 @@ right.
 - [x] The `-api` jar exists and contains only api classes. *(17 classes, 0
       leaks; the `addon.gradle` guard fails the build on an internal import.)*
 - [x] An unauthorized mod is denied; an authorized one gets exactly its scopes.
-- [ ] Wallet, bank and escrow all work on the **local** backend.
+- [x] Wallet and escrow work on the **local** backend. *(32/32 in game,
+      2026-08-11. Bank is covered there only as a correct scope refusal.)*
 - [ ] Wallet, bank and escrow all work on the **remote** OMCE backend.
 - [ ] Events fire for both SUM-internal and third-party transactions.
 - [ ] Escrow survives a server restart and never duplicates or loses value.
@@ -938,8 +956,9 @@ right.
       is the parser's empty case; the registry installs but grants nothing, and
       the escrow sweep idles after one pass with no tickets.)*
 
-The four unticked boxes are all the same thing: money has not been observed
-moving. See §10a.
+The unticked boxes are now all about the **remote** backend, plus the three
+local scenarios the probe cannot script: a restart mid-hold, the orphan sweep,
+and SUM's own transactions posting events. See §10a.
 
 ---
 
@@ -950,20 +969,26 @@ Paste this into a fresh session to pick the work up cold.
 ```
 Continue the SUM Economy API work.
 
-Phases 1-7 and 9 are complete; Phase 8 is blocked on a human at a game client.
-Everything is COMMITTED on dev/ogh and not pushed. Read
+Phases 1-7 and 9 are complete. Phase 8 is verified on the LOCAL backend
+(/casinoprobe passed 32/32 in game on 2026-08-11) and outstanding on the REMOTE
+one. Everything is COMMITTED on dev/ogh and not pushed. Read
 docs/agent-plans/ECONOMY_API_PLAN.md first — locked decisions in §2, rejected
 alternatives in §3, architecture in §4, per-phase detail in §6, what Phase 8 did
 and did not prove in §10a, and the progress log in §9.
 
-The single most important outstanding item: NO MONEY HAS ACTUALLY MOVED yet.
-Every money path needs a live player, so it cannot be covered by a unit test or
-a headless boot. The checklist is docs/agent_progress/TESTING_PLAN.md §4.14, and
-a probe mod is already built at run/mods/mycasino-probe.jar (authorized in
-run/config/sum.cfg as `mycasino=escrow`) which registers /casinoprobe to run the
-whole suite in one command. Do not describe the API as verified until that
-passes, and until it has been run against a remote OMCE backend too. Do not tag
-a release before then either — a tag is what consumers pin to.
+The single most important outstanding item: THE REMOTE OMCE BACKEND HAS NEVER
+BEEN EXERCISED. Everything proved so far ran on the local backend, so the claim
+"works with both setups" is still half unverified, and it is the half most
+likely to be quietly false — watch quantisation on a whole-unit currency and the
+ambiguity-recovery path. Also outstanding locally: a restart mid-hold, the
+orphan sweep, a successful bank deposit/withdraw, and SUM's own transactions
+posting events attributed to `sum`.
+
+The checklist is docs/agent_progress/TESTING_PLAN.md §4.14. A probe mod is built
+at run/mods/mycasino-probe.jar (authorized in run/config/sum.cfg as
+`mycasino=escrow`) and registers /casinoprobe to run the whole money-movement
+suite in one command; leave both in place until §4.14 is finished. Do not tag a
+release before it is — a tag is what consumers pin to.
 
 Every §10 open question is now answered and every Phase 9 decision is recorded,
 so there is nothing left to decide — only to verify. If you find yourself about

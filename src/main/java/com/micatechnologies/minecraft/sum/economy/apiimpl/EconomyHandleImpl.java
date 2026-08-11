@@ -358,10 +358,10 @@ public final class EconomyHandleImpl implements EconomyHandle {
         // guard checks zero and the operator's cap does not apply to paying out a held stake.
         EconomyResult refusal = guard(EconomyScope.ESCROW, recipient, 0.0, 0.0);
         if (refusal != null) {
-            return log("escrowRelease", recipient, 0.0, reason, refusal);
+            return log("escrowRelease", recipient, null, reason, refusal);
         }
         try (EconomyAttribution.Scope ignored = EconomyAttribution.enter(modId, reason)) {
-            return log("escrowRelease", recipient, 0.0, reason,
+            return log("escrowRelease", recipient, null, reason,
                 EscrowService.release(modId, ticket, recipient, reason));
         }
     }
@@ -379,7 +379,7 @@ public final class EconomyHandleImpl implements EconomyHandle {
                 "'" + modId + "' called the economy off the server thread.");
         }
         try (EconomyAttribution.Scope ignored = EconomyAttribution.enter(modId, reason)) {
-            return log("escrowRefund", null, 0.0, reason,
+            return log("escrowRefund", null, null, reason,
                 EscrowService.refund(modId, ticket, reason));
         }
     }
@@ -397,7 +397,7 @@ public final class EconomyHandleImpl implements EconomyHandle {
                 "'" + modId + "' called the economy off the server thread.");
         }
         try (EconomyAttribution.Scope ignored = EconomyAttribution.enter(modId, reason)) {
-            return log("escrowForfeit", null, 0.0, reason,
+            return log("escrowForfeit", null, null, reason,
                 EscrowService.forfeit(modId, ticket, reason));
         }
     }
@@ -450,24 +450,45 @@ public final class EconomyHandleImpl implements EconomyHandle {
      * missing scope or an off-thread call is a bug an operator needs to see, not routine traffic
      * they opted out of.
      */
-    private EconomyResult log(String operation, @Nullable EntityPlayer player, double amount,
-            @Nullable String reason, EconomyResult result) {
+    private EconomyResult log(String operation, @Nullable EntityPlayer player,
+            @Nullable Double amount, @Nullable String reason, EconomyResult result) {
         boolean callerError = result.isCallerError();
         if (!callerError && !SumConfig.isEconomyIntegrationLoggingEnabled()) {
             return result;
         }
-        String who = player != null ? player.getName() : "unknown";
+        String what = describe(operation, player, amount);
         if (callerError) {
-            Sum.LOGGER.warn("[economy-api] {} {} {} for {}: {} ({})", modId, operation, amount, who,
-                result.getFailure(), result.getMessage());
+            Sum.LOGGER.warn("[economy-api] {} {}: {} ({})", modId, what, result.getFailure(),
+                result.getMessage());
         } else if (result.isOk()) {
-            Sum.LOGGER.info("[economy-api] {} {} {} for {} -> ok. Reason: {}", modId, operation,
-                amount, who, attributeReason(modId, reason));
+            Sum.LOGGER.info("[economy-api] {} {} -> ok. Reason: {}", modId, what,
+                attributeReason(modId, reason));
         } else {
-            Sum.LOGGER.info("[economy-api] {} {} {} for {} -> {}: {}", modId, operation, amount,
-                who, result.getFailure(), result.getMessage());
+            Sum.LOGGER.info("[economy-api] {} {} -> {}: {}", modId, what, result.getFailure(),
+                result.getMessage());
         }
         return result;
+    }
+
+    /**
+     * Renders the subject of a log line, leaving out what the call site genuinely does not know.
+     *
+     * <p>The escrow settlements identify their money by ticket, not by amount, and a refund or
+     * forfeit does not even need a player. Printing the placeholders anyway produced lines reading
+     * {@code escrowForfeit 0.0 for unknown -> ok} next to the accurate one {@link EscrowService}
+     * writes — which invites an operator to read a settled hold as a $0 movement, in the log whose
+     * whole purpose is reconstructing where money went.
+     */
+    private static String describe(String operation, @Nullable EntityPlayer player,
+            @Nullable Double amount) {
+        StringBuilder text = new StringBuilder(operation);
+        if (amount != null) {
+            text.append(' ').append(amount);
+        }
+        if (player != null) {
+            text.append(" for ").append(player.getName());
+        }
+        return text.toString();
     }
 
     /** Hands a result to a bank callback, containing any exception the consumer throws. */

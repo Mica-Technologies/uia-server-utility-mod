@@ -1037,15 +1037,21 @@ Two players recommended (`gradlew runServer` + client, or two clients).
 
 ---
 
-### 4.14 Public economy API (added 2026-08-09) — NEEDS IN-GAME VERIFICATION
+### 4.14 Public economy API (added 2026-08-09) — LOCAL BACKEND VERIFIED 2026-08-11
+
+> **Money has moved.** `/casinoprobe` passed 32/32 in a dev client on the local
+> backend on 2026-08-11, on top of 24/24 headless startup checks. What remains
+> below is the restart, the sweep, SUM's *own* transactions posting events, and
+> the entire remote-OMCE story.
 
 Automated coverage so far: 60 unit tests, plus a real external consumer mod
 compiled against **only** the `-api` jar and booted on a dedicated server. That
 proved authorization, scope expansion, status, guard rejections, the
 fire-exactly-once bank callback, and that the documented examples compile.
 
-**None of it moved a single dollar** — every money path needs a live player, so
-this section is the part a human has to do.
+On 2026-08-11 the live-player half was run too, so the local backend is now
+verified end to end. The remote backend is not, and neither are the two failure
+scenarios (restart, orphan sweep).
 
 A throwaway probe mod (`mycasino`) is already built and installed in
 `run/mods/mycasino-probe.jar`, and `run/config/sum.cfg` already authorizes it
@@ -1053,36 +1059,47 @@ with `mycasino=escrow`. It registers `/casinoprobe`, which runs the whole
 money-movement suite against whoever types it and asserts their wallet ends
 exactly where it started.
 
-- [ ] `./gradlew runClient`, open a world, give yourself money, run
-      `/casinoprobe`. Expect **ALL CHECKS PASSED**. It covers: credit, spend,
-      refused overspend, escrow open/release/refund, double-release refused,
-      a **forged ticket paying only what was really held**, **forfeit
-      destroying a losing stake and not handing it back**, double-forfeit
-      refused, bank refused without `bank_write`, and a net-zero wallet at the
-      end.
-- [ ] Watch the log during the forfeit checks: `escrowForfeit` should log
-      `destroyed:` with the amount. That money is gone from the economy on
-      purpose — it is the only API operation that shrinks the money supply, so
-      if a wallet total goes *up* across those checks something is badly wrong.
+- [x] `./gradlew runClient`, open a world, run `/casinoprobe`. **ALL 32 CHECKS
+      PASSED, 2026-08-11.** It covers: credit, spend, refused overspend, escrow
+      open/release/refund, double-release refused, a **forged ticket paying only
+      what was really held**, **forfeit destroying a losing stake and not
+      handing it back**, double-forfeit refused, bank refused without
+      `bank_write`, and a net-zero wallet at the end. (It self-funds with a $100
+      credit, so no `/give` is needed.)
+- [x] Watch the log during the forfeit checks. Confirmed:
+      `escrowForfeit $20.0 ... destroyed: probe: house keeps it`, followed by an
+      unchanged wallet. That money is gone from the economy on purpose — it is
+      the only API operation that shrinks the money supply, so a wallet total
+      going *up* across those checks would mean something is badly wrong.
+- [x] Third-party events fire. The probe's listener logged all 19 movements with
+      the right types and amounts, including `escrow FORFEITED`, each attributed
+      to `mycasino`. **The forged-ticket case is the one to reread in the log:**
+      a ticket claiming $1,000,000 produced `wallet CREDIT $10.0` and
+      `escrow RELEASED $10.0` — the stored amount, not the claimed one.
 - [ ] `/sum econ api mods` — `mycasino` shows as installed + connected with
-      `wallet_read, wallet_write, escrow`.
+      `wallet_read, wallet_write, escrow`. *(Not run yet.)*
 - [ ] `/sum econ api escrow` — empty after a clean `/casinoprobe` run.
+      *(Not run yet.)*
 - [ ] **Crash safety.** Add a temporary hold (or stop mid-probe), `/stop` the
       server, restart, then `/sum econ api escrow` — the hold must still be
       there with the same amount. Then `/sum econ api refund <id>`.
 - [ ] **Orphan sweep.** Set `orphanedEscrowGraceMinutes=0`, open a hold, remove
       `mycasino=escrow` from `allowedMods`, `/sum econ api reload`, wait ~5s.
       The hold should refund itself with a WARN naming the mod.
-- [ ] **Events.** Watch the log while shopping/`/pay`/using an ATM: the probe's
-      listener prints every wallet and bank event. SUM's own transactions must
-      appear attributed to `sum`, the probe's to `mycasino`.
+- [ ] **SUM's own transactions post events too.** The 2026-08-11 run only
+      exercised `mycasino`, so half this claim is still untested. Shop, `/pay`
+      and use an ATM with the probe installed: its listener prints every wallet
+      and bank event, and SUM's must appear attributed to `sum`. An event bus
+      that only shows third-party activity would give a listener a
+      systematically wrong picture of where money goes.
 - [ ] **Remote backend.** Repeat `/casinoprobe` with `economy_api` pointed at a
       real OMCE service. This is the highest-value check in the whole plan: it
       is the claim "works with both setups", and the one most likely to be
       quietly false. Watch quantisation on a whole-unit currency, and confirm
       ledger entries carry `sum.source_mod` and `mod_deposit`/`mod_withdraw`.
 - [ ] Remove `run/mods/mycasino-probe.jar` and the `mycasino=escrow` config line
-      when done.
+      when done. **Leave them for now** — every unticked item above still needs
+      the probe.
 
 > Rebuilding the probe: sources are in the session scratchpad under
 > `consumer/src/com/example/mycasino/`. It is five files compiled with
