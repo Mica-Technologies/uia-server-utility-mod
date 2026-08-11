@@ -96,6 +96,13 @@ public final class OmceProtocol {
     public static final String TX_ADMIN_DEBIT = "admin_debit";
     public static final String TX_ADMIN_MIGRATION = "admin_migration";
 
+    // Bank moves made by another mod through SUM's public economy API. Distinct from the atm_*
+    // types so a ledger can tell "the player went to an ATM" from "an integration moved this on
+    // their behalf" — the metadata key `sum.source_mod` names which mod. A service running in
+    // strictTransactionTypes mode must be told about these before enabling integrations.
+    public static final String TX_MOD_DEPOSIT = "mod_deposit";
+    public static final String TX_MOD_WITHDRAW = "mod_withdraw";
+
     // ---------------------------------------------------------------------------------------
     // Error codes (spec section 6.7)
     // ---------------------------------------------------------------------------------------

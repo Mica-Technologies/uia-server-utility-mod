@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum.economy;
 
+import com.micatechnologies.minecraft.sum.api.event.WalletTransactionEvent;
 import com.micatechnologies.minecraft.sum.atm.Bills;
 import com.micatechnologies.minecraft.sum.pocket.PocketInventory;
 import java.util.ArrayList;
@@ -92,7 +93,12 @@ public final class WalletService {
             return false;
         }
         if (invisible >= amount) {
-            return EconomyBridge.adjustBalance(player, -amount);
+            if (!EconomyBridge.adjustBalance(player, -amount)) {
+                return false;
+            }
+            EconomyEventPoster.walletMoved(player, WalletTransactionEvent.Type.SPEND, amount,
+                getTotal(player));
+            return true;
         }
 
         // Cover the shortfall with bills, smallest first so the least value is broken up.
@@ -126,6 +132,8 @@ public final class WalletService {
         if (!EconomyBridge.adjustBalance(player, change - invisible)) {
             return false;
         }
+        EconomyEventPoster.walletMoved(player, WalletTransactionEvent.Type.SPEND, amount,
+            getTotal(player));
         return true;
     }
 
@@ -134,7 +142,15 @@ public final class WalletService {
         if (player == null || amount < 0.0) {
             return false;
         }
-        return amount == 0.0 || EconomyBridge.adjustBalance(player, amount);
+        if (amount == 0.0) {
+            return true;
+        }
+        if (!EconomyBridge.adjustBalance(player, amount)) {
+            return false;
+        }
+        EconomyEventPoster.walletMoved(player, WalletTransactionEvent.Type.CREDIT, amount,
+            getTotal(player));
+        return true;
     }
 
     /** True when a wallet backend is attached at all. */
