@@ -3,13 +3,17 @@ package com.micatechnologies.minecraft.sum;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.micatechnologies.minecraft.sum.api.EconomyScope;
 import com.micatechnologies.minecraft.sum.border.BorderEntry;
 import com.micatechnologies.minecraft.sum.loyalty.LoyaltyMilestone;
 import java.lang.reflect.Method;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,6 +39,14 @@ class SumConfigParsersTest {
         Method m = SumConfig.class.getDeclaredMethod("parseLoyaltyMilestones", String[].class, String.class);
         m.setAccessible(true);
         return (List<LoyaltyMilestone>) m.invoke(null, (Object) entries, "test");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Set<EconomyScope>> parseAllowedMods(String... entries)
+        throws Exception {
+        Method m = SumConfig.class.getDeclaredMethod("parseAllowedMods", String[].class);
+        m.setAccessible(true);
+        return (Map<String, Set<EconomyScope>>) m.invoke(null, (Object) entries);
     }
 
     // --- Border parser ---
@@ -181,5 +193,106 @@ class SumConfigParsersTest {
     @Test
     void speedBlockParserEmptyInputIsEmpty() {
         assertTrue(SumConfig.parseSpeedBlocks(new String[0]).isEmpty());
+    }
+
+    // --- Economy integration allowlist parser ---
+    //
+    // This one decides which other mods may move players' money, so its failure modes matter more
+    // than the others': a line that silently grants too much is a mod spending balances nobody
+    // authorized, and a line that silently grants nothing is a working integration that mystifies
+    // an operator by refusing every call.
+
+    @Test
+    void allowlistParsesModAndScopes() throws Exception {
+        Map<String, Set<EconomyScope>> result = parseAllowedMods("mycasino=wallet_read,bank_read");
+        assertEquals(1, result.size());
+        assertEquals(EnumSet.of(EconomyScope.WALLET_READ, EconomyScope.BANK_READ),
+            result.get("mycasino"));
+    }
+
+    @Test
+    void allowlistExpandsImpliedScopes() throws Exception {
+        Map<String, Set<EconomyScope>> result = parseAllowedMods("mycasino=escrow");
+        assertEquals(EnumSet.of(EconomyScope.ESCROW, EconomyScope.WALLET_WRITE,
+            EconomyScope.WALLET_READ), result.get("mycasino"),
+            "escrow debits and refunds a wallet, so it must carry the wallet scopes");
+    }
+
+    @Test
+    void allowlistWildcardGrantsEverything() throws Exception {
+        assertEquals(EnumSet.allOf(EconomyScope.class), parseAllowedMods("mycasino=*")
+            .get("mycasino"));
+    }
+
+    @Test
+    void allowlistIsCaseAndWhitespaceInsensitive() throws Exception {
+        Map<String, Set<EconomyScope>> result =
+            parseAllowedMods("  MyCasino =  WALLET_WRITE , bank_read  ");
+        assertEquals(EnumSet.of(EconomyScope.WALLET_WRITE, EconomyScope.WALLET_READ,
+            EconomyScope.BANK_READ), result.get("mycasino"),
+            "operators type this by hand; the mod id is matched lower-case");
+    }
+
+    @Test
+    void allowlistKeepsValidScopesWhenOneIsUnknown() throws Exception {
+        Map<String, Set<EconomyScope>> result =
+            parseAllowedMods("mycasino=wallet_read,teleport,bank_read");
+        assertEquals(EnumSet.of(EconomyScope.WALLET_READ, EconomyScope.BANK_READ),
+            result.get("mycasino"), "one bad token must not discard the rest of the line");
+    }
+
+    @Test
+    void allowlistDropsEntriesGrantingNothing() throws Exception {
+        Map<String, Set<EconomyScope>> result = parseAllowedMods(
+            "mycasino=",           // no scopes at all
+            "othermod=teleport",   // only an unknown scope
+            "thirdmod= , ,");      // only separators
+        assertTrue(result.isEmpty(),
+            "an authorized mod with no scopes would report as allowed while failing every call");
+    }
+
+    @Test
+    void allowlistSkipsMalformedEntries() throws Exception {
+        Map<String, Set<EconomyScope>> result = parseAllowedMods(
+            "",                       // blank
+            "   ",                    // whitespace
+            "# mycasino=wallet_read", // commented out
+            "garbage",                // no '='
+            "=wallet_read",           // no mod id
+            null);                    // null element
+        assertTrue(result.isEmpty(), "malformed lines are skipped, never fatal");
+    }
+
+    @Test
+    void allowlistLastEntryWinsOnDuplicateModId() throws Exception {
+        Map<String, Set<EconomyScope>> result =
+            parseAllowedMods("mycasino=wallet_read", "mycasino=bank_read");
+        assertEquals(1, result.size());
+        assertEquals(EnumSet.of(EconomyScope.BANK_READ), result.get("mycasino"),
+            "the later line is the operator's more recent intent");
+    }
+
+    @Test
+    void allowlistSurvivesOneBadLineAmongGoodOnes() throws Exception {
+        Map<String, Set<EconomyScope>> result = parseAllowedMods(
+            "mycasino=wallet_write", "garbage", "shopmod=bank_read");
+        assertEquals(2, result.size(),
+            "a typo in one line must not cost an operator every other integration");
+        assertTrue(result.containsKey("mycasino"));
+        assertTrue(result.containsKey("shopmod"));
+    }
+
+    @Test
+    void allowlistEmptyInputDeniesEverything() throws Exception {
+        assertTrue(parseAllowedMods().isEmpty(), "empty config is the deny-by-default case");
+        assertTrue(parseAllowedMods((String[]) null).isEmpty());
+    }
+
+    @Test
+    void allowlistScopeSetsAreUnmodifiable() throws Exception {
+        Set<EconomyScope> scopes = parseAllowedMods("mycasino=wallet_read").get("mycasino");
+        assertThrows(UnsupportedOperationException.class,
+            () -> scopes.add(EconomyScope.BANK_WRITE),
+            "a granted scope set must not be widenable by whoever holds a reference to it");
     }
 }
