@@ -114,6 +114,26 @@ jobs:
       - name: Copy Assembled Mod Jar to GitHub Actions Workspace
         run: cp ./build/libs/${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}.jar ./
 
+      # The public economy API jar (docs/SUM_ECONOMY_API.md). Dependent mods compile
+      # against this and run against the full mod jar above.
+      #
+      # `./gradlew build` produces it because addon.gradle wires `build` to depend on
+      # `apiJar` — the GTCEu buildscript alone only attaches it under CI. Fail loudly if
+      # it is missing rather than publishing a release that silently lacks it: a consumer
+      # pinning a version that has no api jar gets an unresolvable dependency, and the
+      # only clue is a 404.
+      - name: Copy API Jar to GitHub Actions Workspace
+        run: |
+          apiJar="./build/libs/${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}-api.jar"
+          if [ ! -f "$apiJar" ]; then
+            echo "::error::Expected API jar not found at $apiJar."
+            echo "Check that apiPackage is still set in buildscript.properties and that"
+            echo "addon.gradle still wires the 'build' task to depend on 'apiJar'."
+            ls -1 ./build/libs/ || true
+            exit 1
+          fi
+          cp "$apiJar" ./
+
       - name: Calculate Hashes for the Jar
         id: calculate-hashes
         run: |
@@ -125,6 +145,11 @@ jobs:
           echo "MD5_HASH=$md5" >> $GITHUB_ENV
           echo "SHA256_HASH=$sha256" >> $GITHUB_ENV
           echo "CRC32_HASH=$crc32" >> $GITHUB_ENV
+
+      - name: Calculate Hashes for the API Jar
+        run: |
+          apiSha256=$(sha256sum ./${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}-api.jar | awk '{print $1}')
+          echo "API_SHA256_HASH=$apiSha256" >> $GITHUB_ENV
 
       - name: Create Release Entry
         if: ${{ github.event.inputs.release == 'true' && github.event.inputs.release }}
@@ -143,11 +168,24 @@ jobs:
             SHA-256: `${{ env.SHA256_HASH }}`
             MD5: `${{ env.MD5_HASH }}`
             CRC-32: `${{ env.CRC32_HASH }}`
+
+            ---
+
+            **Players and server owners: download the `.jar` above.**
+
+            `${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}-api.jar` is for
+            *mod developers only*. It contains SUM's public economy API, for mods that
+            integrate with SUM's economy. It is not a mod — putting it in your `mods`
+            folder does nothing. Compile against it, and depend on the full mod at
+            runtime. See `docs/SUM_ECONOMY_API.md`.
+
+            API jar SHA-256: `${{ env.API_SHA256_HASH }}`
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
             ${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}.jar
+            ${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}-api.jar
 
       - name: Create Pre-Release Entry
         if: ${{ github.event.inputs.release == 'false' || !github.event.inputs.release }}
@@ -171,8 +209,24 @@ jobs:
             guaranteed to be stable or permanently available for download/usage.
             Pre-release versions of ${{ env.MOD_NAME }} may be removed or unavailable after
             90 days from their initial release.
+
+            ---
+
+            **Players and server owners: download the `.jar` above.**
+
+            `${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}-api.jar` is for
+            *mod developers only*. It contains SUM's public economy API, for mods that
+            integrate with SUM's economy. It is not a mod — putting it in your `mods`
+            folder does nothing. Compile against it, and depend on the full mod at
+            runtime. See `docs/SUM_ECONOMY_API.md`.
+
+            Do not pin a dependent mod to a pre-release API jar: pre-releases are
+            deleted after 90 days, which will break that mod's build.
+
+            API jar SHA-256: `${{ env.API_SHA256_HASH }}`
           draft: false
           prerelease: true
           generate_release_notes: true
           files: |
             ${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}.jar
+            ${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}-api.jar

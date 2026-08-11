@@ -206,3 +206,55 @@ tasks.matching { it.name == 'reobfJar' }.configureEach {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// The public economy API jar (see docs/SUM_ECONOMY_API.md).
+//
+// `apiPackage = api` in buildscript.properties makes the GTCEu buildscript register an
+// `apiJar` task, but it only attaches that task to the artifact set under CI or when
+// deploymentDebug is on (build.gradle ~1152). A local `./gradlew build` therefore produces
+// every other jar and silently skips this one — so anyone building SUM to get the API for a
+// dependent mod finds no api jar and no error explaining why. Wire it into `build`.
+tasks.matching { it.name == 'build' }.configureEach {
+    dependsOn 'apiJar'
+}
+
+// Build-time guard on the API's isolation.
+//
+// The API's stability contract promises consumers the -api jar is self-contained: compile
+// against it alone and your mod builds. An API class importing SUM's internals breaks that
+// silently — it compiles fine here, because the whole mod is on this project's classpath,
+// and only fails in the dependent mod's build, or later at runtime with a
+// NoClassDefFoundError on someone's server. Same reasoning as the manifest guard above:
+// assert the invariant where breaking it costs seconds.
+tasks.matching { it.name == 'apiJar' }.configureEach {
+    doLast {
+        String internalPrefix = project.modGroup.toString() + '.'
+        String apiPrefix = internalPrefix + 'api.'
+        File apiSrc = file('src/main/java/' + internalPrefix.replace('.' as char, '/' as char) + 'api')
+        if (!apiSrc.exists()) {
+            throw new GradleException("API source directory is missing: ${apiSrc}")
+        }
+        def offenders = []
+        apiSrc.eachFileRecurse { File sourceFile ->
+            if (!sourceFile.name.endsWith('.java')) {
+                return
+            }
+            sourceFile.readLines().eachWithIndex { String line, int index ->
+                def matcher = (line =~ /^\s*import\s+(?:static\s+)?([\w.]+)/)
+                if (matcher) {
+                    String imported = matcher[0][1]
+                    if (imported.startsWith(internalPrefix) && !imported.startsWith(apiPrefix)) {
+                        offenders << "  - ${sourceFile.name}:${index + 1} imports ${imported}"
+                    }
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException('The api package leaks SUM internals, so the -api jar '
+                    + 'would not be self-contained:\n' + offenders.join('\n')
+                    + '\nKeep implementation behind an interface declared in the api package.')
+        }
+        logger.lifecycle('API isolation OK: api package imports no SUM internals')
+    }
+}

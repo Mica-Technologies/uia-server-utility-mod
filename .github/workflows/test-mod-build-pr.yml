@@ -35,6 +35,27 @@ jobs:
       - name: Assemble mod with Gradle
         run: ./gradlew build -Dhttp.socketTimeout=60000 -Dhttp.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.http.connectionTimeout=60000
 
+      # The release workflow publishes this jar for dependent mods to compile against, so
+      # a PR that stops producing it must fail here rather than at release time. `build`
+      # produces it via the `apiJar` dependency wired in addon.gradle; that same task runs
+      # the guard asserting the api package imports no SUM internals.
+      - name: Assert the API jar was produced
+        run: |
+          if ! ls ./build/libs/*-api.jar >/dev/null 2>&1; then
+            echo "::error::No -api.jar in build/libs. Check that apiPackage is still set in"
+            echo "buildscript.properties and that addon.gradle still wires 'build' to 'apiJar'."
+            ls -1 ./build/libs/ || true
+            exit 1
+          fi
+          echo "API jar: $(ls -1 ./build/libs/*-api.jar)"
+
+      - name: Upload API jar for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-jar
+          path: build/libs/*-api.jar
+          retention-days: 7
+
       - name: Upload unit test report on failure
         if: failure()
         uses: actions/upload-artifact@v4
