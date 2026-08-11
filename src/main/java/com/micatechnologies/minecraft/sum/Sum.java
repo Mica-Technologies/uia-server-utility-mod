@@ -96,6 +96,8 @@ public class Sum {
             new com.micatechnologies.minecraft.sum.serverconfig.ServerConfigBridge());
         MinecraftForge.EVENT_BUS.register(
             new com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyEvents());
+        MinecraftForge.EVENT_BUS.register(
+            new com.micatechnologies.minecraft.sum.economy.apiimpl.EscrowEvents());
         proxy.preInit(event);
         SumTab.initTabElements();
         SumNetwork.init();
@@ -172,6 +174,9 @@ public class Sum {
         com.micatechnologies.minecraft.sum.economy.EconomyBridge.setRemoteService(
             com.micatechnologies.minecraft.sum.omceapi.service.OmceEconomyService
                 .startIfEnabled(event.getServer()));
+        // After the backend is chosen, so the first mod to acquire a handle sees the real economy
+        // rather than "unavailable". See docs/SUM_ECONOMY_API.md.
+        com.micatechnologies.minecraft.sum.economy.apiimpl.EconomyApiRegistry.install();
     }
 
     /**
@@ -189,6 +194,9 @@ public class Sum {
      */
     @EventHandler
     public void serverStopped(FMLServerStoppedEvent event) {
+        // Close the economy API before tearing the backend down, so an integrating mod cannot be
+        // handed a handle onto a half-stopped economy during shutdown.
+        com.micatechnologies.minecraft.sum.economy.apiimpl.EconomyApiRegistry.uninstall();
         // Stop the economy client first: it holds background threads and an in-memory balance
         // cache tied to this server instance, and a single-player client that opens a second
         // world must not inherit either.
