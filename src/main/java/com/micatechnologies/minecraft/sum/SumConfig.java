@@ -1,5 +1,6 @@
 package com.micatechnologies.minecraft.sum;
 
+import com.micatechnologies.minecraft.sum.api.EconomyScope;
 import com.micatechnologies.minecraft.sum.border.BorderEntry;
 import com.micatechnologies.minecraft.sum.loyalty.LoyaltyMilestone;
 import java.io.File;
@@ -418,6 +419,79 @@ public class SumConfig {
             + "token, HMAC secret, and signature are never logged regardless of this setting.";
     private static final boolean FIELD_DEFAULT_ECONOMY_API_VERBOSE = false;
 
+    // Economy integration - SUM's public economy API for OTHER MODS.
+    //
+    // Not to be confused with 'economy_api' above. That category is SUM's client for a remote
+    // economy SERVICE, and decides where player money is kept. This one decides which other
+    // MODS are allowed to move that money, wherever it is kept. A server may use either, both,
+    // or neither. See docs/SUM_ECONOMY_API.md.
+    // ------------------------------------------------------------------------------------------
+
+    private static final String CATEGORY_ECONOMY_INTEGRATION = "economy_integration";
+
+    private static final String FIELD_KEY_ECONOMY_INTEGRATION_ALLOWED_MODS = "allowedMods";
+    private static final String FIELD_DESCRIPTION_ECONOMY_INTEGRATION_ALLOWED_MODS =
+        "Which other mods may move money through SUM's economy API, and what each may do. "
+            + "Format: '<modid>=<scope>,<scope>' - for example 'mycasino=wallet_read,wallet_write,"
+            + "escrow'. Use '<modid>=*' to grant every scope. EMPTY BY DEFAULT, which denies every "
+            + "mod: a mod must be listed here before it can touch a single player's balance. "
+            + "Scopes: 'wallet_read' (see what a player is carrying), 'wallet_write' (spend from "
+            + "and credit to it), 'bank_read' (see a bank balance), 'bank_write' (deposit and "
+            + "withdraw), 'escrow' (hold wallet money while a wager or trade resolves). Some imply "
+            + "others, so you need not list them: wallet_write grants wallet_read, bank_write "
+            + "grants bank_read, and escrow grants wallet_write. "
+            + "WHAT THIS IS: an operator control and an audit trail, NOT a security boundary. It "
+            + "lets you revoke one integration without a code change, makes a mod that forgot to "
+            + "ask fail loudly instead of half-working, and tags every transaction with the mod "
+            + "that made it. It CANNOT stop a mod that is determined to reach into SUM directly - "
+            + "no setting inside Minecraft could. Install only mods you trust with your economy.";
+    private static final String[] FIELD_DEFAULT_ECONOMY_INTEGRATION_ALLOWED_MODS = new String[0];
+
+    private static final String FIELD_KEY_ECONOMY_INTEGRATION_LOG_TRANSACTIONS = "logTransactions";
+    private static final String FIELD_DESCRIPTION_ECONOMY_INTEGRATION_LOG_TRANSACTIONS =
+        "When true (default), logs every wallet, bank and escrow operation another mod performs, "
+            + "with the mod id, player, amount and outcome. This is the audit trail for money that "
+            + "SUM itself did not move; turning it off makes an integration's mistakes very hard "
+            + "to reconstruct after the fact.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_INTEGRATION_LOG_TRANSACTIONS = true;
+
+    private static final String FIELD_KEY_ECONOMY_INTEGRATION_MAX_WALLET = "maxWalletTransaction";
+    private static final String FIELD_DESCRIPTION_ECONOMY_INTEGRATION_MAX_WALLET =
+        "Largest wallet amount another mod may move in a single call, in dollars. Applies to both "
+            + "spending and crediting, because a bug that credits too much is the more expensive "
+            + "direction - it invents money the economy never had. Set 0 for no limit (default). "
+            + "This does not limit SUM's own shops, jobs or ATM.";
+    private static final double FIELD_DEFAULT_ECONOMY_INTEGRATION_MAX_WALLET = 0.0;
+
+    private static final String FIELD_KEY_ECONOMY_INTEGRATION_MAX_BANK = "maxBankTransaction";
+    private static final String FIELD_DESCRIPTION_ECONOMY_INTEGRATION_MAX_BANK =
+        "Largest bank amount another mod may deposit or withdraw in a single call, in dollars. "
+            + "Set 0 for no limit (default). This does not limit SUM's own ATM.";
+    private static final double FIELD_DEFAULT_ECONOMY_INTEGRATION_MAX_BANK = 0.0;
+
+    private static final double FIELD_MIN_ECONOMY_INTEGRATION_LIMIT = 0.0;
+    private static final double FIELD_MAX_ECONOMY_INTEGRATION_LIMIT = 1.0e12;
+
+    private static final String FIELD_KEY_ECONOMY_INTEGRATION_ESCROW_REFUND_ORPHANED =
+        "refundOrphanedEscrow";
+    private static final String FIELD_DESCRIPTION_ECONOMY_INTEGRATION_ESCROW_REFUND_ORPHANED =
+        "When true (default), money still held in escrow by a mod that has been removed or "
+            + "de-authorized is refunded to the players who put it up, once "
+            + "'orphanedEscrowGraceMinutes' has passed. Set false to leave it held for manual "
+            + "handling with '/sum econ api escrow'. Leaving it false means a removed mod's "
+            + "players never see their stakes again without operator action.";
+    private static final boolean FIELD_DEFAULT_ECONOMY_INTEGRATION_ESCROW_REFUND_ORPHANED = true;
+
+    private static final String FIELD_KEY_ECONOMY_INTEGRATION_ESCROW_GRACE =
+        "orphanedEscrowGraceMinutes";
+    private static final String FIELD_DESCRIPTION_ECONOMY_INTEGRATION_ESCROW_GRACE =
+        "How long after server start to wait before refunding escrow whose owning mod is missing. "
+            + "The delay exists so a mod that simply loads late, or is temporarily removed for a "
+            + "restart, does not have its in-flight wagers refunded out from under it.";
+    private static final int FIELD_DEFAULT_ECONOMY_INTEGRATION_ESCROW_GRACE = 15;
+    private static final int FIELD_MIN_ECONOMY_INTEGRATION_ESCROW_GRACE = 0;
+    private static final int FIELD_MAX_ECONOMY_INTEGRATION_ESCROW_GRACE = 10080;
+
     private static String[] roamerWalkableBlocks;
     private static Set<String> roamerWalkableBlockSet;
     // Resolved lazily on first use. Block instances aren't available at preInit, since the block
@@ -481,6 +555,15 @@ public class SumConfig {
     private static int economyApiHealthPollSeconds;
     private static String economyApiUnavailablePolicy;
     private static boolean economyApiVerboseLogging;
+
+    private static String[] economyIntegrationAllowedMods;
+    /** Parsed and scope-expanded form of {@link #economyIntegrationAllowedMods}, keyed by mod id. */
+    private static Map<String, Set<EconomyScope>> economyIntegrationScopes = Collections.emptyMap();
+    private static boolean economyIntegrationLogTransactions;
+    private static double economyIntegrationMaxWalletTransaction;
+    private static double economyIntegrationMaxBankTransaction;
+    private static boolean economyIntegrationRefundOrphanedEscrow;
+    private static int economyIntegrationOrphanedEscrowGraceMinutes;
 
     private static Configuration config;
 
@@ -667,9 +750,113 @@ public class SumConfig {
             FIELD_KEY_ECONOMY_API_VERBOSE, CATEGORY_ECONOMY_API,
             FIELD_DEFAULT_ECONOMY_API_VERBOSE, FIELD_DESCRIPTION_ECONOMY_API_VERBOSE);
 
+        economyIntegrationAllowedMods = config.getStringList(
+            FIELD_KEY_ECONOMY_INTEGRATION_ALLOWED_MODS, CATEGORY_ECONOMY_INTEGRATION,
+            FIELD_DEFAULT_ECONOMY_INTEGRATION_ALLOWED_MODS,
+            FIELD_DESCRIPTION_ECONOMY_INTEGRATION_ALLOWED_MODS);
+        economyIntegrationScopes = parseAllowedMods(economyIntegrationAllowedMods);
+        economyIntegrationLogTransactions = config.getBoolean(
+            FIELD_KEY_ECONOMY_INTEGRATION_LOG_TRANSACTIONS, CATEGORY_ECONOMY_INTEGRATION,
+            FIELD_DEFAULT_ECONOMY_INTEGRATION_LOG_TRANSACTIONS,
+            FIELD_DESCRIPTION_ECONOMY_INTEGRATION_LOG_TRANSACTIONS);
+        economyIntegrationMaxWalletTransaction = config.get(CATEGORY_ECONOMY_INTEGRATION,
+            FIELD_KEY_ECONOMY_INTEGRATION_MAX_WALLET,
+            FIELD_DEFAULT_ECONOMY_INTEGRATION_MAX_WALLET,
+            FIELD_DESCRIPTION_ECONOMY_INTEGRATION_MAX_WALLET,
+            FIELD_MIN_ECONOMY_INTEGRATION_LIMIT, FIELD_MAX_ECONOMY_INTEGRATION_LIMIT).getDouble();
+        economyIntegrationMaxBankTransaction = config.get(CATEGORY_ECONOMY_INTEGRATION,
+            FIELD_KEY_ECONOMY_INTEGRATION_MAX_BANK,
+            FIELD_DEFAULT_ECONOMY_INTEGRATION_MAX_BANK,
+            FIELD_DESCRIPTION_ECONOMY_INTEGRATION_MAX_BANK,
+            FIELD_MIN_ECONOMY_INTEGRATION_LIMIT, FIELD_MAX_ECONOMY_INTEGRATION_LIMIT).getDouble();
+        economyIntegrationRefundOrphanedEscrow = config.getBoolean(
+            FIELD_KEY_ECONOMY_INTEGRATION_ESCROW_REFUND_ORPHANED, CATEGORY_ECONOMY_INTEGRATION,
+            FIELD_DEFAULT_ECONOMY_INTEGRATION_ESCROW_REFUND_ORPHANED,
+            FIELD_DESCRIPTION_ECONOMY_INTEGRATION_ESCROW_REFUND_ORPHANED);
+        economyIntegrationOrphanedEscrowGraceMinutes = config.getInt(
+            FIELD_KEY_ECONOMY_INTEGRATION_ESCROW_GRACE, CATEGORY_ECONOMY_INTEGRATION,
+            FIELD_DEFAULT_ECONOMY_INTEGRATION_ESCROW_GRACE,
+            FIELD_MIN_ECONOMY_INTEGRATION_ESCROW_GRACE, FIELD_MAX_ECONOMY_INTEGRATION_ESCROW_GRACE,
+            FIELD_DESCRIPTION_ECONOMY_INTEGRATION_ESCROW_GRACE);
+
         if (config.hasChanged()) {
             config.save();
         }
+    }
+
+    /**
+     * Parses the {@code economy_integration.allowedMods} list into scope sets, keyed by mod id.
+     *
+     * <p>Entries look like {@code mycasino=wallet_write,escrow}, or {@code mycasino=*} for
+     * everything. Scopes are {@linkplain EconomyScope#expand expanded} here, so a later
+     * authorization check is a plain {@code contains} rather than a rule walk.
+     *
+     * <p>Nothing here throws. A typo in one line must not cost an operator every other
+     * integration on the server, so a bad line is warned about, named, and skipped. The one case
+     * that is deliberately strict is an entry granting <i>no</i> valid scopes: it is dropped
+     * entirely rather than recorded as an authorized mod with an empty scope set, because the
+     * latter would report the mod as authorized while every call it makes fails.
+     */
+    private static Map<String, Set<EconomyScope>> parseAllowedMods(String[] entries) {
+        Map<String, Set<EconomyScope>> result = new HashMap<>();
+        if (entries == null) {
+            return result;
+        }
+        for (String raw : entries) {
+            if (raw == null) {
+                continue;
+            }
+            String entry = raw.trim();
+            if (entry.isEmpty() || entry.startsWith("#")) {
+                continue;
+            }
+            int eq = entry.indexOf('=');
+            if (eq <= 0) {
+                Sum.LOGGER.warn("[economy-api] invalid allowedMods entry '{}': expected "
+                    + "'<modid>=<scope>,<scope>' (or '<modid>=*')", entry);
+                continue;
+            }
+            String modId = entry.substring(0, eq).trim().toLowerCase(java.util.Locale.ROOT);
+            if (modId.isEmpty()) {
+                Sum.LOGGER.warn("[economy-api] invalid allowedMods entry '{}': no mod id before "
+                    + "the '='", entry);
+                continue;
+            }
+            String scopeList = entry.substring(eq + 1).trim();
+            Set<EconomyScope> granted = new HashSet<>();
+            if (EconomyScope.WILDCARD_TOKEN.equals(scopeList)) {
+                granted.addAll(EconomyScope.all());
+            } else {
+                for (String token : scopeList.split(",")) {
+                    String trimmed = token.trim();
+                    if (trimmed.isEmpty()) {
+                        continue;
+                    }
+                    EconomyScope scope = EconomyScope.fromToken(trimmed);
+                    if (scope == null) {
+                        Sum.LOGGER.warn("[economy-api] allowedMods entry '{}': unknown scope '{}', "
+                            + "ignoring it. Valid scopes are wallet_read, wallet_write, bank_read, "
+                            + "bank_write, escrow, or * for all.", entry, trimmed);
+                        continue;
+                    }
+                    granted.add(scope);
+                }
+            }
+            if (granted.isEmpty()) {
+                Sum.LOGGER.warn("[economy-api] allowedMods entry '{}' grants no valid scopes, so "
+                    + "'{}' stays unauthorized. Remove the line or give it a scope.", entry, modId);
+                continue;
+            }
+            Set<EconomyScope> expanded = EconomyScope.expand(granted);
+            Set<EconomyScope> previous = result.put(modId, expanded);
+            if (previous != null) {
+                Sum.LOGGER.warn("[economy-api] allowedMods lists '{}' more than once; the last "
+                    + "entry wins, granting {}", modId, expanded);
+            } else {
+                Sum.LOGGER.info("[economy-api] '{}' is authorized for {}", modId, expanded);
+            }
+        }
+        return result;
     }
 
     /** Strips trailing slashes from a base URL so endpoint paths can be appended directly. */
@@ -1079,6 +1266,49 @@ public class SumConfig {
         return economyApiEnabled && validateEconomyApiConfig() == null;
     }
 
+    /**
+     * Scopes granted to an integrating mod, already expanded under
+     * {@link EconomyScope#expand}.
+     *
+     * @return an empty set for any mod not in {@code allowedMods} — the deny-by-default case.
+     *     Never null, so callers need no null check before a {@code contains}.
+     */
+    public static Set<EconomyScope> getEconomyIntegrationScopes(String modId) {
+        if (modId == null) {
+            return Collections.emptySet();
+        }
+        Set<EconomyScope> scopes =
+            economyIntegrationScopes.get(modId.trim().toLowerCase(java.util.Locale.ROOT));
+        return scopes != null ? scopes : Collections.emptySet();
+    }
+
+    /** Every authorized mod id and its scopes. Unmodifiable; used by {@code /sum econ api mods}. */
+    public static Map<String, Set<EconomyScope>> getEconomyIntegrationAllowedMods() {
+        return Collections.unmodifiableMap(economyIntegrationScopes);
+    }
+
+    public static boolean isEconomyIntegrationLoggingEnabled() {
+        return economyIntegrationLogTransactions;
+    }
+
+    /** Per-call wallet cap for integrating mods, in dollars. 0 means no limit. */
+    public static double getEconomyIntegrationMaxWalletTransaction() {
+        return economyIntegrationMaxWalletTransaction;
+    }
+
+    /** Per-call bank cap for integrating mods, in dollars. 0 means no limit. */
+    public static double getEconomyIntegrationMaxBankTransaction() {
+        return economyIntegrationMaxBankTransaction;
+    }
+
+    public static boolean isEconomyIntegrationRefundOrphanedEscrow() {
+        return economyIntegrationRefundOrphanedEscrow;
+    }
+
+    public static int getEconomyIntegrationOrphanedEscrowGraceMinutes() {
+        return economyIntegrationOrphanedEscrowGraceMinutes;
+    }
+
     public static double getPayFeePercent() {
         return payFeePercent;
     }
@@ -1182,6 +1412,10 @@ public class SumConfig {
         if (config != null) {
             config.load();
             loadConfig();
+            // Economy authorization is re-read above; tell the API so a mod that has just been
+            // authorized is announced rather than staying suppressed by an earlier denial.
+            com.micatechnologies.minecraft.sum.economy.apiimpl.EconomyApiRegistry
+                .onConfigReloaded();
         }
     }
 
