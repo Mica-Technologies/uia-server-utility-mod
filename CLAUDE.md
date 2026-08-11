@@ -7,10 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Set `JAVA_HOME` to a **Java 21+** install before each `./gradlew` invocation (CI runs Java 21).
 **21 is the recommended sweet spot:** RetroFuturaGradle requires the Gradle process to run on
 Java 21+ (older is deprecated and slated for removal), and the pinned Gradle 8.9 officially
-supports running only on Java ≤ 22 — so 21/22 are both in-support *and* match CI. Newer JDKs
-(23–26) still compile the mod correctly via Jabel but run Gradle past its supported ceiling
-(you'll see harmless `native-access` / restricted-method warnings). Either way the compiler and
-mod code target **Java 8** — only the JVM that runs Gradle changes.
+supports running only on Java ≤ 22 — so 21/22 are both in-support *and* match CI. Either way the
+compiler and mod code target **Java 8** — only the JVM that runs Gradle changes.
+
+**Do not use JDK 23–26.** They run Gradle past its supported ceiling, and the failure is not
+cosmetic: Gradle 8.9 bundles a Groovy whose ASM cannot read Java 25 class files, so any
+`.gradle` script that makes Groovy resolve a JDK type — a typed closure parameter such as
+`{ File f -> ... }` is enough — dies at configuration time with
+
+```
+BUG! exception in phase 'semantic analysis' in source unit '_BuildScript_'
+Unsupported class file major version 69
+```
+
+This bit on 2026-08-09 when a guard was added to `addon.gradle`: the same script built fine under
+17 and failed outright under 25. The `native-access` / restricted-method warnings you also see on
+those JDKs *are* harmless; this is the part that isn't. Java 17 still works in practice despite
+RFG's deprecation warning, so 17 is a usable fallback when no 21 is installed.
 
 IntelliJ manages these JDKs (point `JAVA_HOME` at your install; exact patch version varies):
 - Windows: `C:/Users/<username>/.jdks/azul-21.x` (managed by IntelliJ)
@@ -85,6 +98,9 @@ src/main/java/com/micatechnologies/minecraft/sum/
 │   ├── RoamerWalkableBlocksNavigator.java
 │   └── RoamerWalkableBlocksPathNodeProcessor.java
 ├── roadrunner/           # Speed boost on configured blocks
+├── api/                  # PUBLIC economy API for other mods — interfaces + value types ONLY
+│   └── event/            # Forge events posted after money moves
+├── economy/apiimpl/      # Implementation behind api/ — authorization, handle, escrow
 └── omceapi/              # Open MCEconomic API — remote authoritative economy
     ├── *.java            # Protocol constants + models (no Minecraft imports)
     ├── client/           # HTTP/TLS/HMAC protocol client (no Minecraft imports)
@@ -118,6 +134,25 @@ All config is in `SumConfig.java` using Forge's `Configuration` class. Categorie
   `docs/OPEN_MCECONOMIC_API_SPECIFICATION.md` (`.tex`/`.pdf` are the same content typeset).
   Operator setup -- what to put in this config category and why -- is
   `docs/OPEN_MCECONOMIC_API_SETUP.tex`/`.pdf`.
+- **`economy_integration`** -- which *other mods* may move money through SUM's public economy
+  API, and what each may do. **Not the same thing as `economy_api`**, which is about where SUM
+  *keeps* money; this is about who may *move* it. Empty by default, which denies every mod.
+  See `docs/SUM_ECONOMY_API.md`.
+
+### Public economy API
+
+`com.micatechnologies.minecraft.sum.api` is SUM's supported surface for other mods (a casino, a
+shop mod, anything that spends player money). It ships as a separate slim `-api` jar built by the
+`apiJar` task, which `addon.gradle` wires into `build` and publishes on every release.
+
+- **The api jar is the contract.** If a class is not in it, it is not API. `addon.gradle` fails
+  the build if anything in `api/` imports SUM internals, because such a leak compiles fine here
+  and only breaks in a *dependent* mod's build.
+- Implementation lives in `economy/apiimpl/` and is installed as a `SumEconomy.Provider` on
+  `FMLServerStartingEvent`, after the economy backend is chosen.
+- Authorization is deny-by-default per mod id, with scopes. It is an **operator control and audit
+  trail, not a security boundary** -- any mod in the JVM can reach SUM's internals directly.
+- Full plan and rationale: `docs/agent-plans/ECONOMY_API_PLAN.md`.
 
 ### Economy: wallet vs bank
 
