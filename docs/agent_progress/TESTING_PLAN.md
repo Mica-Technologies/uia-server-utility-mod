@@ -58,6 +58,9 @@ Weather 2 Remastered fork) — NOT this repo.
 |---|---|
 | `Sum.java` / `SumConstants.java` / `SumConfig.java` / `SumRegistry.java` / `SumTab.java` / `SumProxy.java` / `Sum{Client,Common}Proxy.java` | Mod root; lifecycle, registration, config, creative tab, proxies |
 | `.afk` | AFK tracking (`AfkTracker`) — activity detection, sleep-vote exclusion, all-AFK world pause |
+| `.api` | **Public economy API for other mods** — interfaces and value types only; shipped as a separate `-api` jar. See `docs/SUM_ECONOMY_API.md` |
+| `.api.event` | Forge events posted when money moves (`WalletTransactionEvent`, `BankTransactionEvent`, `EscrowEvent`) |
+| `.economy.apiimpl` | Implementation behind `.api` — authorization, the per-mod handle, escrow. Never in the api jar |
 | `.atm` | ATM kit (kiosk/wall/drive-thru), `SumNetwork`, `SumGuiHandler`, atm GUI + packet |
 | `.bank` | Bank counter, safe deposit box, vault door, velvet rope |
 | `.beaches` | Pretty-Beaches absorption (`BeachesHandler`) |
@@ -122,6 +125,10 @@ Weather 2 Remastered fork) — NOT this repo.
 | Command | Perm | What |
 |---|---|---|
 | `/sum help [page]` | anyone | Paginated help, 7 pages |
+| `/sum econ api mods` | op-2 | Authorized integrating mods, scopes, and whether each is installed/connected |
+| `/sum econ api escrow [modid]` | op-2 | Money currently held in escrow, with ticket ids and ages |
+| `/sum econ api refund <ticketId>` | op-2 | Force-refund one hold to its owner |
+| `/sum econ api reload` | op-2 | Re-read config so an authorization change applies without a restart |
 | `/sum reloadconfig` | op | Reloads `sum.cfg` |
 | `/sum addroamerblock <block>` / `/sum rmroamerblock <block>` | op | Add/remove from roamer-walkable list |
 | `/sum roamer greet <add\|list\|clear> <target> [message]` | op | Roamer greetings |
@@ -216,6 +223,7 @@ swap re-spaces rows without a second click.
 | Category | Knobs |
 |---|---|
 | `roamer` | `walkableBlocks` (string list) |
+| `economy_integration` | `allowedMods` (string list, `modid=scope,scope`), `logTransactions`, `maxWalletTransaction`, `maxBankTransaction`, `refundOrphanedEscrow`, `orphanedEscrowGraceMinutes`. **Not** `economy_api` — that one is the remote service client |
 | `roadrunner` | `speedBlocks` (string list, `block=multiplier`) |
 | `favorites` | `enableStarOverlay` (migrated to OneConfig; Forge config still loaded as fallback) |
 | `border` | `enabled`, `borders` (string list, `dimId=radius:mode` where mode is bounce/loop) |
@@ -237,6 +245,36 @@ GUI is per-login — re-login to see changes there.
 
 These were settled with Alex; don't re-litigate without an explicit ask.
 Each line is one decision + brief why.
+
+### Public economy API (`.api`, added 2026-08-09)
+
+Full plan and per-phase detail: `docs/agent-plans/ECONOMY_API_PLAN.md`.
+Consumer-facing reference: `docs/SUM_ECONOMY_API.md`.
+
+- **Deny by default, with scopes.** `economy_integration.allowedMods` is empty
+  out of the box, so no third-party mod can touch the economy until an operator
+  opts it in with `modid=scope,scope`.
+- **The allowlist is an operator control and an audit trail, NOT a security
+  boundary.** Any mod in the JVM can reach SUM's internals directly. What it
+  buys is revocability without a code change, a loud failure for a mod that
+  never asked, and an attributable mod id on every transaction. Never describe
+  it to operators as a sandbox.
+- **The `-api` jar is the API.** If a class isn't in it, it isn't API. A build
+  guard in `addon.gradle` fails `apiJar` if anything in `.api` imports SUM
+  internals.
+- **No `NaN` in the public surface** — balances are `OptionalDouble`, because
+  `NaN >= amount` is silently false in every comparison a consumer would write.
+- **Scopes are read live, not frozen into the handle**, so revoking a mod takes
+  effect immediately instead of at next restart.
+- **Escrow holds value, it never mints it.** A release moves exactly what was
+  held; a bigger payout is a release plus a separate `walletCredit`.
+- **Caller-supplied `EscrowTicket`s are never trusted** — every operation
+  re-reads the stored ticket by id. The type has a public constructor, so
+  otherwise a consumer could forge an amount.
+- **Admin set-balance is deliberately NOT exposed**: it already refuses on the
+  remote backend, so it would be a capability that works on one backend only.
+- **Events are post-only.** A cancellable `Pre` is deferred until every internal
+  `WalletService.spend` call site has been audited for correct false-handling.
 
 ### Economy / bank kit (Sections A + C)
 
@@ -996,6 +1034,62 @@ Two players recommended (`gradlew runServer` + client, or two clients).
 - [ ] `sleep_vote.actionBarProgress=false` + `/sum reloadconfig` → old
       behavior: chat line on sleeper-count change only, no action bar
 - [ ] `sleep_vote.enabled=false` → no action bar, no chat, vanilla sleep
+
+---
+
+### 4.14 Public economy API (added 2026-08-09) — NEEDS IN-GAME VERIFICATION
+
+Automated coverage so far: 60 unit tests, plus a real external consumer mod
+compiled against **only** the `-api` jar and booted on a dedicated server. That
+proved authorization, scope expansion, status, guard rejections, the
+fire-exactly-once bank callback, and that the documented examples compile.
+
+**None of it moved a single dollar** — every money path needs a live player, so
+this section is the part a human has to do.
+
+A throwaway probe mod (`mycasino`) is already built and installed in
+`run/mods/mycasino-probe.jar`, and `run/config/sum.cfg` already authorizes it
+with `mycasino=escrow`. It registers `/casinoprobe`, which runs the whole
+money-movement suite against whoever types it and asserts their wallet ends
+exactly where it started.
+
+- [ ] `./gradlew runClient`, open a world, give yourself money, run
+      `/casinoprobe`. Expect **ALL CHECKS PASSED**. It covers: credit, spend,
+      refused overspend, escrow open/release/refund, double-release refused,
+      a **forged ticket paying only what was really held**, **forfeit
+      destroying a losing stake and not handing it back**, double-forfeit
+      refused, bank refused without `bank_write`, and a net-zero wallet at the
+      end.
+- [ ] Watch the log during the forfeit checks: `escrowForfeit` should log
+      `destroyed:` with the amount. That money is gone from the economy on
+      purpose — it is the only API operation that shrinks the money supply, so
+      if a wallet total goes *up* across those checks something is badly wrong.
+- [ ] `/sum econ api mods` — `mycasino` shows as installed + connected with
+      `wallet_read, wallet_write, escrow`.
+- [ ] `/sum econ api escrow` — empty after a clean `/casinoprobe` run.
+- [ ] **Crash safety.** Add a temporary hold (or stop mid-probe), `/stop` the
+      server, restart, then `/sum econ api escrow` — the hold must still be
+      there with the same amount. Then `/sum econ api refund <id>`.
+- [ ] **Orphan sweep.** Set `orphanedEscrowGraceMinutes=0`, open a hold, remove
+      `mycasino=escrow` from `allowedMods`, `/sum econ api reload`, wait ~5s.
+      The hold should refund itself with a WARN naming the mod.
+- [ ] **Events.** Watch the log while shopping/`/pay`/using an ATM: the probe's
+      listener prints every wallet and bank event. SUM's own transactions must
+      appear attributed to `sum`, the probe's to `mycasino`.
+- [ ] **Remote backend.** Repeat `/casinoprobe` with `economy_api` pointed at a
+      real OMCE service. This is the highest-value check in the whole plan: it
+      is the claim "works with both setups", and the one most likely to be
+      quietly false. Watch quantisation on a whole-unit currency, and confirm
+      ledger entries carry `sum.source_mod` and `mod_deposit`/`mod_withdraw`.
+- [ ] Remove `run/mods/mycasino-probe.jar` and the `mycasino=escrow` config line
+      when done.
+
+> Rebuilding the probe: sources are in the session scratchpad under
+> `consumer/src/com/example/mycasino/`. It is five files compiled with
+> `javac --release 8` against the api jar plus the Forge classpath. Nothing in
+> the repo depends on it. If the scratchpad has been cleaned, the probe is
+> reconstructable from `docs/SUM_ECONOMY_API.md` — every sample in that document
+> is one of its source files.
 
 ---
 
