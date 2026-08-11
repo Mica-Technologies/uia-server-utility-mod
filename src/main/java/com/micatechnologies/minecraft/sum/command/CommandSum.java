@@ -5,9 +5,13 @@ import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.bank.BlockVaultDoor;
 import com.micatechnologies.minecraft.sum.bank.TileEntityVaultDoor;
 import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
+import com.micatechnologies.minecraft.sum.api.EconomyScope;
+import com.micatechnologies.minecraft.sum.api.EscrowTicket;
 import com.micatechnologies.minecraft.sum.bank.BankService;
 import com.micatechnologies.minecraft.sum.economy.EconomyBridge;
 import com.micatechnologies.minecraft.sum.economy.WalletService;
+import com.micatechnologies.minecraft.sum.economy.apiimpl.EconomyApiRegistry;
+import com.micatechnologies.minecraft.sum.economy.apiimpl.EscrowService;
 import com.micatechnologies.minecraft.sum.favorites.FavoriteKey;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
 import com.micatechnologies.minecraft.sum.jobs.JobBoardSavedData;
@@ -23,9 +27,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.command.CommandBase;
@@ -43,6 +50,7 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.common.Loader;
 
 public class CommandSum extends CommandBase {
 
@@ -282,7 +290,15 @@ public class CommandSum extends CommandBase {
 
     private void handleEcon(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
         if (args.length < 2) {
-            sendMessage(sender, TextFormatting.RED, "Usage: /sum econ <balance|add|set> [args...]");
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum econ <balance|add|set|api> [args...]");
+            return;
+        }
+        // Before the wallet-availability guard on purpose: inspecting which mods are authorized,
+        // and refunding money they are holding, is exactly what an operator needs when the
+        // economy is misbehaving.
+        if (args[1].equalsIgnoreCase("api")) {
+            handleEconApi(sender, args);
             return;
         }
         if (!WalletService.isAvailable()) {
@@ -303,9 +319,130 @@ public class CommandSum extends CommandBase {
                 break;
             default:
                 sendMessage(sender, TextFormatting.RED,
-                    "Unknown econ subcommand. Usage: /sum econ <balance|add|set> [args...]");
+                    "Unknown econ subcommand. Usage: /sum econ <balance|add|set|api> [args...]");
                 break;
         }
+    }
+
+    // --- /sum econ api — the public economy API's operator surface ---
+
+    private void handleEconApi(ICommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sendMessage(sender, TextFormatting.RED,
+                "Usage: /sum econ api <mods|escrow|refund|reload> [args...]");
+            return;
+        }
+        switch (args[2].toLowerCase()) {
+            case "mods":
+                handleEconApiMods(sender);
+                break;
+            case "escrow":
+                handleEconApiEscrow(sender, args);
+                break;
+            case "refund":
+                handleEconApiRefund(sender, args);
+                break;
+            case "reload":
+                SumConfig.reloadConfig();
+                sendMessage(sender, TextFormatting.GREEN,
+                    "Reloaded SUM's config. Economy authorization now allows "
+                        + SumConfig.getEconomyIntegrationAllowedMods().size() + " mod(s).");
+                break;
+            default:
+                sendMessage(sender, TextFormatting.RED,
+                    "Unknown api subcommand. Usage: /sum econ api <mods|escrow|refund|reload>");
+                break;
+        }
+    }
+
+    /** Lists authorized mods, their scopes, and whether each has actually taken a handle. */
+    private void handleEconApiMods(ICommandSender sender) {
+        Map<String, Set<EconomyScope>> allowed = SumConfig.getEconomyIntegrationAllowedMods();
+        if (allowed.isEmpty()) {
+            sendMessage(sender, TextFormatting.YELLOW,
+                "No mods are authorized to use SUM's economy. Add entries to "
+                    + "economy_integration.allowedMods in SUM's config, then run "
+                    + "/sum econ api reload.");
+            return;
+        }
+        Set<String> acquired = EconomyApiRegistry.getAcquiredModIds();
+        sendMessage(sender, TextFormatting.GREEN, allowed.size() + " authorized mod(s):");
+        for (Map.Entry<String, Set<EconomyScope>> entry : allowed.entrySet()) {
+            String modId = entry.getKey();
+            boolean loaded = Loader.isModLoaded(modId);
+            boolean connected = acquired.contains(modId);
+            StringBuilder scopes = new StringBuilder();
+            for (EconomyScope scope : entry.getValue()) {
+                if (scopes.length() > 0) {
+                    scopes.append(", ");
+                }
+                scopes.append(scope.getToken());
+            }
+            // The distinction matters when an integration "isn't working": not installed, or
+            // installed but never asked for a handle, are different problems with different fixes.
+            String state = !loaded ? "not installed"
+                : connected ? "connected" : "installed, has not asked for access";
+            sendMessage(sender, connected ? TextFormatting.GREEN : TextFormatting.YELLOW,
+                "  " + modId + " [" + state + "] - " + scopes);
+        }
+    }
+
+    /** Lists money currently held in escrow, optionally filtered to one mod. */
+    private void handleEconApiEscrow(ICommandSender sender, String[] args) {
+        String filter = args.length >= 4 ? args[3].toLowerCase(Locale.ROOT) : null;
+        List<EscrowTicket> tickets = EscrowService.adminListAll();
+        if (filter != null) {
+            List<EscrowTicket> filtered = new ArrayList<>();
+            for (EscrowTicket ticket : tickets) {
+                if (ticket.getOwningModId().equals(filter)) {
+                    filtered.add(ticket);
+                }
+            }
+            tickets = filtered;
+        }
+        if (tickets.isEmpty()) {
+            sendMessage(sender, TextFormatting.GREEN, filter == null
+                ? "No money is being held in escrow."
+                : "'" + filter + "' is holding no money in escrow.");
+            return;
+        }
+        double total = 0.0;
+        for (EscrowTicket ticket : tickets) {
+            total += ticket.getAmount();
+        }
+        sendMessage(sender, TextFormatting.GREEN,
+            tickets.size() + " hold(s), $" + formatMoney(total) + " total:");
+        for (EscrowTicket ticket : tickets) {
+            long ageMinutes = (System.currentTimeMillis() - ticket.getOpenedAtMillis()) / 60_000L;
+            sendMessage(sender, TextFormatting.GRAY,
+                "  " + ticket.getId() + "  $" + formatMoney(ticket.getAmount())
+                    + "  " + ticket.getOwningModId() + "  " + ageMinutes + "m ago  "
+                    + ticket.getReason());
+        }
+        sendMessage(sender, TextFormatting.GRAY,
+            "Use /sum econ api refund <id> to return a hold to whoever put it up.");
+    }
+
+    /** Force-refunds one hold, for a ticket nothing is ever going to settle. */
+    private void handleEconApiRefund(ICommandSender sender, String[] args) {
+        if (args.length < 4) {
+            sendMessage(sender, TextFormatting.RED, "Usage: /sum econ api refund <ticketId>");
+            return;
+        }
+        UUID ticketId;
+        try {
+            ticketId = UUID.fromString(args[3]);
+        } catch (IllegalArgumentException e) {
+            sendMessage(sender, TextFormatting.RED,
+                "'" + args[3] + "' is not a ticket id. Run /sum econ api escrow to list them.");
+            return;
+        }
+        String problem = EscrowService.adminForceRefund(ticketId);
+        if (problem != null) {
+            sendMessage(sender, TextFormatting.RED, problem);
+            return;
+        }
+        sendMessage(sender, TextFormatting.GREEN, "Refunded that hold to its owner.");
     }
 
     private void handleEconBalance(MinecraftServer server, ICommandSender sender, String[] args)
