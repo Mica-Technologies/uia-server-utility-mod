@@ -3,6 +3,7 @@ package com.micatechnologies.minecraft.sum.omceapi.service;
 import com.micatechnologies.minecraft.sum.Sum;
 import com.micatechnologies.minecraft.sum.SumConfig;
 import com.micatechnologies.minecraft.sum.SumConstants;
+import com.micatechnologies.minecraft.sum.api.EconomyScope;
 import com.micatechnologies.minecraft.sum.omceapi.OmceAccount;
 import com.micatechnologies.minecraft.sum.omceapi.OmceBalance;
 import com.micatechnologies.minecraft.sum.omceapi.OmceError;
@@ -332,6 +333,7 @@ public final class OmceEconomyService {
             Sum.LOGGER.warn("[omce] Service declares 'strictTransactionTypes'. It will reject "
                 + "transaction types it does not know, so new SUM economy features may fail until "
                 + "the service is updated.");
+            warnAboutStrictTypesAndIntegrations();
         }
         if (h.getCurrency().getMinorUnitDigits() < 2) {
             Sum.LOGGER.warn("[omce] Service currency has {} decimal place(s); SUM prices with finer "
@@ -342,6 +344,34 @@ public final class OmceEconomyService {
             Sum.LOGGER.info("[omce] Service requires headers: {}",
                 String.join(", ", h.getRequiredHeaders()));
         }
+    }
+
+    /**
+     * Names the integrations that will break under {@code strictTransactionTypes}, and the two
+     * transaction types the service needs to be told about.
+     *
+     * <p>Split out from the generic warning above because the generic one is easy to shrug off. The
+     * concrete failure is that a mod holding {@code bank_write} sends {@code mod_deposit} or
+     * {@code mod_withdraw}, a strict service rejects a type it has never heard of, and the operator
+     * finds out when a player's first bank move through that integration fails. Saying so at
+     * connect time, with the mod ids and the exact type names, turns that into a five-minute fix
+     * before anyone loses a transaction.
+     */
+    private void warnAboutStrictTypesAndIntegrations() {
+        List<String> affected = new ArrayList<>();
+        for (Map.Entry<String, Set<EconomyScope>> entry
+                : SumConfig.getEconomyIntegrationAllowedMods().entrySet()) {
+            if (entry.getValue().contains(EconomyScope.BANK_WRITE)) {
+                affected.add(entry.getKey());
+            }
+        }
+        if (affected.isEmpty()) {
+            return;
+        }
+        Sum.LOGGER.warn("[omce] ...and {} authorized to move bank money ({}). Add '{}' and '{}' to "
+                + "the service's accepted transaction types, or those mods' bank operations will "
+                + "be rejected.", affected.size() == 1 ? "1 mod is" : affected.size() + " mods are",
+            String.join(", ", affected), OmceProtocol.TX_MOD_DEPOSIT, OmceProtocol.TX_MOD_WITHDRAW);
     }
 
     private void onSuccess() {
