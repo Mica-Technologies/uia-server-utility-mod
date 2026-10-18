@@ -55,6 +55,12 @@ dependencies {
     // SUM constructs the reader directly rather than through ImageIO's plugin registry, so
     // shadedJar drops the library's META-INF/services entries and installing SUM does not
     // change what ImageIO can read for any other mod.
+    //
+    // FML logs "MOD HAS DIRECT REFERENCE System.exit()" naming vp8/MacroBlock.predictY when the
+    // first WebP is decoded. That call sits in the default branch of a switch on yMode, and
+    // yMode only ever comes from vp8KeyFrameYModeTree, whose leaves are the four modes the
+    // switch handles plus B_PRED, for which predictY is never called. Unreachable for any input
+    // as of 3.15.2; re-check MacroBlock.predictY when bumping this version.
     shade 'com.twelvemonkeys.imageio:imageio-webp:3.15.2'
 
     // City Super Mod (CSM) - compile-only for soft dependency on fire alarm API.
