@@ -8,6 +8,7 @@ import com.micatechnologies.minecraft.sum.beaches.BeachesHandler;
 import com.micatechnologies.minecraft.sum.border.BorderHandler;
 import com.micatechnologies.minecraft.sum.dropper.TileEntityAutoDropper;
 import com.micatechnologies.minecraft.sum.command.CommandBalance;
+import com.micatechnologies.minecraft.sum.command.CommandLightning;
 import com.micatechnologies.minecraft.sum.command.CommandPay;
 import com.micatechnologies.minecraft.sum.command.CommandSum;
 import com.micatechnologies.minecraft.sum.economy.BillsLootInjector;
@@ -168,6 +169,7 @@ public class Sum {
         event.registerServerCommand(new CommandSum());
         event.registerServerCommand(new CommandBalance());
         event.registerServerCommand(new CommandPay());
+        event.registerServerCommand(new CommandLightning());
         // Started here rather than in preInit because it needs the live MinecraftServer: the
         // dedicated-vs-integrated check, the world save that holds the rollback counter, and the
         // player list all come from it.
