@@ -1,0 +1,21 @@
+{
+  "__comment": "Picture Frame: an item frame, a pane of glass to put the picture behind, and redstone for the part that goes online.",
+  "type": "forge:ore_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:item_frame"
+    },
+    {
+      "type": "forge:ore_dict",
+      "ore": "paneGlass"
+    },
+    {
+      "type": "forge:ore_dict",
+      "ore": "dustRedstone"
+    }
+  ],
+  "result": {
+    "item": "sum:picture_frame",
+    "count": 2
+  }
+}

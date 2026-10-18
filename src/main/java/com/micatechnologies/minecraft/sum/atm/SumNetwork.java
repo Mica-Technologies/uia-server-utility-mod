@@ -9,6 +9,8 @@ import com.micatechnologies.minecraft.sum.jobs.PacketJobAction;
 import com.micatechnologies.minecraft.sum.jobs.PacketOpenJobBoard;
 import com.micatechnologies.minecraft.sum.pocket.PacketOpenPocketGui;
 import com.micatechnologies.minecraft.sum.pocket.PacketSyncPocket;
+import com.micatechnologies.minecraft.sum.picture.PacketOpenPictureFrame;
+import com.micatechnologies.minecraft.sum.picture.PacketPictureFrameUpdate;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudAction;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudFetchRequest;
 import com.micatechnologies.minecraft.sum.phone.cloud.PhoneCloudSync;
@@ -76,6 +78,10 @@ public final class SumNetwork {
             PacketSyncServerConfig.class, 17, Side.CLIENT);
         CHANNEL.registerMessage(PacketOpenJobBoard.Handler.class,
             PacketOpenJobBoard.class, 18, Side.CLIENT);
+        CHANNEL.registerMessage(PacketOpenPictureFrame.Handler.class,
+            PacketOpenPictureFrame.class, 19, Side.CLIENT);
+        CHANNEL.registerMessage(PacketPictureFrameUpdate.Handler.class,
+            PacketPictureFrameUpdate.class, 20, Side.SERVER);
         initialized = true;
     }
 }

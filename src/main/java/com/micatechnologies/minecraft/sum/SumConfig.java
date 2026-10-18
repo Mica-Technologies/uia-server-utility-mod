@@ -294,6 +294,29 @@ public class SumConfig {
             + "still /unjail. Empty by default.";
     private static final String[] FIELD_DEFAULT_JAIL_ALLOWED_COMMANDS = {};
 
+    private static final String CATEGORY_PICTURE_FRAME = "picture_frame";
+
+    private static final String FIELD_KEY_PICTURE_FRAME_ALLOWED_HOSTS = "allowedHosts";
+    private static final String FIELD_DESCRIPTION_PICTURE_FRAME_ALLOWED_HOSTS =
+        "Host names picture frames may load images from, e.g. 'i.imgur.com'. An entry also allows "
+            + "its subdomains ('imgur.com' allows 'i.imgur.com'). Empty (the default) allows any "
+            + "http/https host. Checked when a frame is set, so tightening this does not clear "
+            + "frames that already exist. Whatever this says, clients never load images from "
+            + "their own machine or private network.";
+    private static final String[] FIELD_DEFAULT_PICTURE_FRAME_ALLOWED_HOSTS = {};
+
+    private static final String FIELD_KEY_PICTURE_FRAME_MAX_SIZE = "maxSizeBlocks";
+    private static final String FIELD_DESCRIPTION_PICTURE_FRAME_MAX_SIZE =
+        "Largest width or height, in blocks, a picture may be set to; offsets are held to the "
+            + "same distance from the frame.";
+    private static final int FIELD_DEFAULT_PICTURE_FRAME_MAX_SIZE = 16;
+
+    private static final String FIELD_KEY_PICTURE_FRAME_MAX_RENDER_DISTANCE = "maxRenderDistance";
+    private static final String FIELD_DESCRIPTION_PICTURE_FRAME_MAX_RENDER_DISTANCE =
+        "Farthest, in blocks, a frame may be set to stay visible from. Each client can also turn "
+            + "pictures off, or down, in its own SUM settings.";
+    private static final int FIELD_DEFAULT_PICTURE_FRAME_MAX_RENDER_DISTANCE = 128;
+
     // ------------------------------------------------------------------------------------------
     // Open MCEconomic API — remote authoritative economy backend.
     //
@@ -555,6 +578,9 @@ public class SumConfig {
     private static boolean afkPauseWorldWhenAllAfk;
     private static boolean jailEnabled;
     private static Set<String> jailAllowedCommands = Collections.emptySet();
+    private static List<String> pictureFrameAllowedHosts = Collections.emptyList();
+    private static int pictureFrameMaxSize;
+    private static int pictureFrameMaxRenderDistance;
 
     private static boolean economyApiEnabled;
     private static boolean economyApiAllowIntegratedServer;
@@ -720,6 +746,24 @@ public class SumConfig {
             }
         }
         jailAllowedCommands = Collections.unmodifiableSet(allowed);
+
+        List<String> hosts = new ArrayList<>();
+        for (String entry : config.getStringList(
+            FIELD_KEY_PICTURE_FRAME_ALLOWED_HOSTS, CATEGORY_PICTURE_FRAME,
+            FIELD_DEFAULT_PICTURE_FRAME_ALLOWED_HOSTS, FIELD_DESCRIPTION_PICTURE_FRAME_ALLOWED_HOSTS)) {
+            String host = entry.trim().toLowerCase(java.util.Locale.ROOT);
+            if (!host.isEmpty() && !host.startsWith("#")) {
+                hosts.add(host);
+            }
+        }
+        pictureFrameAllowedHosts = Collections.unmodifiableList(hosts);
+        pictureFrameMaxSize = config.getInt(
+            FIELD_KEY_PICTURE_FRAME_MAX_SIZE, CATEGORY_PICTURE_FRAME,
+            FIELD_DEFAULT_PICTURE_FRAME_MAX_SIZE, 1, 64, FIELD_DESCRIPTION_PICTURE_FRAME_MAX_SIZE);
+        pictureFrameMaxRenderDistance = config.getInt(
+            FIELD_KEY_PICTURE_FRAME_MAX_RENDER_DISTANCE, CATEGORY_PICTURE_FRAME,
+            FIELD_DEFAULT_PICTURE_FRAME_MAX_RENDER_DISTANCE, 16, 512,
+            FIELD_DESCRIPTION_PICTURE_FRAME_MAX_RENDER_DISTANCE);
 
         economyApiEnabled = config.getBoolean(
             FIELD_KEY_ECONOMY_API_ENABLED, CATEGORY_ECONOMY_API,
@@ -1376,6 +1420,19 @@ public class SumConfig {
     /** Lower-case command names, without a slash, that an inmate may still run. */
     public static Set<String> getJailAllowedCommands() {
         return jailAllowedCommands;
+    }
+
+    /** Lower-case host names frames may load from; empty means any. */
+    public static List<String> getPictureFrameAllowedHosts() {
+        return pictureFrameAllowedHosts;
+    }
+
+    public static int getPictureFrameMaxSize() {
+        return pictureFrameMaxSize;
+    }
+
+    public static int getPictureFrameMaxRenderDistance() {
+        return pictureFrameMaxRenderDistance;
     }
 
     /**

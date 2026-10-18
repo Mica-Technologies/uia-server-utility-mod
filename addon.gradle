@@ -258,3 +258,38 @@ tasks.matching { it.name == 'apiJar' }.configureEach {
         logger.lifecycle('API isolation OK: api package imports no SUM internals')
     }
 }
+
+// ---------------------------------------------------------------------------
+// Shaded libraries (see the `shade` configuration in dependencies.gradle).
+//
+// Repack the finished `jar` together with the `shade` libraries, relocating those libraries
+// under SUM's package and rewriting SUM's own references to match, then hand the result to
+// reobfJar in place of `jar`. Everything `jar` carries (the embedded OneConfig wrapper, the
+// mixin refmap, the manifest attributes above) passes through unchanged; the manifest guard on
+// reobfJar re-checks the manifest afterwards.
+//
+// Dev runs never see this: runClient/runServer load build/classes with the libraries on the
+// classpath under their real names, which is also why only the shipped jar needs relocating.
+// build.gradle declares the shadow plugin `apply false`, which puts its classes on the project's
+// buildscript classloader but not on this applied script's, so the task type is looked up there.
+def shadowJarType = project.buildscript.classLoader
+        .loadClass('com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar')
+def shadedJar = tasks.register('shadedJar', shadowJarType) {
+    def jarTask = tasks.named('jar', Jar).get()
+    dependsOn jarTask
+    from({ zipTree(jarTask.archiveFile.get().asFile) }) {
+        exclude 'META-INF/MANIFEST.MF'
+    }
+    manifest.inheritFrom(jarTask.manifest)
+    configurations = [project.configurations.shade]
+    relocate('com.twelvemonkeys', "${project.modGroup}.shadow.twelvemonkeys")
+    // The libraries' ImageIO plugin registrations: SUM never uses them (see dependencies.gradle),
+    // and after relocation they would name classes ImageIO has no business loading.
+    exclude 'META-INF/services/**'
+    exclude 'META-INF/maven/**'
+    archiveClassifier.set('dev-shaded')
+    destinationDirectory.set(jarTask.destinationDirectory)
+}
+tasks.matching { it.name == 'reobfJar' }.configureEach {
+    inputJar.set(shadedJar.flatMap { it.archiveFile })
+}

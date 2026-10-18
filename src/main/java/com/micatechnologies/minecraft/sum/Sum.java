@@ -128,6 +128,9 @@ public class Sum {
         GameRegistry.registerTileEntity(
             com.micatechnologies.minecraft.sum.phone.TileEntityDeskPhone.class,
             new ResourceLocation(SumConstants.MOD_NAMESPACE, "desk_phone"));
+        GameRegistry.registerTileEntity(
+            com.micatechnologies.minecraft.sum.picture.TileEntityPictureFrame.class,
+            new ResourceLocation(SumConstants.MOD_NAMESPACE, "picture_frame"));
         LOGGER.info("I am " + SumConstants.MOD_NAME + " at version " + SumConstants.MOD_VERSION);
     }
 
