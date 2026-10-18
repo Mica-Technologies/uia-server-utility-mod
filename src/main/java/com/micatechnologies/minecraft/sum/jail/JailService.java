@@ -73,6 +73,12 @@ public final class JailService {
         }
         player.connection.setPlayerLocation(cell.getSpawnX(), cell.getSpawnY(), cell.getSpawnZ(),
             cell.getSpawnYaw(), player.rotationPitch);
+        // A teleport keeps momentum, so a sprinting or flying inmate would coast straight back
+        // out of the cell before the next check. Stop them where they land.
+        player.motionX = 0.0;
+        player.motionY = 0.0;
+        player.motionZ = 0.0;
+        player.connection.sendPacket(new net.minecraft.network.play.server.SPacketEntityVelocity(player));
     }
 
     /** Places a player at a cell without building or searching for a portal. */
