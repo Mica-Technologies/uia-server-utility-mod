@@ -227,5 +227,6 @@ public class Sum {
         EntityAIRoamerStormShelter.clearClaims();
         RoamerExitCache.clear();
         RoamerShelterCache.clear();
+        com.micatechnologies.minecraft.sum.roamer.RoamerSearchBudget.clear();
     }
 }
