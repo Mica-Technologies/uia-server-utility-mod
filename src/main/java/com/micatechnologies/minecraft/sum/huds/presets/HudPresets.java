@@ -104,12 +104,14 @@ public final class HudPresets {
             new OneColor(80, 255, 80), 0,
             true, new OneColor(0, 200, 0)),
 
-        // Realistic Game HUD — the explicitly-requested option. Tiny font, no bg, full
-        // shadow so the text stays legible against any background.
+        // Realistic Game HUD — the explicitly-requested option. Tiny font, no bg, a plain
+        // drop shadow. It was full shadow (2) until 2026-10-18: OneConfig draws a full-shadow
+        // string five times, and with the Alto layout's ~25 lines (through SmoothFont) that
+        // was 26-35% of the client thread in an FPS audit. One shadow keeps it legible.
         new HudStyle("Realistic Game HUD", 0.4f,
             false, false, 2f, 2f, 2f, new OneColor(0, 0, 0, 0),
             false, 2f, new OneColor(0, 0, 0),
-            new OneColor(255, 255, 255), 2,
+            new OneColor(255, 255, 255), 1,
             false, new OneColor(255, 255, 255)),
 
         // High Contrast — yellow on solid black, no anti-shenanigans. Accessibility
@@ -505,6 +507,40 @@ public final class HudPresets {
                 return;
             }
         }
+    }
+
+    /**
+     * Turns full shadow ({@code textType} 2) into a plain shadow (1) on every SUM text HUD,
+     * touching nothing else. Used once by {@link SumOneConfig} to move existing installs off the
+     * old "Realistic Game HUD" full shadow, which cost far more to draw (see {@link #STYLES}).
+     *
+     * @return how many HUDs were changed
+     */
+    public static int downgradeFullShadow(SumOneConfig cfg) {
+        int changed = 0;
+        for (Hud hud : collectHuds(cfg).values()) {
+            if (hud instanceof TextHud && readInt(hud, "textType", -1) == 2) {
+                setField(hud, "textType", 1);
+                changed++;
+            }
+        }
+        return changed;
+    }
+
+    private static int readInt(Object instance, String fieldName, int fallback) {
+        Class<?> c = instance.getClass();
+        while (c != null && c != Object.class) {
+            try {
+                Field f = c.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                return f.getInt(instance);
+            } catch (NoSuchFieldException e) {
+                c = c.getSuperclass();
+            } catch (IllegalAccessException e) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private static float readFloat(Object instance, String fieldName, float fallback) {

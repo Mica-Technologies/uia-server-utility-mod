@@ -400,6 +400,15 @@ public class SumOneConfig extends Config {
         HudPresets.applyLayout(layoutPresetIndex, this);
     }
 
+    /**
+     * Which one-time HUD style fixes this install has had. Not annotated, so OneConfig saves it
+     * in sum.json but never shows it. 1 = the "Realistic Game HUD" full shadow became a plain
+     * shadow (2026-10-18). Fresh installs start at {@link #HUD_STYLE_REVISION}.
+     */
+    public int hudStyleRevision = 0;
+
+    private static final int HUD_STYLE_REVISION = 1;
+
     public SumOneConfig() {
         super(new Mod("Server Utility Mod", ModType.UTIL_QOL), "sum.json");
         INSTANCE = this;
@@ -419,6 +428,17 @@ public class SumOneConfig extends Config {
             // layouts/styles are never clobbered by an update.
             HudPresets.applyStyle(stylePresetIndex, this);
             HudPresets.applyLayout(layoutPresetIndex, this);
+            hudStyleRevision = HUD_STYLE_REVISION;
+            save();
+        } else if (hudStyleRevision < 1) {
+            // Existing install from before the plain-shadow default: only players still on the
+            // "Realistic Game HUD" style get their full shadow replaced (a player who picked
+            // another style chose its look). Runs once; the setting stays changeable in the GUI.
+            if (stylePresetIndex == HudPresets.styleIndexOf("Realistic Game HUD")) {
+                HudPresets.downgradeFullShadow(this);
+            }
+            hudStyleRevision = HUD_STYLE_REVISION;
+            save();
         }
     }
 
