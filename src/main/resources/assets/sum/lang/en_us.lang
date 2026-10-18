@@ -36,6 +36,7 @@ tile.sum.bills_display.name=Bills Display
 tile.sum.trash_can.name=Trash Can
 sum.trash.title=Trash
 tile.sum.storm_shelter_sign.name=Storm Shelter Sign
+tile.sum.picture_frame.name=Picture Frame
 item.sum.business_card.name=Business Card
 tile.sum.mailbox.name=Mailbox
 sum.mailbox.title=Mailbox

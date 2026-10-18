@@ -1,0 +1,6 @@
+{
+  "__comment": "Never drawn: the block renders through TESRPictureFrame (EnumBlockRenderType.ENTITYBLOCK_ANIMATED). Only the particle texture is used, for break and walk particles.",
+  "textures": {
+    "particle": "minecraft:blocks/planks_oak"
+  }
+}

@@ -38,6 +38,13 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 - Protection handler cancels block break/place from non-owners, mob-driven destruction, and filters owned blocks out of explosions.
 - Op bypass via `sum.plots.bypass` permission node (auto-granted at op-2+).
 
+### Picture frames
+
+- Wall-mounted frame that shows an image from a link: PNG, JPEG, GIF (animated), WebP (lossy, lossless, animated) and BMP. No LittleTiles or other dependency; WebP decoding is TwelveMonkeys ImageIO, shaded and relocated inside the SUM jar.
+- Right-click (placer or op) to set the link, size (up to `picture_frame.maxSizeBlocks`, default 16), offset, rotation, fit (Fit / Fill / Stretch), opacity, glow and view distance. "Match image shape" sizes the frame to the picture.
+- Cached twice on each client: textures shared by every frame showing the same link and freed when unused, and the downloaded files on disk under `sum/picture-cache` (size cap and re-check age in the SUM OneConfig page, with a Clear button), so pictures load without the network after a restart.
+- Clients never fetch from their own machine or private network, redirects included. Operators can restrict hosts with `picture_frame.allowedHosts`; every link change is logged with who made it.
+
 ### Jail
 
 - Jail wand — sneak+right-click for corner A, right-click for corner B, then stand inside and `/setjail <name>`; where you stand is where inmates are put.

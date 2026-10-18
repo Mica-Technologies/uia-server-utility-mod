@@ -309,6 +309,34 @@ public class SumOneConfig extends Config {
     @Switch(name = "Ignore the Click That Refocuses the Window", category = "Controls")
     public boolean refocusClickGobble = true;
 
+    // === Picture Frames ===
+    // Read through PictureClientSettings, which falls back to these defaults without OneConfig.
+
+    /** Off: frames draw an empty plate and this client downloads nothing. */
+    @Switch(name = "Show Pictures", category = "Picture Frames", subcategory = "Display")
+    public boolean pictureFramesEnabled = true;
+
+    /** Caps every frame's own render distance; a frame never draws farther than this. */
+    @Number(name = "Max Render Distance (Blocks)", min = 16, max = 512, step = 16,
+        category = "Picture Frames", subcategory = "Display")
+    public int pictureMaxRenderDistance = 128;
+
+    /** On-disk cache of downloaded images, so they survive a restart without a re-download. */
+    @Number(name = "Disk Cache Size (MB)", min = 16, max = 4096, step = 16,
+        category = "Picture Frames", subcategory = "Cache")
+    public int pictureCacheSizeMb = 512;
+
+    /** After this long a cached image is re-checked with the server (cheap if unchanged). */
+    @Number(name = "Re-check Cached Images After (Days)", min = 1, max = 90, step = 1,
+        category = "Picture Frames", subcategory = "Cache")
+    public int pictureCacheDays = 7;
+
+    @Button(name = "Clear Picture Cache", text = "Clear",
+        category = "Picture Frames", subcategory = "Cache")
+    public void clearPictureCache() {
+        com.micatechnologies.minecraft.sum.picture.PictureCache.INSTANCE.clearAll();
+    }
+
     // === Music ===
     // Knobs for MixinMusicTickerMusicType (client mixin on MusicTicker$MusicType). Vanilla
     // waits 10-20 MINUTES between survival music tracks — with the Alto pack's 21-track

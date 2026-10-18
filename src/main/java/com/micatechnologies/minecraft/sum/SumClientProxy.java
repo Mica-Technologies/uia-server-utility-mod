@@ -2,6 +2,9 @@ package com.micatechnologies.minecraft.sum;
 
 import com.micatechnologies.minecraft.sum.atm.GuiSumAtm;
 import com.micatechnologies.minecraft.sum.phone.GuiSumPhone;
+import com.micatechnologies.minecraft.sum.picture.PictureCache;
+import com.micatechnologies.minecraft.sum.picture.TESRPictureFrame;
+import com.micatechnologies.minecraft.sum.picture.TileEntityPictureFrame;
 import com.micatechnologies.minecraft.sum.economy.TESRBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
@@ -43,6 +46,9 @@ public class SumClientProxy implements SumProxy {
             TileEntityShop.class, new TESRShop());
         net.minecraftforge.fml.client.registry.ClientRegistry.bindTileEntitySpecialRenderer(
             TileEntityServerShop.class, new TESRShop());
+        net.minecraftforge.fml.client.registry.ClientRegistry.bindTileEntitySpecialRenderer(
+            TileEntityPictureFrame.class, new TESRPictureFrame());
+        MinecraftForge.EVENT_BUS.register(PictureCache.INSTANCE);
         FavoritesStore.setStorageFile(event.getModConfigurationDirectory());
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
         FavoritesClientHandler.registerKeybinds();

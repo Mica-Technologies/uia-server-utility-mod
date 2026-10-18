@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "sum:picture_frame" },
+    "facing=south": { "model": "sum:picture_frame" },
+    "facing=east":  { "model": "sum:picture_frame" },
+    "facing=west":  { "model": "sum:picture_frame" }
+  }
+}

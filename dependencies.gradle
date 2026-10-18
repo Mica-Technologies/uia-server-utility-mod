@@ -37,7 +37,26 @@
  *
  * For more details, see https://docs.gradle.org/8.4/userguide/java_library_plugin.html#sec:java_library_configurations_graph
  */
+// `shade`: third-party libraries bundled INSIDE the SUM jar under a relocated package, so they
+// cannot collide with another mod shipping its own copy. On the compile and dev-run classpaths
+// they keep their real package names; addon.gradle's `shadedJar` task copies them into the jar
+// and rewrites SUM's references to the relocated names before reobfJar. This is deliberately
+// not the GTCEu buildscript's usesShadowedDependencies switch: that disables `jar` and builds
+// from shadowJar instead, which would drop the `embed`ded OneConfig wrapper and the manifest
+// attributes addon.gradle puts on `jar`.
+configurations {
+    shade
+    implementation.extendsFrom(shade)
+}
+
 dependencies {
+    // TwelveMonkeys ImageIO WebP reader (BSD-3-Clause), for picture frames. Pure Java, Java 8
+    // bytecode, no natives. Pulls in imageio-core, imageio-metadata and the common-* helpers.
+    // SUM constructs the reader directly rather than through ImageIO's plugin registry, so
+    // shadedJar drops the library's META-INF/services entries and installing SUM does not
+    // change what ImageIO can read for any other mod.
+    shade 'com.twelvemonkeys.imageio:imageio-webp:3.15.2'
+
     // City Super Mod (CSM) - compile-only for soft dependency on fire alarm API.
     // The SUM mod works without CSM present; integration classes are only classloaded when
     // Loader.isModLoaded("csm") returns true.
