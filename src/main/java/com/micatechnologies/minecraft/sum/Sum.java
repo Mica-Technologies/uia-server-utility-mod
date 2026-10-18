@@ -16,6 +16,12 @@ import com.micatechnologies.minecraft.sum.economy.CapabilitySumMoney;
 import com.micatechnologies.minecraft.sum.economy.SumMoneyEvents;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillChanger;
 import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
+import com.micatechnologies.minecraft.sum.jail.CommandDelJail;
+import com.micatechnologies.minecraft.sum.jail.CommandJail;
+import com.micatechnologies.minecraft.sum.jail.CommandJails;
+import com.micatechnologies.minecraft.sum.jail.CommandSetJail;
+import com.micatechnologies.minecraft.sum.jail.CommandUnjail;
+import com.micatechnologies.minecraft.sum.jail.JailEventHandler;
 import com.micatechnologies.minecraft.sum.loyalty.LoyaltyHandler;
 import com.micatechnologies.minecraft.sum.mailbox.TileEntityMailbox;
 import com.micatechnologies.minecraft.sum.plots.PlotsProtectionHandler;
@@ -91,6 +97,7 @@ public class Sum {
         MinecraftForge.EVENT_BUS.register(new LoyaltyHandler());
         MinecraftForge.EVENT_BUS.register(new BorderHandler());
         MinecraftForge.EVENT_BUS.register(new AfkTracker());
+        MinecraftForge.EVENT_BUS.register(new JailEventHandler());
         MinecraftForge.EVENT_BUS.register(
             new com.micatechnologies.minecraft.sum.huds.snapshot.PlayerStatusTracker());
         MinecraftForge.EVENT_BUS.register(
@@ -170,6 +177,11 @@ public class Sum {
         event.registerServerCommand(new CommandBalance());
         event.registerServerCommand(new CommandPay());
         event.registerServerCommand(new CommandLightning());
+        event.registerServerCommand(new CommandJail());
+        event.registerServerCommand(new CommandUnjail());
+        event.registerServerCommand(new CommandSetJail());
+        event.registerServerCommand(new CommandDelJail());
+        event.registerServerCommand(new CommandJails());
         // Started here rather than in preInit because it needs the live MinecraftServer: the
         // dedicated-vs-integrated check, the world save that holds the rollback counter, and the
         // player list all come from it.

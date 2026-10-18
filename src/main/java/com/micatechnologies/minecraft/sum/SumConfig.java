@@ -277,6 +277,23 @@ public class SumConfig {
             + "by default since some servers want AFK farms to keep running.";
     private static final boolean FIELD_DEFAULT_AFK_PAUSE_ALL = false;
 
+    private static final String CATEGORY_JAIL = "jail";
+
+    private static final String FIELD_KEY_JAIL_ENABLED = "enabled";
+    private static final String FIELD_DESCRIPTION_JAIL_ENABLED =
+        "Master toggle for /jail, /unjail, /setjail, /deljail and /jails. When false the commands "
+            + "refuse to run and nobody is held, but saved cells and inmates are kept, so turning "
+            + "it back on picks up where it left off.";
+    private static final boolean FIELD_DEFAULT_JAIL_ENABLED = true;
+
+    private static final String FIELD_KEY_JAIL_ALLOWED_COMMANDS = "allowedCommands";
+    private static final String FIELD_DESCRIPTION_JAIL_ALLOWED_COMMANDS =
+        "Commands an inmate may still run, by name without the slash (e.g. 'help'). Everything "
+            + "else is refused, including /msg, /spawn and /home. The jail commands themselves are "
+            + "always allowed for anyone with permission to use them, so a jailed operator can "
+            + "still /unjail. Empty by default.";
+    private static final String[] FIELD_DEFAULT_JAIL_ALLOWED_COMMANDS = {};
+
     // ------------------------------------------------------------------------------------------
     // Open MCEconomic API — remote authoritative economy backend.
     //
@@ -536,6 +553,8 @@ public class SumConfig {
     private static boolean afkExcludeFromSleepVote;
     private static boolean afkAnnounce;
     private static boolean afkPauseWorldWhenAllAfk;
+    private static boolean jailEnabled;
+    private static Set<String> jailAllowedCommands = Collections.emptySet();
 
     private static boolean economyApiEnabled;
     private static boolean economyApiAllowIntegratedServer;
@@ -684,6 +703,23 @@ public class SumConfig {
         afkPauseWorldWhenAllAfk = config.getBoolean(
             FIELD_KEY_AFK_PAUSE_ALL, CATEGORY_AFK,
             FIELD_DEFAULT_AFK_PAUSE_ALL, FIELD_DESCRIPTION_AFK_PAUSE_ALL);
+
+        jailEnabled = config.getBoolean(
+            FIELD_KEY_JAIL_ENABLED, CATEGORY_JAIL,
+            FIELD_DEFAULT_JAIL_ENABLED, FIELD_DESCRIPTION_JAIL_ENABLED);
+        Set<String> allowed = new HashSet<>();
+        for (String entry : config.getStringList(
+            FIELD_KEY_JAIL_ALLOWED_COMMANDS, CATEGORY_JAIL,
+            FIELD_DEFAULT_JAIL_ALLOWED_COMMANDS, FIELD_DESCRIPTION_JAIL_ALLOWED_COMMANDS)) {
+            String name = entry.trim();
+            while (name.startsWith("/")) {
+                name = name.substring(1);
+            }
+            if (!name.isEmpty()) {
+                allowed.add(name.toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        jailAllowedCommands = Collections.unmodifiableSet(allowed);
 
         economyApiEnabled = config.getBoolean(
             FIELD_KEY_ECONOMY_API_ENABLED, CATEGORY_ECONOMY_API,
@@ -1331,6 +1367,15 @@ public class SumConfig {
 
     public static boolean isAfkPauseWorldWhenAllAfk() {
         return afkPauseWorldWhenAllAfk;
+    }
+
+    public static boolean isJailEnabled() {
+        return jailEnabled;
+    }
+
+    /** Lower-case command names, without a slash, that an inmate may still run. */
+    public static Set<String> getJailAllowedCommands() {
+        return jailAllowedCommands;
     }
 
     /**

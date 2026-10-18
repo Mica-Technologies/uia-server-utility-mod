@@ -38,6 +38,14 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 - Protection handler cancels block break/place from non-owners, mob-driven destruction, and filters owned blocks out of explosions.
 - Op bypass via `sum.plots.bypass` permission node (auto-granted at op-2+).
 
+### Jail
+
+- Jail wand — sneak+right-click for corner A, right-click for corner B, then stand inside and `/setjail <name>`; where you stand is where inmates are put.
+- `/jail <player> [cell] [duration]` — jails a player (online, or offline and held on next login) in the named or least-occupied cell; durations like `30m`, `2h`, `1d`, or open-ended until `/unjail`.
+- `/unjail <player>` releases them where they stand: privileges come back, but they walk out on their own.
+- `/jails [cell]` lists cells and inmates with time left; `/deljail <name>` removes an empty cell.
+- Inmates can't break, place, open or use blocks, hit or use entities, use items other than food, ender-pearl, chat, or run commands outside `jail.allowedCommands`; anyone who leaves the cell is put back within a second. Ops only; `jail.enabled` turns it all off.
+
 ### NPCs
 
 - Roamer wandering passive entity with role enum (GENERIC, BANK_TELLER) and theme-aware greetings.
