@@ -56,6 +56,8 @@ public class EntityRoamer extends EntityCreature {
     // the alarm sounded — the bug Multiplayer hit because alarm sources aren't always
     // co-located with the activator.
     private boolean emergencyNearby = false;
+    /** Server only: no player in range and no alarm, so the AI is not ticked at all. */
+    private boolean aiIdle = false;
     private final boolean csmLoaded = Loader.isModLoaded("csm");
 
     private boolean greetEnabled = true;
@@ -104,27 +106,43 @@ public class EntityRoamer extends EntityCreature {
         return new RoamerWalkableBlocksNavigator(this, world);
     }
 
+    /**
+     * Refreshes the idle gate, then ticks as normal; {@link #isMovementBlocked} applies it.
+     *
+     * <p>The gate used to live in {@code updateAITasks()}, which skipped nothing:
+     * {@code EntityLiving.updateEntityActionState} runs the goal selector and the navigator
+     * <i>before</i> calling that hook, so every roamer kept wandering and pathfinding however
+     * far it was from a player, and the gate only threw each new path away.
+     */
     @Override
-    protected void updateAITasks() {
-        if (idleCheckTimer > 0) {
-            idleCheckTimer--;
-        } else {
-            idleCheckTimer = IDLE_CHECK_INTERVAL;
-            playerNearby = world.getClosestPlayer(posX, posY, posZ, IDLE_RANGE, false) != null;
-            emergencyNearby = checkEmergencyNearby();
-        }
-
-        if (!playerNearby && !emergencyNearby) {
-            // Stop in place when nobody can see us AND no emergency demands a response. AI
-            // resumes on the next tick that finds a player back in range (or an alarm
-            // activates).
-            if (!getNavigator().noPath()) {
-                getNavigator().clearPath();
+    public void onLivingUpdate() {
+        if (!world.isRemote) {
+            if (idleCheckTimer > 0) {
+                idleCheckTimer--;
+            } else {
+                idleCheckTimer = IDLE_CHECK_INTERVAL;
+                playerNearby = world.getClosestPlayer(posX, posY, posZ, IDLE_RANGE, false) != null;
+                emergencyNearby = checkEmergencyNearby();
+                boolean idle = !playerNearby && !emergencyNearby;
+                if (idle && !aiIdle) {
+                    // Stop where we are rather than resume a stale path when AI comes back.
+                    getNavigator().clearPath();
+                }
+                aiIdle = idle;
             }
-            return;
         }
+        super.onLivingUpdate();
+    }
 
-        super.updateAITasks();
+    /**
+     * True while idle, which makes {@code EntityLivingBase.onLivingUpdate} skip
+     * {@code updateEntityActionState} entirely: goal selector, navigator, move, look and jump
+     * helpers. Gravity, collision and pushing still run, since they live in {@code travel}.
+     * This is the one place vanilla reads it, so nothing else changes.
+     */
+    @Override
+    protected boolean isMovementBlocked() {
+        return super.isMovementBlocked() || aiIdle;
     }
 
     /**
@@ -158,6 +176,23 @@ public class EntityRoamer extends EntityCreature {
     @Override
     public boolean isEntityInvulnerable(DamageSource source) {
         return true;
+    }
+
+    /**
+     * {@code /kill} removes a roamer. Vanilla kills through {@code attackEntityFrom}, which a
+     * roamer refuses, so without this an operator had no way to remove one: {@code /kill}
+     * reported "Killed Roamer" and left it standing, and every misplaced roamer kept ticking
+     * for good.
+     */
+    @Override
+    public void onKillCommand() {
+        setDead();
+    }
+
+    /** Below the world, likewise: vanilla's void damage is refused too, so it fell forever. */
+    @Override
+    protected void outOfWorld() {
+        setDead();
     }
 
     @Override

@@ -69,6 +69,14 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     // SEARCH_RADIUS_XZ^2 * (SEARCH_RADIUS_Y_DOWN + SEARCH_RADIUS_Y_UP + 1) cells, spread over
     // ceil(total / CELLS_PER_TICK) ticks instead of one tick spike.
     private static final int CELLS_PER_TICK = 1000;
+    // After a search finds no reachable shelter, wait this many shouldExecute calls (x3 ticks,
+    // so roughly 10-30 s) plus jitter before scanning again. It used to restart in ~15 ticks,
+    // so a roamer with no shelter in reach (outdoors in a field, say) re-ran a full 67k-cell
+    // scan for the whole storm.
+    private static final int FAILED_SEARCH_BACKOFF_MIN = 70;
+    private static final int FAILED_SEARCH_BACKOFF_JITTER = 130;
+    // Cached and signed shelters probed per attempt; each probe is a full path search.
+    private static final int MAX_CACHED_SHELTER_PROBES = 3;
 
     // Shelter-in-place indoor wander settings
     private static final int INDOOR_WANDER_RANGE = 5;
@@ -84,6 +92,9 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
     private final boolean csmLoaded;
 
     private BlockPos shelterTarget;
+    // The path to shelterTarget found while choosing it, handed to the navigator as is; see
+    // the same field in EntityAIRoamerFireEvacuate for why moving there afterwards was wrong.
+    private Path pendingPath;
     private int checkTimer;
     private int repathTimer;
     private int continueCheckTimer;
@@ -151,15 +162,22 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         // Try cached shelters first (cheap, single-shot). Across storm waves the building's
         // shelter zone is the same, and once claims have been released the cached positions
         // are usually re-usable directly.
+        int probes = 0;
         for (BlockPos cached : RoamerShelterCache.findNearest(entityPos)) {
+            if (probes >= MAX_CACHED_SHELTER_PROBES) {
+                break;
+            }
             if (isPositionClaimed(cached)) {
                 continue;
             }
             if (!isShelterPosition(world, cached)) {
                 continue;
             }
-            if (roamer.getNavigator().getPathToXYZ(
-                    cached.getX() + 0.5, cached.getY(), cached.getZ() + 0.5) != null) {
+            probes++;
+            Path path = roamer.getNavigator().getPathToXYZ(
+                cached.getX() + 0.5, cached.getY(), cached.getZ() + 0.5);
+            if (path != null) {
+                pendingPath = path;
                 shelterTarget = cached;
                 claimPosition(shelterTarget);
                 searching = false;
@@ -233,6 +251,9 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
                 + roamer.getRNG().nextInt(INDOOR_WANDER_INTERVAL_MAX - INDOOR_WANDER_INTERVAL_MIN);
         } else if (searching) {
             // No path target yet — cube scan runs across ticks in updateTask.
+        } else if (pendingPath != null) {
+            roamer.getNavigator().setPath(pendingPath, speed);
+            pendingPath = null;
         } else {
             roamer.getNavigator().tryMoveToXYZ(shelterTarget.getX() + 0.5, shelterTarget.getY(),
                 shelterTarget.getZ() + 0.5, speed);
@@ -273,12 +294,15 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         // Release everything this roamer holds, not just shelterTarget: a task can claim a
         // preferred sign shelter and then a search result before reset.
         CLAIMS.releaseAll(roamer.getEntityId());
+        checkTimer = searchFailed
+            ? FAILED_SEARCH_BACKOFF_MIN + roamer.getRNG().nextInt(FAILED_SEARCH_BACKOFF_JITTER)
+            : CHECK_INTERVAL_TICKS;
         shelterTarget = null;
+        pendingPath = null;
         sheltered = false;
         searching = false;
         searchFailed = false;
         search = null;
-        checkTimer = CHECK_INTERVAL_TICKS;
         roamer.setEmergencyMode(false);
     }
 
@@ -313,16 +337,20 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
      *  spread roamers across organic shelter spots; signed shelters opt out so a crowd can
      *  converge on the same room. */
     private BlockPos findPreferredSignedShelterInside(World world, BlockPos from) {
+        int probes = 0;
         for (BlockPos signed : RoamerShelterCache.findNearestSigned(from)) {
+            if (probes >= MAX_CACHED_SHELTER_PROBES) break;
             if (signed.equals(from)) continue;
             if (Math.abs(signed.getX() - from.getX()) > INDOOR_SIGN_HORIZONTAL_RANGE) continue;
             if (Math.abs(signed.getZ() - from.getZ()) > INDOOR_SIGN_HORIZONTAL_RANGE) continue;
             if (Math.abs(signed.getY() - from.getY()) > INDOOR_SIGN_VERTICAL_RANGE) continue;
             if (!isShelterPosition(world, signed)) continue;
+            probes++;
             Path path = roamer.getNavigator().getPathToXYZ(
                 signed.getX() + 0.5, signed.getY(), signed.getZ() + 0.5);
             if (path == null) continue;
             if (!pathStaysInside(world, path)) continue;
+            pendingPath = path;
             return signed;
         }
         return null;
@@ -361,10 +389,11 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
      */
     private boolean isNearHazard(World world, BlockPos pos) {
         int r = HAZARD_CHECK_DISTANCE;
+        BlockPos.MutableBlockPos check = new BlockPos.MutableBlockPos();
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
                 for (int dy = -1; dy <= 2; dy++) {
-                    BlockPos check = pos.add(dx, dy, dz);
+                    check.setPos(pos.getX() + dx, pos.getY() + dy, pos.getZ() + dz);
 
                     // Check for sky-exposed openings (doorways, holes)
                     if (world.isAirBlock(check) && world.canSeeSky(check)) {
@@ -412,8 +441,9 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
 
         // Stage 1: cube walk, capped by cube exhaustion or a good-enough candidate.
         if (!search.cubeExhausted && !search.foundGoodEnough) {
+            int allowed = RoamerSearchBudget.take(world, CELLS_PER_TICK);
             int processed = 0;
-            while (processed < CELLS_PER_TICK
+            while (processed < allowed
                 && !search.cubeExhausted && !search.foundGoodEnough) {
                 if (!search.advance()) {
                     search.cubeExhausted = true;
@@ -473,16 +503,16 @@ public class EntityAIRoamerStormShelter extends EntityAIBase {
         // Stage 2: try paths in score order, take the first reachable.
         search.candidates.sort(Comparator.comparingInt(s -> -s.score));
         for (ScoredPos sp : search.candidates) {
-            if (roamer.getNavigator().getPathToXYZ(
-                    sp.pos.getX() + 0.5, sp.pos.getY(), sp.pos.getZ() + 0.5) == null) {
+            Path path = roamer.getNavigator().getPathToXYZ(
+                sp.pos.getX() + 0.5, sp.pos.getY(), sp.pos.getZ() + 0.5);
+            if (path == null) {
                 continue;
             }
             shelterTarget = sp.pos;
             claimPosition(shelterTarget);
             searching = false;
             search = null;
-            roamer.getNavigator().tryMoveToXYZ(sp.pos.getX() + 0.5, sp.pos.getY(),
-                sp.pos.getZ() + 0.5, speed);
+            roamer.getNavigator().setPath(path, speed);
             repathTimer = 0;
             return;
         }

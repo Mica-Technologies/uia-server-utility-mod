@@ -27,6 +27,10 @@ public class RoamerExitCache {
     // Exits within this Y difference from the roamer are considered "same level"
     private static final int SAME_LEVEL_TOLERANCE = 2;
 
+    // Recording and lookup both walk the whole list, and nothing else ever removes an entry, so
+    // over a long uptime of fire drills the list would only grow. Past this, the oldest goes.
+    static final int MAX_EXITS = 512;
+
     private static final List<BlockPos> exits = new ArrayList<>();
 
     /**
@@ -38,6 +42,9 @@ public class RoamerExitCache {
             if (existing.distanceSq(pos) < 4.0) {
                 return;
             }
+        }
+        if (exits.size() >= MAX_EXITS) {
+            exits.remove(0);
         }
         exits.add(pos);
     }

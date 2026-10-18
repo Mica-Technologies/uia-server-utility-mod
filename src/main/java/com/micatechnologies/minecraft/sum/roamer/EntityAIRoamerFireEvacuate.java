@@ -10,6 +10,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.ai.EntityAIBase;
 import net.minecraft.entity.ai.RandomPositionGenerator;
+import net.minecraft.pathfinding.Path;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -61,6 +62,15 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     // (no exits within SEARCH_RADIUS_XZ) takes ~SEARCH_RADIUS_XZ * SEARCH_RADIUS_XZ * (2 *
     // SEARCH_RADIUS_Y + 1) / CELLS_PER_TICK ticks.
     private static final int CELLS_PER_TICK = 1000;
+    // After a search finds no reachable exit, wait this many shouldExecute calls (x3 ticks,
+    // so roughly 10-30 s) plus jitter before scanning again. It used to restart in ~15 ticks,
+    // so a roamer trapped inside re-ran a full 78k-cell scan for as long as the alarm sounded.
+    private static final int FAILED_SEARCH_BACKOFF_MIN = 70;
+    private static final int FAILED_SEARCH_BACKOFF_JITTER = 130;
+    // Cached exits probed per attempt, nearest first, and how far away one may be. Each probe
+    // is a full path search, and one beyond the path range always fails after the whole search.
+    private static final int MAX_CACHED_EXIT_PROBES = 3;
+    private static final double MAX_CACHED_EXIT_DISTANCE_SQ = 40.0 * 40.0;
 
     // Rally-phase outdoor wander settings
     private static final int OUTDOOR_WANDER_RANGE = 6;
@@ -76,6 +86,11 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
     private final boolean csmLoaded;
 
     private BlockPos exitTarget;     // the position the roamer is currently pathing to
+    // The path to exitTarget found while choosing it, handed to the navigator as is. Asking
+    // the navigator to move there afterwards searched again, or worse, got back the wander
+    // path still in progress, because vanilla caches by target and getPathToXYZ sets the
+    // target without setting the path.
+    private Path pendingPath;
     private BlockPos rallyPoint;     // the final outdoor rally position (well clear of building)
     private int checkTimer;
     private int repathTimer;
@@ -131,10 +146,20 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         // Check the shared exit cache first — a nearby roamer may have already found the way out.
         // Exits are sorted: same-level first (no stairs needed), then other levels by distance.
         List<BlockPos> cachedExits = RoamerExitCache.findExitsByPriority(entityPos);
+        int probes = 0;
         for (BlockPos cachedExit : cachedExits) {
-            if (roamer.getNavigator().getPathToXYZ(
-                    cachedExit.getX() + 0.5, cachedExit.getY(), cachedExit.getZ() + 0.5) != null) {
+            if (probes >= MAX_CACHED_EXIT_PROBES) {
+                break;
+            }
+            if (cachedExit.distanceSq(entityPos) > MAX_CACHED_EXIT_DISTANCE_SQ) {
+                continue;
+            }
+            probes++;
+            Path path = roamer.getNavigator().getPathToXYZ(
+                cachedExit.getX() + 0.5, cachedExit.getY(), cachedExit.getZ() + 0.5);
+            if (path != null) {
                 exitTarget = cachedExit;
+                pendingPath = path;
                 searching = false;
                 searchFailed = false;
                 return true;
@@ -208,8 +233,13 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
             reachedOutdoors = false;
         } else {
             reachedOutdoors = false;
-            roamer.getNavigator().tryMoveToXYZ(exitTarget.getX() + 0.5, exitTarget.getY(),
-                exitTarget.getZ() + 0.5, speed);
+            if (pendingPath != null) {
+                roamer.getNavigator().setPath(pendingPath, speed);
+                pendingPath = null;
+            } else {
+                roamer.getNavigator().tryMoveToXYZ(exitTarget.getX() + 0.5, exitTarget.getY(),
+                    exitTarget.getZ() + 0.5, speed);
+            }
         }
     }
 
@@ -268,14 +298,17 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
         // claimed by stepFireExitSearch and every rally block claimed on arrival — permanently,
         // since nothing else ever removed them.
         CLAIMS.releaseAll(roamer.getEntityId());
+        checkTimer = searchFailed
+            ? FAILED_SEARCH_BACKOFF_MIN + roamer.getRNG().nextInt(FAILED_SEARCH_BACKOFF_JITTER)
+            : CHECK_INTERVAL_TICKS;
         exitTarget = null;
+        pendingPath = null;
         rallyPoint = null;
         reachedOutdoors = false;
         atRallyPoint = false;
         searching = false;
         searchFailed = false;
         search = null;
-        checkTimer = CHECK_INTERVAL_TICKS;
         roamer.setEmergencyMode(false);
     }
 
@@ -338,8 +371,9 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
 
         // Stage 1: cube walk, capped at MAX_CANDIDATES collected.
         if (!search.cubeExhausted && search.candidates.size() < MAX_CANDIDATES) {
+            int allowed = RoamerSearchBudget.take(world, CELLS_PER_TICK);
             int processed = 0;
-            while (processed < CELLS_PER_TICK
+            while (processed < allowed
                 && search.candidates.size() < MAX_CANDIDATES) {
                 if (!search.advance()) {
                     search.cubeExhausted = true;
@@ -395,16 +429,16 @@ public class EntityAIRoamerFireEvacuate extends EntityAIBase {
             if (isPositionClaimed(candidate)) {
                 continue;
             }
-            if (roamer.getNavigator().getPathToXYZ(
-                    candidate.getX() + 0.5, candidate.getY(), candidate.getZ() + 0.5) == null) {
+            Path path = roamer.getNavigator().getPathToXYZ(
+                candidate.getX() + 0.5, candidate.getY(), candidate.getZ() + 0.5);
+            if (path == null) {
                 continue;
             }
             claimPosition(candidate);
             exitTarget = candidate;
             searching = false;
             search = null;
-            roamer.getNavigator().tryMoveToXYZ(candidate.getX() + 0.5, candidate.getY(),
-                candidate.getZ() + 0.5, speed);
+            roamer.getNavigator().setPath(path, speed);
             repathTimer = 0;
             return;
         }

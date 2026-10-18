@@ -63,6 +63,22 @@ class RoamerExitCacheTest {
     }
 
     @Test
+    void cacheIsCappedAndDropsTheOldestExitFirst() {
+        // Spaced 3 apart on x so none is deduplicated; all within 100 blocks of the origin
+        // only for the first few, so look the oldest up from its own position.
+        BlockPos oldest = new BlockPos(0, 64, 0);
+        for (int i = 0; i < RoamerExitCache.MAX_EXITS; i++) {
+            RoamerExitCache.recordExit(new BlockPos(i * 3, 64, 0));
+        }
+        assertTrue(RoamerExitCache.findExitsByPriority(oldest).contains(oldest));
+        RoamerExitCache.recordExit(new BlockPos(0, 64, 9000));
+        assertTrue(!RoamerExitCache.findExitsByPriority(oldest).contains(oldest),
+            "one past the cap evicts the first exit recorded");
+        assertTrue(RoamerExitCache.findExitsByPriority(new BlockPos(0, 64, 9000))
+            .contains(new BlockPos(0, 64, 9000)));
+    }
+
+    @Test
     void clearEmptiesTheCache() {
         RoamerExitCache.recordExit(new BlockPos(5, 64, 5));
         RoamerExitCache.clear();
