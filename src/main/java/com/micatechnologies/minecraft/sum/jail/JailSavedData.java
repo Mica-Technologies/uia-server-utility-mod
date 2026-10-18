@@ -9,6 +9,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.storage.MapStorage;
 import net.minecraft.world.storage.WorldSavedData;
@@ -54,8 +55,43 @@ public class JailSavedData extends WorldSavedData {
     @Nullable
     public JailCell putCell(JailCell cell) {
         JailCell previous = cells.put(JailCell.key(cell.getName()), cell);
+        if (previous != null) {
+            cell.copyLinksFrom(previous);
+        }
         markDirty();
         return previous;
+    }
+
+    /** Links or unlinks a door. Returns true if it is now linked to the cell. */
+    public boolean toggleDoor(JailCell cell, BlockPos pos) {
+        boolean linked = cell.toggleDoor(pos);
+        markDirty();
+        return linked;
+    }
+
+    /** Links or unlinks an alarm relay. Returns true if it is now linked to the cell. */
+    public boolean toggleAlarm(JailCell cell, BlockPos pos) {
+        boolean linked = cell.toggleAlarm(pos);
+        markDirty();
+        return linked;
+    }
+
+    /**
+     * The cell a door belongs to, if any. A door is matched by either of its blocks, since a
+     * vanilla door is two blocks and a CSM cell door is usually stacked two high.
+     */
+    @Nullable
+    public JailCell cellForDoor(int dimension, BlockPos pos) {
+        for (JailCell cell : cells.values()) {
+            if (cell.getDimensionId() != dimension) continue;
+            for (BlockPos door : cell.getDoors()) {
+                if (door.getX() == pos.getX() && door.getZ() == pos.getZ()
+                    && Math.abs(door.getY() - pos.getY()) <= 1) {
+                    return cell;
+                }
+            }
+        }
+        return null;
     }
 
     public boolean removeCell(String name) {

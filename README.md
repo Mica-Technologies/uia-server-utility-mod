@@ -51,6 +51,9 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 - `/jail <player> [cell] [duration]` — jails a player (online, or offline and held on next login) in the named or least-occupied cell; durations like `30m`, `2h`, `1d`, or open-ended until `/unjail`.
 - `/unjail <player>` releases them where they stand: privileges come back, but they walk out on their own.
 - `/jails [cell]` lists cells and inmates with time left; `/deljail <name>` removes an empty cell.
+- Jail Control Tool — right-click for a screen listing every cell, its inmates and time left, with release, open/close doors, go-to-cell and silence-alarm buttons; sneak+right-click a door (vanilla or modded door, trapdoor, fence gate, or CSM's Holding Cell Door) or a Jail Alarm Relay to link it to the chosen cell.
+- Linked doors close on `/jail`, stay locked to non-ops while the cell is occupied, and open when its last inmate is released.
+- Jailbreak alarm — an inmate caught outside their cell powers the cell's linked Jail Alarm Relays for `jail.alarmSeconds` (default 30; wire them to CSM bells, sirens or a panel's storm input, lamps…) and alerts online ops.
 - Inmates can't break, place, open or use blocks, hit or use entities, use items other than food, ender-pearl, chat, or run commands outside `jail.allowedCommands`; anyone who leaves the cell is put back within a second. Ops only; `jail.enabled` turns it all off.
 
 ### NPCs

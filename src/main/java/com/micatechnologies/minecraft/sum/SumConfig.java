@@ -294,6 +294,13 @@ public class SumConfig {
             + "still /unjail. Empty by default.";
     private static final String[] FIELD_DEFAULT_JAIL_ALLOWED_COMMANDS = {};
 
+    private static final String FIELD_KEY_JAIL_ALARM_SECONDS = "alarmSeconds";
+    private static final String FIELD_DESCRIPTION_JAIL_ALARM_SECONDS =
+        "How long a jailbreak alarm keeps the Jail Alarm Relays linked to that cell powered after "
+            + "an inmate is caught outside it. Another escape restarts the count. Operators can "
+            + "silence it sooner from the Jail Control Tool.";
+    private static final int FIELD_DEFAULT_JAIL_ALARM_SECONDS = 30;
+
     private static final String CATEGORY_PICTURE_FRAME = "picture_frame";
 
     private static final String FIELD_KEY_PICTURE_FRAME_ALLOWED_HOSTS = "allowedHosts";
@@ -578,6 +585,7 @@ public class SumConfig {
     private static boolean afkPauseWorldWhenAllAfk;
     private static boolean jailEnabled;
     private static Set<String> jailAllowedCommands = Collections.emptySet();
+    private static int jailAlarmSeconds;
     private static List<String> pictureFrameAllowedHosts = Collections.emptyList();
     private static int pictureFrameMaxSize;
     private static int pictureFrameMaxRenderDistance;
@@ -746,6 +754,9 @@ public class SumConfig {
             }
         }
         jailAllowedCommands = Collections.unmodifiableSet(allowed);
+        jailAlarmSeconds = config.getInt(
+            FIELD_KEY_JAIL_ALARM_SECONDS, CATEGORY_JAIL,
+            FIELD_DEFAULT_JAIL_ALARM_SECONDS, 1, 3600, FIELD_DESCRIPTION_JAIL_ALARM_SECONDS);
 
         List<String> hosts = new ArrayList<>();
         for (String entry : config.getStringList(
@@ -1420,6 +1431,10 @@ public class SumConfig {
     /** Lower-case command names, without a slash, that an inmate may still run. */
     public static Set<String> getJailAllowedCommands() {
         return jailAllowedCommands;
+    }
+
+    public static int getJailAlarmSeconds() {
+        return jailAlarmSeconds;
     }
 
     /** Lower-case host names frames may load from; empty means any. */

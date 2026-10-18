@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "powered=false": { "model": "sum:jail_alarm_relay" },
+    "powered=true":  { "model": "sum:jail_alarm_relay_on" }
+  }
+}
