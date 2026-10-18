@@ -7,6 +7,7 @@ import com.micatechnologies.minecraft.sum.economy.TileEntityBillsDisplay;
 import com.micatechnologies.minecraft.sum.favorites.CreativeTabFavorites;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesClientHandler;
 import com.micatechnologies.minecraft.sum.favorites.FavoritesStore;
+import com.micatechnologies.minecraft.sum.focus.RefocusClickGobbler;
 import com.micatechnologies.minecraft.sum.huds.HudStateTracker;
 import com.micatechnologies.minecraft.sum.music.NowPlayingTracker;
 import com.micatechnologies.minecraft.sum.pocket.PocketKeybinds;
@@ -46,6 +47,7 @@ public class SumClientProxy implements SumProxy {
         CreativeTabFavorites.INSTANCE = new CreativeTabFavorites();
         FavoritesClientHandler.registerKeybinds();
         MinecraftForge.EVENT_BUS.register(new FavoritesClientHandler());
+        MinecraftForge.EVENT_BUS.register(new RefocusClickGobbler());
 
         // OneConfig drives every SUM HUD and the pocket UI, and it's an optional (after:)
         // dependency — so all of the OneConfig-touching registrations are gated on it actually

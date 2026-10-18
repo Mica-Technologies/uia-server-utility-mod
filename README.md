@@ -55,6 +55,7 @@ The UIA SUM (Server Utility Mod) is a server-specific mod developed for and inte
 ### Player UX
 
 - Creative-tab favorites with optional gold-star overlay on favorited slots.
+- Refocus click gobble — the click that brings the game window back into focus is discarded, so it can't break, place or pick a block, or press a pause-menu button. Toggle under Controls on the SUM OneConfig page.
 - `/sum help` paginated command listing.
 - Loyalty rewards — playtime-milestone bonuses (money via `EconomyBridge` or arbitrary console commands with `{player}` substitution). Two tracks: lifetime (`milestones`) fires once per player ever, persisted in NBT; session (`sessionMilestones`) fires once per session and resets on every login.
 - Pocket — three filtered slots (phone / debit card / bills) backed by a server-authoritative capability that survives death/respawn/dimension change. Opens via a keybind (default `P`) into a small GUI that respects shift-click and number-key swap filters. Contents render as a HUD overlay (driven by OneConfig — `cc.polyfrost`) above the hotbar by default; position, scale, background, and border are drag-to-reposition customizable through OneConfig's standard editor (R-SHIFT, or the SUM keybind, or the "Edit HUD…" button on the pocket GUI). The SUM settings page is gated to singleplayer or operator-level players on multiplayer servers.
