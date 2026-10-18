@@ -301,6 +301,14 @@ public class SumOneConfig extends Config {
     @Switch(name = "Favorites Star Overlay", category = "Favorites")
     public boolean favoritesStarOverlay = true;
 
+    /**
+     * Discard the mouse click that brings the Minecraft window back into focus, so clicking
+     * back into the game does not also break, place, use or pick a block (or press a button
+     * on the pause menu). Read by {@link com.micatechnologies.minecraft.sum.focus.RefocusClickGobbler}.
+     */
+    @Switch(name = "Ignore the Click That Refocuses the Window", category = "Controls")
+    public boolean refocusClickGobble = true;
+
     // === Music ===
     // Knobs for MixinMusicTickerMusicType (client mixin on MusicTicker$MusicType). Vanilla
     // waits 10-20 MINUTES between survival music tracks — with the Alto pack's 21-track
