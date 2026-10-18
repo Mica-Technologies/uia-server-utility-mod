@@ -164,6 +164,53 @@ class JailTest {
         assertNotNull(data.findInmateByName("renamed"));
     }
 
+    // --- Linked doors and alarm relays ---
+
+    @Test
+    void linksToggleAndRoundTripThroughNbt() {
+        JailSavedData data = new JailSavedData();
+        JailCell c = cell("A", 0, BlockPos.ORIGIN, new BlockPos(4, 4, 4));
+        data.putCell(c);
+        assertTrue(data.toggleDoor(c, new BlockPos(5, 1, 2)), "first toggle links");
+        assertTrue(data.toggleAlarm(c, new BlockPos(9, 1, 9)));
+        assertTrue(data.toggleDoor(c, new BlockPos(6, 1, 2)));
+        assertFalse(data.toggleDoor(c, new BlockPos(6, 1, 2)), "second toggle unlinks");
+
+        JailCell back = JailCell.readFromNBT(c.writeToNBT());
+        assertNotNull(back);
+        assertEquals(1, back.getDoors().size());
+        assertTrue(back.getDoors().contains(new BlockPos(5, 1, 2)));
+        assertTrue(back.getAlarms().contains(new BlockPos(9, 1, 9)));
+    }
+
+    @Test
+    void redrawingACellKeepsItsLinks() {
+        JailSavedData data = new JailSavedData();
+        JailCell original = cell("A", 0, BlockPos.ORIGIN, new BlockPos(4, 4, 4));
+        data.putCell(original);
+        data.toggleDoor(original, new BlockPos(5, 1, 2));
+        data.toggleAlarm(original, new BlockPos(9, 1, 9));
+
+        JailCell redrawn = cell("a", 0, BlockPos.ORIGIN, new BlockPos(6, 6, 6));
+        data.putCell(redrawn);
+        assertSame(redrawn, data.getCell("A"));
+        assertTrue(redrawn.getDoors().contains(new BlockPos(5, 1, 2)));
+        assertTrue(redrawn.getAlarms().contains(new BlockPos(9, 1, 9)));
+    }
+
+    @Test
+    void aDoorIsFoundByEitherOfItsBlocksInItsOwnDimension() {
+        JailSavedData data = new JailSavedData();
+        JailCell c = cell("A", 0, BlockPos.ORIGIN, new BlockPos(4, 4, 4));
+        data.putCell(c);
+        data.toggleDoor(c, new BlockPos(5, 1, 2));
+        assertSame(c, data.cellForDoor(0, new BlockPos(5, 1, 2)));
+        assertSame(c, data.cellForDoor(0, new BlockPos(5, 2, 2)), "upper half of the door");
+        assertNull(data.cellForDoor(0, new BlockPos(5, 3, 2)), "two above is another block");
+        assertNull(data.cellForDoor(0, new BlockPos(6, 1, 2)));
+        assertNull(data.cellForDoor(-1, new BlockPos(5, 1, 2)), "other dimension");
+    }
+
     // --- Durations ---
 
     @Test

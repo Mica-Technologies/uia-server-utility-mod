@@ -33,6 +33,9 @@ public final class JailService {
         data.putInmate(inmate);
         EntityPlayerMP online = server.getPlayerList().getPlayerByUUID(inmate.getPlayerId());
         JailCell cell = data.getCell(inmate.getCellName());
+        if (cell != null) {
+            setDoors(server, cell, false);
+        }
         if (online != null && cell != null) {
             putInCell(online, cell);
             send(online, TextFormatting.RED, "You have been jailed in " + cell.getName()
@@ -48,9 +51,16 @@ public final class JailService {
      */
     @Nullable
     public static Inmate release(MinecraftServer server, Inmate inmate, String reason) {
-        Inmate removed = data(server).removeInmate(inmate.getPlayerId());
+        JailSavedData data = data(server);
+        Inmate removed = data.removeInmate(inmate.getPlayerId());
         if (removed == null) {
             return null;
+        }
+        // Open the cell once nobody is left in it, so the released can walk out: free of the
+        // cell, but still inside the facility and finding their own way out of it.
+        JailCell cell = data.getCell(inmate.getCellName());
+        if (cell != null && data.countInmates(cell.getName()) == 0) {
+            setDoors(server, cell, true);
         }
         EntityPlayerMP online = server.getPlayerList().getPlayerByUUID(inmate.getPlayerId());
         if (online != null) {
@@ -60,6 +70,20 @@ public final class JailService {
         Sum.LOGGER.info("[jail] released {} from '{}' ({})", inmate.getPlayerName(),
             inmate.getCellName(), reason);
         return removed;
+    }
+
+    /**
+     * Opens or closes every door linked to the cell. Doors in unloaded chunks are skipped.
+     *
+     * @return how many doors were found and set
+     */
+    public static int setDoors(MinecraftServer server, JailCell cell, boolean open) {
+        World world = server.getWorld(cell.getDimensionId());
+        int set = 0;
+        for (net.minecraft.util.math.BlockPos door : cell.getDoors()) {
+            if (JailDoors.setOpen(world, door, open)) set++;
+        }
+        return set;
     }
 
     /** Moves a player to the cell's spawn point, across dimensions if need be. */

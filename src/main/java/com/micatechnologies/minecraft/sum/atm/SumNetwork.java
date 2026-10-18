@@ -82,6 +82,12 @@ public final class SumNetwork {
             PacketOpenPictureFrame.class, 19, Side.CLIENT);
         CHANNEL.registerMessage(PacketPictureFrameUpdate.Handler.class,
             PacketPictureFrameUpdate.class, 20, Side.SERVER);
+        CHANNEL.registerMessage(
+            com.micatechnologies.minecraft.sum.jail.PacketOpenJailControl.Handler.class,
+            com.micatechnologies.minecraft.sum.jail.PacketOpenJailControl.class, 21, Side.CLIENT);
+        CHANNEL.registerMessage(
+            com.micatechnologies.minecraft.sum.jail.PacketJailControlAction.Handler.class,
+            com.micatechnologies.minecraft.sum.jail.PacketJailControlAction.class, 22, Side.SERVER);
         initialized = true;
     }
 }

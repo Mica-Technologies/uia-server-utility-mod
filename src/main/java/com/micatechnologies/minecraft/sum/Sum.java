@@ -228,5 +228,6 @@ public class Sum {
         RoamerExitCache.clear();
         RoamerShelterCache.clear();
         com.micatechnologies.minecraft.sum.roamer.RoamerSearchBudget.clear();
+        com.micatechnologies.minecraft.sum.jail.JailAlarms.clear();
     }
 }

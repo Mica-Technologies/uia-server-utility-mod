@@ -115,6 +115,11 @@ public class JailEventHandler {
             return false;
         }
         if (!cell.containsPlayerAt(player.dimension, player.posX, player.posY, player.posZ)) {
+            if (!quiet) {
+                // An escape, not a login or respawn somewhere else: sound the cell's alarm
+                // before the inmate is put back, so the relays fire where it happened.
+                JailAlarms.raise(server, cell, inmate, player.getPosition());
+            }
             JailService.putInCell(player, cell);
             if (!quiet) {
                 notify(player, "You can't leave your cell.");
@@ -141,7 +146,10 @@ public class JailEventHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (!isInmate(event.getEntityPlayer())) return;
+        if (!isInmate(event.getEntityPlayer())) {
+            denyLockedCellDoor(event);
+            return;
+        }
         // Deny the block always (doors, levers, chests); deny the held item unless it is food,
         // which is what lets an inmate eat while looking at the floor.
         event.setUseBlock(Event.Result.DENY);
@@ -213,6 +221,28 @@ public class JailEventHandler {
         event.setCanceled(true);
         JailService.send(player, TextFormatting.RED, "You can't use /" + command.getName()
             + " while in jail.");
+    }
+
+    /**
+     * A door linked to a cell stays shut to everyone but operators while someone is held in that
+     * cell, so a friend outside cannot simply open it. Operators open it from the Jail Control
+     * Tool or by hand. A redstone signal to the door is not intercepted; keep switches for cell
+     * doors inside the guard area.
+     */
+    private void denyLockedCellDoor(PlayerInteractEvent.RightClickBlock event) {
+        EntityPlayer player = event.getEntityPlayer();
+        if (player.world.isRemote || !SumConfig.isJailEnabled()
+            || player.canUseCommand(2, "sum.jail")) {
+            return;
+        }
+        if (!JailDoors.isDoor(player.world.getBlockState(event.getPos()))) return;
+        JailSavedData data = JailService.data(player.getServer());
+        if (data.getInmates().isEmpty()) return;
+        JailCell cell = data.cellForDoor(player.dimension, event.getPos());
+        if (cell != null && data.countInmates(cell.getName()) > 0) {
+            event.setUseBlock(Event.Result.DENY);
+            notify(player, "This cell door is locked.");
+        }
     }
 
     // --- Helpers ---

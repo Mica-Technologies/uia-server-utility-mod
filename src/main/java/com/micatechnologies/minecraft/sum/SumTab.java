@@ -14,6 +14,8 @@ import com.micatechnologies.minecraft.sum.economy.BlockBillsDisplay;
 import com.micatechnologies.minecraft.sum.economy.ItemAccountAccess;
 import com.micatechnologies.minecraft.sum.economy.ItemSumBill;
 import com.micatechnologies.minecraft.sum.economy.ItemSumPacket;
+import com.micatechnologies.minecraft.sum.jail.BlockJailAlarmRelay;
+import com.micatechnologies.minecraft.sum.jail.ItemJailControlTool;
 import com.micatechnologies.minecraft.sum.jail.ItemJailWand;
 import com.micatechnologies.minecraft.sum.jobs.BlockJobBoard;
 import com.micatechnologies.minecraft.sum.mailbox.BlockMailbox;
@@ -62,6 +64,8 @@ public class SumTab {
     public static BlockJobBoard jobBoard;
     public static ItemPlotWand plotWand;
     public static ItemJailWand jailWand;
+    public static ItemJailControlTool jailControlTool;
+    public static BlockJailAlarmRelay jailAlarmRelay;
     public static BlockAutoDropper autoDropper;
     public static BlockDeskPhone deskPhone;
     public static BlockPictureFrame pictureFrame;
@@ -101,6 +105,8 @@ public class SumTab {
         jobBoard = new BlockJobBoard();
         plotWand = new ItemPlotWand();
         jailWand = new ItemJailWand();
+        jailControlTool = new ItemJailControlTool();
+        jailAlarmRelay = new BlockJailAlarmRelay();
         autoDropper = new BlockAutoDropper();
         deskPhone = new BlockDeskPhone();
         pictureFrame = new BlockPictureFrame();
