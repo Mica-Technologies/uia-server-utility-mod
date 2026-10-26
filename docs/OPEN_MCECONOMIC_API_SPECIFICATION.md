@@ -137,6 +137,9 @@ Therefore the token belongs **only** in the dedicated server's config file.
 > **Operational warning.** Modpack configs are distributed to players. Do **not** put `authToken`,
 > `hmacSecret`, or `certificatePassword` in a config that ships with your pack. The client has no
 > use for them — it never opens a connection — so leaving them blank client-side costs nothing.
+> SUM reads all three from `config/sum-secrets.cfg` or the `SUM_ECONOMY_*` environment variables
+> ahead of `sum.cfg`, so a pack can manage `sum.cfg` on the server too while the secrets stay
+> server-only.
 
 ### 3.3 The four scenarios
 

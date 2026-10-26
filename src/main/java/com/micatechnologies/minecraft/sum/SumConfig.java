@@ -363,8 +363,12 @@ public class SumConfig {
     private static final String FIELD_KEY_ECONOMY_API_AUTH_TOKEN = "authToken";
     private static final String FIELD_DESCRIPTION_ECONOMY_API_AUTH_TOKEN =
         "Bearer token issued by the economy service operator, sent on every request. THIS IS A "
-            + "SECRET: anyone holding it can move money. Protect this config file accordingly and "
-            + "use a per-server token so one Minecraft server can be revoked on its own.";
+            + "SECRET: anyone holding it can move money. Prefer setting it in the secrets file "
+            + "('secretsFile', default sum-secrets.cfg) or the SUM_ECONOMY_AUTH_TOKEN environment "
+            + "variable, and leave this blank - ALWAYS do so when a modpack or launcher manages "
+            + "sum.cfg, since a shipped sum.cfg reaches every player. Either of those overrides "
+            + "this value. Use a per-server token so one Minecraft server can be revoked on its "
+            + "own.";
     private static final String FIELD_DEFAULT_ECONOMY_API_AUTH_TOKEN = "";
 
     private static final String FIELD_KEY_ECONOMY_API_INSTANCE_ID = "instanceId";
@@ -378,7 +382,8 @@ public class SumConfig {
     private static final String FIELD_DESCRIPTION_ECONOMY_API_HMAC_SECRET =
         "Optional shared secret for HMAC-SHA256 request signing, layered on top of the bearer "
             + "token. Leave blank to disable signing. THIS IS A SECRET. Only set it if the "
-            + "economy service verifies signatures.";
+            + "economy service verifies signatures, and prefer the secrets file or the "
+            + "SUM_ECONOMY_HMAC_SECRET environment variable, which override this value.";
     private static final String FIELD_DEFAULT_ECONOMY_API_HMAC_SECRET = "";
 
     private static final String FIELD_KEY_ECONOMY_API_CERT_PATH = "certificatePath";
@@ -394,8 +399,20 @@ public class SumConfig {
     private static final String FIELD_KEY_ECONOMY_API_CERT_PASSWORD = "certificatePassword";
     private static final String FIELD_DESCRIPTION_ECONOMY_API_CERT_PASSWORD =
         "Password for 'certificatePath' when it points at a PKCS#12 or JKS keystore. Not needed "
-            + "for PEM files. THIS IS A SECRET.";
+            + "for PEM files. THIS IS A SECRET: prefer the secrets file or the "
+            + "SUM_ECONOMY_CERT_PASSWORD environment variable, which override this value.";
     private static final String FIELD_DEFAULT_ECONOMY_API_CERT_PASSWORD = "";
+
+    private static final String FIELD_KEY_ECONOMY_API_SECRETS_FILE = "secretsFile";
+    private static final String FIELD_DESCRIPTION_ECONOMY_API_SECRETS_FILE =
+        "File holding authToken, hmacSecret and certificatePassword, so this file can be managed "
+            + "by a modpack or launcher without carrying a secret. Resolved relative to this "
+            + "config file's folder; absolute paths also work. A non-blank value there overrides "
+            + "the same key here, and the SUM_ECONOMY_AUTH_TOKEN, SUM_ECONOMY_HMAC_SECRET and "
+            + "SUM_ECONOMY_CERT_PASSWORD environment variables override both. A commented template "
+            + "is created on first start of a dedicated server with the economy API enabled; it "
+            + "is never created on a client. Keep it out of any modpack.";
+    private static final String FIELD_DEFAULT_ECONOMY_API_SECRETS_FILE = SumSecrets.DEFAULT_FILE_NAME;
 
     private static final String FIELD_KEY_ECONOMY_API_ENABLE_HTTP = "enableHttp";
     private static final String FIELD_DESCRIPTION_ECONOMY_API_ENABLE_HTTP =
@@ -599,6 +616,7 @@ public class SumConfig {
     private static String economyApiHmacSecret;
     private static String economyApiCertificatePath;
     private static String economyApiCertificatePassword;
+    private static String economyApiSecretsFile;
     private static boolean economyApiEnableHttp;
     private static boolean economyApiSendIntegrityHeaders;
     private static int economyApiConnectTimeoutMs;
@@ -802,6 +820,10 @@ public class SumConfig {
         economyApiCertificatePassword = config.getString(
             FIELD_KEY_ECONOMY_API_CERT_PASSWORD, CATEGORY_ECONOMY_API,
             FIELD_DEFAULT_ECONOMY_API_CERT_PASSWORD, FIELD_DESCRIPTION_ECONOMY_API_CERT_PASSWORD);
+        economyApiSecretsFile = config.getString(
+            FIELD_KEY_ECONOMY_API_SECRETS_FILE, CATEGORY_ECONOMY_API,
+            FIELD_DEFAULT_ECONOMY_API_SECRETS_FILE, FIELD_DESCRIPTION_ECONOMY_API_SECRETS_FILE).trim();
+        applyEconomySecrets();
         economyApiEnableHttp = config.getBoolean(
             FIELD_KEY_ECONOMY_API_ENABLE_HTTP, CATEGORY_ECONOMY_API,
             FIELD_DEFAULT_ECONOMY_API_ENABLE_HTTP, FIELD_DESCRIPTION_ECONOMY_API_ENABLE_HTTP);
@@ -1348,9 +1370,62 @@ public class SumConfig {
                 + "Set economy_api.enableHttp=true only for local development.";
         }
         if (economyApiAuthToken.isEmpty()) {
-            return "economy_api.enabled is true but economy_api.authToken is blank.";
+            return "economy_api.enabled is true but no authToken is set. Put it in "
+                + SumSecrets.resolveFile(configDirectory, economyApiSecretsFile).getName()
+                + " (or the " + SumSecrets.ENV_AUTH_TOKEN + " environment variable).";
         }
         return null;
+    }
+
+    /**
+     * Overrides the three economy secrets just read from sum.cfg with any set in the environment
+     * or the secrets file (see {@link SumSecrets}), and logs where each came from, redacted.
+     * The secrets file is created only on a dedicated server with the economy API enabled.
+     */
+    private static void applyEconomySecrets() {
+        File secretsFile = SumSecrets.resolveFile(configDirectory, economyApiSecretsFile);
+        boolean dedicatedServer = net.minecraftforge.fml.common.FMLCommonHandler.instance().getSide()
+            == net.minecraftforge.fml.relauncher.Side.SERVER;
+        Configuration secrets = null;
+        try {
+            secrets = SumSecrets.load(secretsFile, dedicatedServer && economyApiEnabled);
+        } catch (RuntimeException e) {
+            Sum.LOGGER.error("[omce] Could not read {}; using sum.cfg for the economy secrets.",
+                secretsFile.getName(), e);
+        }
+        Map<String, String> env = System.getenv();
+        String fileName = secretsFile.getName();
+
+        SumSecrets.Resolved token = SumSecrets.resolve(env.get(SumSecrets.ENV_AUTH_TOKEN),
+            SumSecrets.ENV_AUTH_TOKEN, SumSecrets.get(secrets, SumSecrets.KEY_AUTH_TOKEN),
+            fileName, economyApiAuthToken);
+        SumSecrets.Resolved hmac = SumSecrets.resolve(env.get(SumSecrets.ENV_HMAC_SECRET),
+            SumSecrets.ENV_HMAC_SECRET, SumSecrets.get(secrets, SumSecrets.KEY_HMAC_SECRET),
+            fileName, economyApiHmacSecret);
+        SumSecrets.Resolved certPassword = SumSecrets.resolve(env.get(SumSecrets.ENV_CERT_PASSWORD),
+            SumSecrets.ENV_CERT_PASSWORD, SumSecrets.get(secrets, SumSecrets.KEY_CERT_PASSWORD),
+            fileName, economyApiCertificatePassword);
+
+        economyApiAuthToken = token.value.trim();
+        economyApiHmacSecret = hmac.value.trim();
+        economyApiCertificatePassword = certPassword.value;
+
+        if (economyApiEnabled) {
+            Sum.LOGGER.info("[omce] Economy secrets: authToken {} (from {}), hmacSecret {} (from {}), "
+                    + "certificatePassword {} (from {}).",
+                redacted(economyApiAuthToken), token.source,
+                redacted(economyApiHmacSecret), hmac.source,
+                redacted(economyApiCertificatePassword), certPassword.source);
+            if ("sum.cfg".equals(token.source)) {
+                Sum.LOGGER.warn("[omce] economy_api.authToken is set in sum.cfg. If a modpack or "
+                    + "launcher manages sum.cfg, move it to {} so it is not shipped to players.",
+                    fileName);
+            }
+        }
+    }
+
+    private static String redacted(String secret) {
+        return secret == null || secret.isEmpty() ? "<unset>" : "<set>";
     }
 
     /** True when the API is enabled and its configuration passes {@link #validateEconomyApiConfig()}. */

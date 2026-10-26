@@ -133,7 +133,10 @@ All config is in `SumConfig.java` using Forge's `Configuration` class. Categorie
 - **`economy_api`** -- Open MCEconomic API client (off by default). Full protocol spec in
   `docs/OPEN_MCECONOMIC_API_SPECIFICATION.md` (`.tex`/`.pdf` are the same content typeset).
   Operator setup -- what to put in this config category and why -- is
-  `docs/OPEN_MCECONOMIC_API_SETUP.tex`/`.pdf`.
+  `docs/OPEN_MCECONOMIC_API_SETUP.tex`/`.pdf`. Its three secrets (`authToken`, `hmacSecret`,
+  `certificatePassword`) resolve env var (`SUM_ECONOMY_*`) > `config/sum-secrets.cfg`
+  (`economy_api.secretsFile`) > `sum.cfg`, via `SumSecrets`, so packs can ship `sum.cfg` to
+  servers. The secrets file is only ever created on a dedicated server with the API enabled.
 - **`economy_integration`** -- which *other mods* may move money through SUM's public economy
   API, and what each may do. **Not the same thing as `economy_api`**, which is about where SUM
   *keeps* money; this is about who may *move* it. Empty by default, which denies every mod.
