@@ -345,7 +345,9 @@ A Minecraft client cannot be trusted with economy credentials:
 \warn{\textbf{Operational warning.} Modpack configs are distributed to players. Do \emph{not} put
 \code{authToken}, \code{hmacSecret}, or \code{certificatePassword} in a config that ships with your
 pack. The client has no use for them --- it never opens a connection --- so leaving them blank
-client-side costs nothing.}
+client-side costs nothing. SUM reads all three from \code{config/sum-secrets.cfg} or the
+\code{SUM\_ECONOMY\_*} environment variables ahead of \code{sum.cfg}, so a pack can manage
+\code{sum.cfg} on the server too while the secrets stay server-only.}
 
 \subsection{The four scenarios}
 

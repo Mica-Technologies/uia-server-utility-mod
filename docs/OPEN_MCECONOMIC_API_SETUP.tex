@@ -141,17 +141,26 @@ service outage cannot stop players trading, and a laggy connection cannot slow d
 % =============================================================================
 \section{The minimum viable configuration}
 
-Everything lives in the \code{economy\_api} category of \code{config/sum.cfg}, generated on first
-launch. Four settings turn it on:
+The settings live in the \code{economy\_api} category of \code{config/sum.cfg}, generated on
+first launch, and the token lives in \code{config/sum-secrets.cfg}, which a dedicated server
+creates on its first start with the economy API enabled. Four settings turn it on:
 
 \begin{lstlisting}
+# config/sum.cfg -- safe to ship in a modpack
 economy_api {
     B:enabled=true
     S:baseUrl=https://economy.example.net
-    S:authToken=<the token your service operator gave you>
     S:instanceId=alto-main
 }
+
+# config/sum-secrets.cfg -- server only, never shipped
+economy_api {
+    S:authToken=<the token your service operator gave you>
+}
 \end{lstlisting}
+
+\code{authToken} can still be set in \code{sum.cfg} itself, as before, but SUM warns about it at
+startup; see Section~\ref{sec:secrets}.
 
 \begin{tabularx}{\linewidth}{L{3.2cm} X}
 \toprule
@@ -222,14 +231,44 @@ unreadable, malformed or expired certificate stops the economy backend from star
 that is deliberate, because the alternative is silently falling back to an unverified connection.
 
 \subsection{Where the token may live}
+\label{sec:secrets}
 
 \warn{\textbf{Never ship \code{authToken} in a modpack.} Config files distributed to players are
 readable by them, and a token in one is a published token. Anyone holding it can move money.}
 
 A Minecraft \emph{client} never contacts the service --- it receives balances from its server over
-SUM's own sync packet --- so leaving \code{authToken}, \code{hmacSecret} and
-\code{certificatePassword} blank in a pack config costs nothing. Fill them in only on the
-dedicated server.
+SUM's own sync packet --- so a pack config needs none of the three secrets (\code{authToken},
+\code{hmacSecret}, \code{certificatePassword}). SUM reads each one from the first of these that
+holds a non-blank value:
+
+\begin{enumerate}
+\item An environment variable, which is convenient for containerised servers:
+      \begin{itemize}
+      \item \code{SUM\_ECONOMY\_AUTH\_TOKEN}
+      \item \code{SUM\_ECONOMY\_HMAC\_SECRET}
+      \item \code{SUM\_ECONOMY\_CERT\_PASSWORD}
+      \end{itemize}
+\item The secrets file, \code{config/sum-secrets.cfg}. It is an ordinary Forge config with an
+      \code{economy\_api} category holding the keys \code{S:authToken}, \code{S:hmacSecret} and
+      \code{S:certificatePassword}. To move it, point \code{economy\_api.secretsFile} in
+      \code{sum.cfg} at another name or an absolute path.
+\item \code{sum.cfg} itself, for servers set up before the secrets file existed.
+\end{enumerate}
+
+This is what lets a launcher or modpack manage \code{sum.cfg} on the server as well: ship
+\code{sum.cfg} with \code{enabled}, \code{baseUrl} and \code{instanceId}, and put the token in
+\code{sum-secrets.cfg} on the server by hand. Pack tooling never touches that file. A dedicated
+server with the economy API enabled writes an empty, commented \code{sum-secrets.cfg} on first
+start (owner-only where the filesystem supports it); a client never creates one.
+
+Each start logs where every secret came from, without its value:
+
+\begin{lstlisting}
+[omce] Economy secrets: authToken <set> (from sum-secrets.cfg), hmacSecret <unset> (from unset),
+       certificatePassword <unset> (from unset).
+\end{lstlisting}
+
+A token still sitting in \code{sum.cfg} adds a warning asking you to move it.
 
 Use a different token per server. If one is compromised you can revoke it without disturbing the
 others.
@@ -414,8 +453,9 @@ paste when asking for help.}
 
 \begin{itemize}[label=$\square$]
 \item \code{baseUrl} is \code{https}, and \code{enableHttp} is \code{false}.
-\item \code{authToken} is set on the \textbf{server only}, and is not in any config shipped to
-      players.
+\item \code{authToken} is set on the \textbf{server only}, in \code{sum-secrets.cfg} or an
+      environment variable, and is not in any config shipped to players. The startup log line
+      \code{Economy secrets: authToken <set> (from ...)} names where it came from.
 \item This server has its own token, not one shared with another server.
 \item \code{instanceId} is distinct from every other server using the same service.
 \item \code{allowIntegratedServer} is \code{false} unless you specifically want local worlds
