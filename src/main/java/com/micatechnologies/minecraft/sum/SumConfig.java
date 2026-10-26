@@ -149,11 +149,12 @@ public class SumConfig {
 
     private static final String FIELD_KEY_PAUSER_ENABLED = "enabled";
     private static final String FIELD_DESCRIPTION_PAUSER_ENABLED =
-        "When true, every WorldServer tick is cancelled while zero players are online — halting time, "
-            + "weather, mob spawning, scheduled block updates, TileEntity ticks (so chunk-loaded farms "
-            + "freeze), and entity ticks. Resumes immediately when the first player logs in. Inspired "
-            + "by Server Pauser (Smileycorp, LGPL-2.1); SUM uses a Mixin on WorldServer.tick(), gated "
-            + "by this flag.";
+        "When true, every world is frozen while zero players are online — halting time, weather, "
+            + "mob spawning, scheduled block updates, TileEntity ticks and entity ticks, including in "
+            + "force-loaded chunks (so chunk-loaded machines and farms freeze). Other mods' own tick "
+            + "handlers still run. Resumes as soon as the first player logs in, and logs 'Pauser: "
+            + "world frozen' / 'resumed' on each change. Dedicated servers only. Inspired by Server "
+            + "Pauser (Smileycorp, LGPL-2.1).";
     private static final boolean FIELD_DEFAULT_PAUSER_ENABLED = true;
 
     private static final String CATEGORY_BEACHES = "beaches";

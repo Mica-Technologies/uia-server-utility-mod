@@ -23,7 +23,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
  * <ul>
  *   <li>{@code SleepVoteHandler} drops AFK players from the sleep head count, so one idle player
  *       can't block the night skip.</li>
- *   <li>The server pauser ({@code MixinWorldServer}) can optionally freeze the world while every
+ *   <li>The server pauser ({@code ServerPauser}) can optionally freeze the world while every
  *       online player is AFK, not just when the server is empty.</li>
  * </ul>
  *
