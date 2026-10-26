@@ -11,6 +11,7 @@
   ],
   "server": [
     "MixinWorldServer",
+    "MixinEntityTracker",
     "MixinNetHandlerPlayServer"
   ]
 }
