@@ -82,6 +82,14 @@ public class SumClientProxy implements SumProxy {
     @Override
     public void init(FMLInitializationEvent event) {
         FavoritesStore.load();
+        // Lets another mod open the phone through the public API (PhoneApps.openPhone) — CSM's
+        // phone items do — without the API package reaching into the GUI.
+        com.micatechnologies.minecraft.sum.api.phone.PhoneApps.setOpener(() -> {
+            EntityPlayer player = Minecraft.getMinecraft().player;
+            if (player != null) {
+                openPhoneGui(player, true);
+            }
+        });
     }
 
     @SubscribeEvent

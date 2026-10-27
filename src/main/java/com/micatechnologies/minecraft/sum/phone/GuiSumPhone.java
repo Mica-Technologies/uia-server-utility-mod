@@ -1,5 +1,8 @@
 package com.micatechnologies.minecraft.sum.phone;
 
+import com.micatechnologies.minecraft.sum.api.phone.PhoneApp;
+import com.micatechnologies.minecraft.sum.api.phone.PhoneApps;
+import com.micatechnologies.minecraft.sum.api.phone.PhoneScreen;
 import com.micatechnologies.minecraft.sum.atm.GuiSumAtm;
 import com.micatechnologies.minecraft.sum.atm.SumNetwork;
 import com.micatechnologies.minecraft.sum.phone.cloud.Contact;
@@ -68,7 +71,9 @@ public class GuiSumPhone extends GuiScreen {
     private static final int BADGE_BG = 0xFFD04050;
 
     // --- App enum ---------------------------------------------------------------------------
-    private enum App { HOME, BANKING, NOTES, CALCULATOR, WEATHER, CONTACTS, MESSAGES, PAY }
+    // EXTERNAL is any app another mod registered through sum.api.phone.PhoneApps; which one is in
+    // externalApp.
+    private enum App { HOME, BANKING, NOTES, CALCULATOR, WEATHER, CONTACTS, MESSAGES, PAY, EXTERNAL }
     private enum NotesMode    { LIST, EDIT }
     private enum ContactsMode { LIST, DETAIL, NEW }
     private enum MessagesMode { THREAD_LIST, THREAD_VIEW, NEW_PICK }
@@ -90,6 +95,11 @@ public class GuiSumPhone extends GuiScreen {
     // Tile IDs use the same space as button IDs but live on TileRegion objects (we render
     // them ourselves rather than using vanilla 3D buttons).
     private static final int TILE_HOME_BUTTON = 1000;
+    private static final int TILE_PAGE_PREV = 1001;
+    private static final int TILE_PAGE_NEXT = 1002;
+
+    /** Home-grid tiles per page: two columns of four rows fill the screen. */
+    private static final int TILES_PER_PAGE = 8;
 
     // --- Construction inputs ----------------------------------------------------------------
     private final EntityPlayer player;
@@ -112,6 +122,13 @@ public class GuiSumPhone extends GuiScreen {
 
     // --- App state --------------------------------------------------------------------------
     private App currentApp = App.HOME;
+
+    /** The open third-party app when {@code currentApp == EXTERNAL}, otherwise null. */
+    private PhoneApp externalApp;
+    /** What {@link #externalApp} draws through. */
+    private final PhoneScreen appScreen = new AppScreen();
+    /** Which page of the home grid is showing, once SUM's and other mods' apps outgrow one. */
+    private int homePage;
 
     private NotesMode notesMode = NotesMode.LIST;
     private int editingNoteIndex = -1;
@@ -168,8 +185,25 @@ public class GuiSumPhone extends GuiScreen {
 
     @Override
     public void onGuiClosed() {
+        closeExternalApp();
         if (activeInstance == this) activeInstance = null;
         super.onGuiClosed();
+    }
+
+    @Override
+    public void updateScreen() {
+        super.updateScreen();
+        if (currentApp == App.EXTERNAL && externalApp != null) {
+            externalApp.tick(appScreen);
+            // An app's back button comes and goes with its own screens, which the phone only hears
+            // about through showsBackButton, so check it each tick rather than only on rebuilds.
+            boolean wanted = externalApp.showsBackButton(appScreen);
+            boolean shown = false;
+            for (GuiButton b : this.buttonList) {
+                if (b.id == BTN_BACK) shown = true;
+            }
+            if (wanted != shown) rebuildButtons();
+        }
     }
 
     @Override
@@ -219,6 +253,18 @@ public class GuiSumPhone extends GuiScreen {
         tiles.add(new TileRegion(TILE_HOME_BUTTON, homeX, homeY, homeSize, homeSize,
             TileKind.HOME_BUTTON, null, null));
 
+        // Page arrows either side of the home button, on the home screen, once there is a second page.
+        if (currentApp == App.HOME && homePageCount() > 1) {
+            if (homePage > 0) {
+                tiles.add(new TileRegion(TILE_PAGE_PREV, homeX - 30, homeY, 18, homeSize,
+                    TileKind.PAGE_ARROW, null, "<"));
+            }
+            if (homePage < homePageCount() - 1) {
+                tiles.add(new TileRegion(TILE_PAGE_NEXT, homeX + homeSize + 12, homeY, 18, homeSize,
+                    TileKind.PAGE_ARROW, null, ">"));
+            }
+        }
+
         // Back button on every sub-screen — small button at the top-left of the screen area.
         if (showBackButton()) {
             this.buttonList.add(new GuiButton(BTN_BACK,
@@ -244,6 +290,7 @@ public class GuiSumPhone extends GuiScreen {
         if (currentApp == App.CONTACTS && contactsMode == ContactsMode.LIST) return false;
         if (currentApp == App.MESSAGES && messagesMode == MessagesMode.THREAD_LIST) return false;
         if (currentApp == App.PAY && payMode == PayMode.PICK) return false;
+        if (currentApp == App.EXTERNAL) return externalApp != null && externalApp.showsBackButton(appScreen);
         return true;
     }
 
@@ -262,23 +309,67 @@ public class GuiSumPhone extends GuiScreen {
         int leftX = guiLeft + (PHONE_W - gridW) / 2;
         int topY = guiTop + CHROME_TOP + 42; // 4px clear of the "My #:" line
 
-        List<App> apps = new ArrayList<>();
-        if (enableBanking) apps.add(App.BANKING);
-        apps.add(App.NOTES);
-        apps.add(App.CALCULATOR);
-        apps.add(App.WEATHER);
-        apps.add(App.MESSAGES);
-        apps.add(App.CONTACTS);
-        if (enableBanking) apps.add(App.PAY);   // needs the wallet, so personal phone only
-
-        for (int idx = 0; idx < apps.size(); idx++) {
-            int col = idx % 2;
-            int row = idx / 2;
+        // SUM's own apps first, then other mods' in registration order (as HomeEntry, so the two
+        // kinds share one grid). More than eight spill onto further pages.
+        List<HomeEntry> entries = homeEntries();
+        homePage = Math.max(0, Math.min(homePage, homePageCount() - 1));
+        int first = homePage * TILES_PER_PAGE;
+        int last = Math.min(entries.size(), first + TILES_PER_PAGE);
+        for (int idx = first; idx < last; idx++) {
+            int slot = idx - first;
+            int col = slot % 2;
+            int row = slot / 2;
             int x = leftX + col * (tileW + colGap);
             int y = topY + row * (tileH + rowGap);
-            App app = apps.get(idx);
-            addAppTile(idx, x, y, tileW, tileH, app, appI18nKey(app));
+            HomeEntry entry = entries.get(idx);
+            if (entry.external != null) {
+                tiles.add(new TileRegion(100 + idx, x, y, tileW, tileH, TileKind.APP_TILE, App.EXTERNAL,
+                    entry.external.id()));
+            } else {
+                addAppTile(idx, x, y, tileW, tileH, entry.builtIn, appI18nKey(entry.builtIn));
+            }
         }
+    }
+
+    /** One home-grid tile: one of SUM's apps, or one another mod registered. */
+    private static final class HomeEntry {
+        final App builtIn;
+        final PhoneApp external;
+
+        HomeEntry(App builtIn, PhoneApp external) {
+            this.builtIn = builtIn;
+            this.external = external;
+        }
+    }
+
+    private List<HomeEntry> homeEntries() {
+        List<HomeEntry> entries = new ArrayList<>();
+        if (enableBanking) entries.add(new HomeEntry(App.BANKING, null));
+        entries.add(new HomeEntry(App.NOTES, null));
+        entries.add(new HomeEntry(App.CALCULATOR, null));
+        entries.add(new HomeEntry(App.WEATHER, null));
+        entries.add(new HomeEntry(App.MESSAGES, null));
+        entries.add(new HomeEntry(App.CONTACTS, null));
+        if (enableBanking) entries.add(new HomeEntry(App.PAY, null));   // needs the wallet, so personal phone only
+        for (PhoneApp app : PhoneApps.registered()) {
+            try {
+                if (app.isAvailable(appScreen)) entries.add(new HomeEntry(null, app));
+            } catch (RuntimeException e) {
+                // Another mod's bug must not take the phone down; that app just isn't listed.
+            }
+        }
+        return entries;
+    }
+
+    private int homePageCount() {
+        return Math.max(1, (homeEntries().size() + TILES_PER_PAGE - 1) / TILES_PER_PAGE);
+    }
+
+    private static PhoneApp findExternal(String id) {
+        for (PhoneApp app : PhoneApps.registered()) {
+            if (app.id().equals(id)) return app;
+        }
+        return null;
     }
 
     private static String appI18nKey(App app) {
@@ -686,6 +777,17 @@ public class GuiSumPhone extends GuiScreen {
             case MESSAGES:   drawMessages(sX1, contentTop, sX2, sY2); break;
             case PAY:        drawPay(sX1, contentTop, sX2, sY2); break;
             case BANKING:    /* hand-off to GuiSumAtm; never visible */ break;
+            case EXTERNAL:
+                if (externalApp != null) {
+                    try {
+                        externalApp.draw(appScreen, mouseX, mouseY, partialTicks);
+                    } catch (RuntimeException e) {
+                        // Another mod's app failed; show it rather than crash the client.
+                        this.fontRenderer.drawString(I18n.format("sum.phone.app.failed"),
+                            sX1 + 4, contentTop + 4, TEXT_ERROR);
+                    }
+                }
+                break;
         }
 
         for (TileRegion r : tiles) drawTile(r, mouseX, mouseY);
@@ -1016,12 +1118,24 @@ public class GuiSumPhone extends GuiScreen {
                 drawRect(r.x + 2, r.y + 2, r.x + r.w - 2, r.y + r.h - 2,
                     hover ? 0xFF50545C : HOME_BTN);
                 break;
+            case PAGE_ARROW: {
+                drawRect(r.x, r.y, r.x + r.w, r.y + r.h, hover ? 0xFF50545C : HOME_BTN);
+                int aw = this.fontRenderer.getStringWidth(r.label);
+                this.fontRenderer.drawString(r.label, r.x + (r.w - aw) / 2, r.y + (r.h - 8) / 2, TEXT_LIGHT);
+                break;
+            }
             case APP_TILE: {
                 boolean disabled = false;
                 int bg = disabled ? APP_TILE_DISABLED : (hover ? APP_TILE_HOVER : APP_TILE_BG);
                 drawRect(r.x, r.y, r.x + r.w, r.y + r.h, bg);
-                drawAppGlyph(r.x, r.y, r.w, r.h, r.app);
-                String label = I18n.format(r.label);
+                PhoneApp ext = r.app == App.EXTERNAL ? findExternal(r.label) : null;
+                if (ext != null) {
+                    drawGlyph(r.x, r.y, r.w, ext.iconColor(), ext.iconGlyph());
+                } else {
+                    drawAppGlyph(r.x, r.y, r.w, r.h, r.app);
+                }
+                String label = ext != null
+                    ? this.fontRenderer.trimStringToWidth(ext.title(), r.w - 2) : I18n.format(r.label);
                 int lw = this.fontRenderer.getStringWidth(label);
                 this.fontRenderer.drawString(label,
                     r.x + (r.w - lw) / 2, r.y + r.h - 10,
@@ -1097,9 +1211,6 @@ public class GuiSumPhone extends GuiScreen {
     private void drawAppGlyph(int x, int y, int w, int h, App app) {
         // Glyph is 20×20 (was 22×22 when tiles were 50 tall); the smaller tile leaves about
         // 12px of vertical space below the glyph for the label drawn by drawTile.
-        int gw = 20, gh = 20;
-        int gx = x + (w - gw) / 2;
-        int gy = y + 4;
         int color;
         String glyph;
         switch (app) {
@@ -1112,9 +1223,18 @@ public class GuiSumPhone extends GuiScreen {
             case PAY:        color = 0xFF6EC07A; glyph = "P"; break;
             default:         color = 0xFF555555; glyph = "?"; break;
         }
+        drawGlyph(x, y, w, color, glyph);
+    }
+
+    /** A home-tile icon: a 20×20 coloured square with a character on it, as every app gets. */
+    private void drawGlyph(int x, int y, int w, int color, String glyph) {
+        int gw = 20, gh = 20;
+        int gx = x + (w - gw) / 2;
+        int gy = y + 4;
         drawRect(gx, gy, gx + gw, gy + gh, color);
-        int lw = this.fontRenderer.getStringWidth(glyph);
-        this.fontRenderer.drawString(glyph, gx + (gw - lw) / 2, gy + (gh - 8) / 2, 0xFF000000);
+        String g = glyph == null ? "?" : glyph;
+        int lw = this.fontRenderer.getStringWidth(g);
+        this.fontRenderer.drawString(g, gx + (gw - lw) / 2, gy + (gh - 8) / 2, 0xFF000000);
     }
 
     private void drawBadge(int rightX, int topY, int count) {
@@ -1140,13 +1260,56 @@ public class GuiSumPhone extends GuiScreen {
                 }
             }
         }
+        // An open app gets the click unless it landed on one of the phone's own buttons (back).
+        if (currentApp == App.EXTERNAL && externalApp != null && !overPhoneButton(mouseX, mouseY)) {
+            try {
+                if (externalApp.mouseClicked(appScreen, mouseX, mouseY, mouseButton)) return;
+            } catch (RuntimeException e) {
+                // Another mod's app failed; the phone carries on.
+            }
+        }
         super.mouseClicked(mouseX, mouseY, mouseButton);
+    }
+
+    private boolean overPhoneButton(int mouseX, int mouseY) {
+        for (GuiButton b : this.buttonList) {
+            if (b.visible && mouseX >= b.x && mouseX < b.x + b.width && mouseY >= b.y && mouseY < b.y + b.height) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void handleMouseInput() throws IOException {
+        super.handleMouseInput();
+        int wheel = org.lwjgl.input.Mouse.getEventDWheel();
+        if (wheel != 0 && currentApp == App.EXTERNAL && externalApp != null) {
+            int mouseX = org.lwjgl.input.Mouse.getEventX() * this.width / this.mc.displayWidth;
+            int mouseY = this.height - org.lwjgl.input.Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
+            try {
+                externalApp.mouseScrolled(appScreen, mouseX, mouseY, Integer.signum(wheel));
+            } catch (RuntimeException e) {
+                // Another mod's app failed; the phone carries on.
+            }
+        }
     }
 
     private void onTileClick(TileRegion r) {
         switch (r.kind) {
             case HOME_BUTTON: onHomeButton(); return;
-            case APP_TILE: if (r.app != null) openApp(r.app); return;
+            case PAGE_ARROW:
+                homePage += r.id == TILE_PAGE_NEXT ? 1 : -1;
+                rebuildButtons();
+                return;
+            case APP_TILE:
+                if (r.app == App.EXTERNAL) {
+                    PhoneApp app = findExternal(r.label);
+                    if (app != null) openExternalApp(app);
+                } else if (r.app != null) {
+                    openApp(r.app);
+                }
+                return;
             case CALC_KEY: if (r.calcKey != null) onCalcKey(r.calcKey); return;
             case NOTE_ROW: {
                 int idx = Integer.parseInt(r.label);
@@ -1178,8 +1341,33 @@ public class GuiSumPhone extends GuiScreen {
         }
     }
 
+    private void openExternalApp(PhoneApp app) {
+        externalApp = app;
+        currentApp = App.EXTERNAL;
+        try {
+            app.onOpen(appScreen);
+        } catch (RuntimeException e) {
+            // Another mod's app failed to open; it still shows, with whatever it managed.
+        }
+        rebuildButtons();
+    }
+
+    /** Tell an open third-party app it is being left, once. */
+    private void closeExternalApp() {
+        PhoneApp app = externalApp;
+        externalApp = null;
+        if (app != null) {
+            try {
+                app.onClose(appScreen);
+            } catch (RuntimeException e) {
+                // Another mod's app failed to close cleanly; the phone carries on.
+            }
+        }
+    }
+
     private void onHomeButton() {
         // Always returns to home — back-arrow handles intermediate sub-screens.
+        closeExternalApp();
         currentApp = App.HOME;
         notesMode = NotesMode.LIST;
         contactsMode = ContactsMode.LIST;
@@ -1207,6 +1395,17 @@ public class GuiSumPhone extends GuiScreen {
             payMode = PayMode.PICK;
             payTarget = null;
             payStatus = "";
+        } else if (currentApp == App.EXTERNAL && externalApp != null) {
+            boolean handled;
+            try {
+                handled = externalApp.onBack(appScreen);
+            } catch (RuntimeException e) {
+                handled = false;
+            }
+            if (!handled) {
+                closeExternalApp();
+                currentApp = App.HOME;
+            }
         } else {
             // For any other sub-state, fall back to home.
             currentApp = App.HOME;
@@ -1252,6 +1451,14 @@ public class GuiSumPhone extends GuiScreen {
 
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        // An open app gets every key but Escape, which still closes the phone.
+        if (currentApp == App.EXTERNAL && externalApp != null && keyCode != Keyboard.KEY_ESCAPE) {
+            try {
+                if (externalApp.keyTyped(appScreen, typedChar, keyCode)) return;
+            } catch (RuntimeException e) {
+                // Another mod's app failed; fall through to the phone's own handling.
+            }
+        }
         // Route to the relevant text field for current screen.
         if (currentApp == App.NOTES && notesMode == NotesMode.EDIT) {
             if (noteEditor.handleKey(typedChar, keyCode)) return;
@@ -1364,8 +1571,81 @@ public class GuiSumPhone extends GuiScreen {
     // ---------------------------------------------------------------------------------------
 
     private enum TileKind {
-        HOME_BUTTON, APP_TILE, CALC_KEY, NOTE_ROW,
+        HOME_BUTTON, PAGE_ARROW, APP_TILE, CALC_KEY, NOTE_ROW,
         CONTACT_ROW, CONTACT_PICK_ROW, PAY_PICK_ROW, THREAD_ROW
+    }
+
+    /**
+     * The phone as an app sees it ({@link PhoneScreen}): the screen area below the status bar and
+     * above the home button, and the phone's own drawing, so third-party apps match SUM's.
+     */
+    private final class AppScreen implements PhoneScreen {
+        @Override
+        public int left() {
+            return guiLeft + SCREEN_PAD_X;
+        }
+
+        @Override
+        public int top() {
+            return guiTop + CHROME_TOP + 14;
+        }
+
+        @Override
+        public int right() {
+            return guiLeft + PHONE_W - SCREEN_PAD_X;
+        }
+
+        @Override
+        public int bottom() {
+            return guiTop + PHONE_H - CHROME_BOTTOM;
+        }
+
+        @Override
+        public EntityPlayer player() {
+            return player;
+        }
+
+        @Override
+        public boolean isDeskPhone() {
+            return !enableBanking;
+        }
+
+        @Override
+        public void fill(int x1, int y1, int x2, int y2, int argb) {
+            drawRect(x1, y1, x2, y2, argb);
+        }
+
+        @Override
+        public void drawText(String text, int x, int y, int argb) {
+            fontRenderer.drawString(text, x, y, argb);
+        }
+
+        @Override
+        public void drawCenteredText(String text, int centreX, int y, int argb) {
+            fontRenderer.drawString(text, centreX - fontRenderer.getStringWidth(text) / 2, y, argb);
+        }
+
+        @Override
+        public int textWidth(String text) {
+            return fontRenderer.getStringWidth(text);
+        }
+
+        @Override
+        public String trimToWidth(String text, int width) {
+            if (fontRenderer.getStringWidth(text) <= width) return text;
+            String ellipsis = "…";
+            return fontRenderer.trimStringToWidth(text, width - fontRenderer.getStringWidth(ellipsis)) + ellipsis;
+        }
+
+        @Override
+        public int lineHeight() {
+            return fontRenderer.FONT_HEIGHT;
+        }
+
+        @Override
+        public void goHome() {
+            onHomeButton();
+        }
     }
 
     private static class TileRegion {
