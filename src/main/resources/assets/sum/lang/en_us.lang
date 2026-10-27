@@ -91,6 +91,7 @@ sum.phone.app.weather=Weather
 sum.phone.app.messages=Messages
 sum.phone.app.contacts=Contacts
 sum.phone.app.pay=Pay
+sum.phone.app.failed=This app ran into a problem.
 sum.phone.notes.title=Notes
 sum.phone.notes.new=+ New
 sum.phone.notes.save=Save
