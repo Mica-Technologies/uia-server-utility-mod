@@ -2,10 +2,7 @@ package com.micatechnologies.minecraft.sum.mixin;
 
 import com.micatechnologies.minecraft.sum.pauser.ServerPauser;
 import net.minecraft.entity.EntityTracker;
-import net.minecraft.world.WorldServer;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -17,11 +14,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(EntityTracker.class)
 public abstract class MixinEntityTracker {
 
-    @Shadow @Final private WorldServer world;
-
     @Inject(at = @At("HEAD"), method = "tick()V", cancellable = true)
     private void sum$pauseTracker(CallbackInfo ci) {
-        if (ServerPauser.isPaused(world.getMinecraftServer())) {
+        if (ServerPauser.isPaused()) {
             ci.cancel();
         }
     }

@@ -6,59 +6,84 @@ import com.micatechnologies.minecraft.sum.afk.AfkTracker;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Decides whether the server pauser should freeze the worlds this tick. One decision covers every
- * world and every frozen phase of a server tick ({@code WorldServer.tick()},
- * {@code WorldServer.updateEntities()} and {@code EntityTracker.tick()}), so a world can never
- * run its entities while its block/time tick is frozen, or the other way round.
+ * Decides whether the server pauser should freeze the server this tick. The decision is made
+ * once, at the start of {@code MinecraftServer.tick()} ({@link #beginTick}), and every pauser
+ * mixin reads that one answer for the rest of the tick, so no phase can run on a different
+ * decision from the others.
  *
- * <p>The answer is cached per server tick: the mixins ask once per world per phase, and the
- * all-AFK check walks the player list. Transitions are logged once each way, so the server log
- * shows the pauser engaging.
+ * <p>Two levels:
+ * <ul>
+ *   <li><b>Deep pause</b> ({@link #isDeepPaused()}): nobody is online. {@code MixinMinecraftServer}
+ *       skips the whole world loop, the {@code ServerTickEvent} / {@code WorldTickEvent} posts and
+ *       autosaves, leaving only networking and scheduled tasks so the next login still gets in.
+ *       This is what stops mods that tick from events rather than from entities or TileEntities
+ *       (Immersive Vehicles' vehicles, IC2's energy net, FAWE's queue, ...).</li>
+ *   <li><b>Soft pause</b> ({@link #isPaused()} without deep): every online player is AFK and
+ *       {@code afk.pauseWorldWhenAllAfk} is on. The worlds freeze ({@code MixinWorldServer},
+ *       {@code MixinEntityTracker}) but tick events keep firing: players are still connected, mods'
+ *       packet queues need their ticks, and {@link AfkTracker}'s own sweep must run to notice a
+ *       player coming back.</li>
+ * </ul>
+ *
+ * <p>Transitions are logged once each way, so the server log shows the pauser engaging.
  *
  * <p>Only called from the server thread.
  */
 public final class ServerPauser {
 
-    private static int cachedTick = Integer.MIN_VALUE;
-    private static boolean cachedPaused = false;
+    private static boolean paused = false;
+    private static boolean deepPaused = false;
     private static boolean loggedPaused = false;
 
     private ServerPauser() {
     }
 
     /**
-     * Returns true when the worlds should be frozen this tick: the pauser is enabled and either
-     * nobody is online, or {@code afk.pauseWorldWhenAllAfk} is on and every online player is AFK.
+     * Makes this tick's decision. Called at the very start of {@code MinecraftServer.tick()},
+     * before the {@code ServerTickEvent} START post, so the whole tick sees one answer.
+     *
+     * @return true when this tick is the first of a deep pause, so the caller can save once
      */
-    public static boolean isPaused(MinecraftServer server) {
+    public static boolean beginTick(MinecraftServer server) {
+        boolean wasDeep = deepPaused;
         if (server == null || server.getPlayerList() == null) {
+            paused = false;
+            deepPaused = false;
             return false;
         }
-        int tick = server.getTickCounter();
-        if (tick == cachedTick) {
-            return cachedPaused;
-        }
-        cachedTick = tick;
 
         int players = server.getPlayerList().getCurrentPlayerCount();
         String reason = null;
+        boolean deep = false;
         if (SumConfig.isPauserEnabled()) {
             if (players <= 0) {
                 reason = "0 players online";
+                deep = true;
             } else if (SumConfig.isAfkPauseWorldWhenAllAfk() && AfkTracker.allOnlinePlayersAfk(server)) {
                 reason = "all " + players + " online player(s) AFK";
             }
         }
-        cachedPaused = reason != null;
+        paused = reason != null;
+        deepPaused = deep;
 
-        if (cachedPaused != loggedPaused) {
-            loggedPaused = cachedPaused;
-            if (cachedPaused) {
-                Sum.LOGGER.info("Pauser: world frozen ({})", reason);
+        if (paused != loggedPaused) {
+            loggedPaused = paused;
+            if (paused) {
+                Sum.LOGGER.info("Pauser: world frozen ({}{})", reason, deep ? ", tick events suspended" : "");
             } else {
                 Sum.LOGGER.info("Pauser: world resumed ({} player(s) online)", players);
             }
         }
-        return cachedPaused;
+        return deepPaused && !wasDeep;
+    }
+
+    /** True when the worlds are frozen this tick, at either level. */
+    public static boolean isPaused() {
+        return paused;
+    }
+
+    /** True when nobody is online and the whole server tick, tick events included, is suspended. */
+    public static boolean isDeepPaused() {
+        return deepPaused;
     }
 }

@@ -10,6 +10,7 @@
     "MixinMusicTickerMusicType"
   ],
   "server": [
+    "MixinMinecraftServer",
     "MixinWorldServer",
     "MixinEntityTracker",
     "MixinNetHandlerPlayServer"
